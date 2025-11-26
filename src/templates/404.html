@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+
+{% block title %}Không tìm thấy{% endblock %}
+
+{% block content %}
+<h2>Không tìm thấy trang</h2>
+<p>Trang bạn yêu cầu không tồn tại hoặc đã bị xoá.</p>
+<p><a href="{{ url_for('index') }}">Quay về trang chủ</a></p>
+{% endblock %}

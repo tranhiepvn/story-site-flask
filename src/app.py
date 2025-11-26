@@ -1,0 +1,769 @@
+"""
+Ứng dụng Flask đơn giản để đăng và đọc truyện.
+
+Mục đích của ứng dụng này là cung cấp một nền tảng nhỏ cho phép bạn
+đăng tải các truyện chữ và hiển thị chúng cho người đọc. Ứng dụng sử
+dụng cơ sở dữ liệu SQLite để lưu trữ thông tin truyện, đồng thời
+tận dụng Flask và Flask‑SQLAlchemy để quản lý dữ liệu và hiển thị
+giao diện web.
+
+Chức năng chính:
+  * Danh sách truyện: hiển thị tiêu đề, tác giả và ngày tạo của
+    từng truyện với đường dẫn chi tiết.
+  * Trang chi tiết: hiển thị toàn bộ nội dung của một truyện.
+  * Form đăng truyện: cho phép bạn (admin) nhập tiêu đề, tác giả
+    và nội dung truyện rồi lưu vào cơ sở dữ liệu.
+
+Để chạy ứng dụng:
+  1. Cài đặt các gói phụ thuộc: Flask và Flask‑SQLAlchemy.
+  2. Khởi động máy chủ với lệnh `flask --app app run --debug`.
+  3. Mở trình duyệt tới http://127.0.0.1:5000 để xem trang.
+"""
+
+import os
+import re
+from datetime import datetime
+
+from flask import Flask, render_template, request, redirect, url_for, session
+from flask_sqlalchemy import SQLAlchemy
+
+# Tạo ứng dụng Flask
+app = Flask(__name__)
+
+# Thiết lập secret key để sử dụng session. Ứng dụng cần khóa bí mật cho
+# cookie session. Bạn có thể đặt biến môi trường SECRET_KEY để thay đổi
+# giá trị này khi triển khai. Nếu không đặt, khóa mặc định sẽ được sử dụng.
+app.secret_key = os.environ.get("SECRET_KEY", "a-very-secret-key")
+
+# Cấu hình đường dẫn tới file cơ sở dữ liệu SQLite
+# Cơ sở dữ liệu được đặt trong thư mục ``data`` nằm cùng cấp với thư mục mã nguồn để tránh bị
+# ghi đè khi cập nhật mã. Nếu thư mục không tồn tại, tự động tạo. Khi triển khai, bạn chỉ
+# cần thay thế mã trong thư mục ``src`` mà không cần xoá thư mục ``data``.
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+db_path = os.path.join(DATA_DIR, "stories.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Khởi tạo đối tượng SQLAlchemy
+db = SQLAlchemy(app)
+
+# Cung cấp đối tượng datetime cho tất cả template Jinja.
+# Điều này cho phép dùng {{ datetime.utcnow().year }} trong layout.html
+# mà không gặp lỗi UndefinedError.
+@app.context_processor
+def inject_datetime():
+    return {"datetime": datetime}
+
+
+class Story(db.Model):
+    """Mô hình dữ liệu cho truyện.
+
+    Lưu thông tin cơ bản của truyện: tiêu đề, tác giả, loại truyện (ngắn/dài),
+    thời điểm tạo, lượt xem và thể loại. Nội dung cụ thể từng phần được lưu
+    riêng trong bảng `Part` để hỗ trợ truyện nhiều chương.
+    """
+
+    __tablename__ = "stories"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    author = db.Column(db.String(100), nullable=True)
+    # loại truyện: 'short' (truyện ngắn) hoặc 'long' (truyện dài)
+    story_type = db.Column(db.String(10), nullable=False, default="short")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # số lượt xem, dùng để hiển thị top truyện
+    views = db.Column(db.Integer, default=0)
+
+    # cờ ẩn truyện: nếu True thì truyện không hiển thị trên trang cho người đọc
+    is_hidden = db.Column(db.Boolean, default=False)
+
+    # cờ đánh dấu truyện đã hoàn thành hay chưa. Nếu True thì truyện đã hoàn thành
+    # và không cần thêm chương mới. Khi truyện hoàn thành, giao diện sẽ hiển thị
+    # nút "Chương cuối" thay cho "Chương sau" trên trang chi tiết và phần cuối
+    # trong danh sách chương sẽ được gắn nhãn "Chương cuối".
+    is_completed = db.Column(db.Boolean, default=False)
+
+    # lưu tổng điểm đánh giá và số lượt đánh giá để tính trung bình
+    rating_sum = db.Column(db.Integer, default=0)
+    rating_count = db.Column(db.Integer, default=0)
+
+    # khóa ngoại tới bảng thể loại (category). Đây là thể loại chính (có thể không
+    # dùng nếu truyện thuộc nhiều thể loại). Khi sử dụng nhiều thể loại, cột này
+    # có thể được đặt là None hoặc bằng ID của thể loại đầu tiên trong danh sách.
+    category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), nullable=True)
+
+    # Quan hệ tới bảng Part để lấy danh sách các phần/chương
+    parts = db.relationship(
+        "Part", backref="story", lazy=True, order_by="Part.part_number"
+    )
+
+    # Quan hệ nhiều‑nhiều với Category thông qua bảng phụ story_categories.
+    categories = db.relationship(
+        "Category",
+        secondary="story_categories",
+        # Sử dụng backref khác tên để tránh xung đột với quan hệ một‑nhiều 'stories' trên Category
+        backref=db.backref("stories_multi", lazy=True),
+        lazy="subquery",
+    )
+
+    def __repr__(self) -> str:
+        return f"<Story {self.id} {self.title}>"
+
+
+class Category(db.Model):
+    """Mô hình thể loại truyện."""
+
+    __tablename__ = "categories"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    stories = db.relationship("Story", backref="category", lazy=True)
+
+    def __repr__(self) -> str:
+        return f"<Category {self.id} {self.name}>"
+
+
+# Bảng phụ để thiết lập quan hệ nhiều‑nhiều giữa Story và Category.
+story_categories = db.Table(
+    "story_categories",
+    db.Column("story_id", db.Integer, db.ForeignKey("stories.id"), primary_key=True),
+    db.Column("category_id", db.Integer, db.ForeignKey("categories.id"), primary_key=True),
+)
+
+
+# Bảng lưu các phần (chương) của truyện dài. Mỗi phần thuộc một truyện.
+class Part(db.Model):
+    __tablename__ = "parts"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    part_number = db.Column(db.Integer, nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Part {self.part_number} of Story {self.story_id}>"
+
+
+# Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
+# đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
+# app context để tránh lỗi "no such table" khi truy cập lần đầu.
+with app.app_context():
+    db.create_all()
+    # nâng cấp cơ sở dữ liệu nếu thiếu các cột mới
+    def upgrade_db():
+        """
+        Kiểm tra và thêm các cột mới vào bảng stories nếu chúng chưa tồn tại.
+
+        Khi cập nhật phiên bản mới, cơ sở dữ liệu cũ sẽ thiếu các cột như
+        `is_hidden`, `rating_sum` và `rating_count`. Hàm này sử dụng PRAGMA
+        để kiểm tra thông tin bảng và thực hiện ALTER TABLE nếu cần.
+        """
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(stories)")).fetchall()
+            columns = [row[1] for row in result]
+            if "is_hidden" not in columns:
+                conn.execute(text("ALTER TABLE stories ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+            if "rating_sum" not in columns:
+                conn.execute(text("ALTER TABLE stories ADD COLUMN rating_sum INTEGER DEFAULT 0"))
+            if "rating_count" not in columns:
+                conn.execute(text("ALTER TABLE stories ADD COLUMN rating_count INTEGER DEFAULT 0"))
+
+            # thêm cột is_completed nếu chưa có để đánh dấu truyện đã hoàn thành
+            if "is_completed" not in columns:
+                conn.execute(text("ALTER TABLE stories ADD COLUMN is_completed BOOLEAN DEFAULT 0"))
+
+    # gọi hàm nâng cấp sau khi tạo bảng
+    upgrade_db()
+
+
+def create_tables() -> None:
+    """Tạo cơ sở dữ liệu và bảng nếu chưa tồn tại.
+
+    Hàm này được gọi lúc khởi động để đảm bảo các bảng tồn tại.
+    """
+    with app.app_context():
+        db.create_all()
+
+
+@app.route("/")
+def index():
+    """Trang chủ hiển thị danh sách truyện nổi bật, truyện ngắn và truyện dài.
+
+    - Truyện nổi bật: tối đa 20 truyện có lượt xem cao nhất.
+    - Truyện ngắn: phân trang 10 truyện mỗi trang, sắp xếp theo ngày đăng mới nhất.
+    - Truyện dài: phân trang 10 truyện mỗi trang, sắp xếp theo ngày đăng mới nhất.
+    Người đọc có thể chuyển trang riêng biệt cho danh sách truyện ngắn và truyện dài bằng
+    cách thay đổi tham số ``short_page`` hoặc ``long_page`` trên URL. Danh sách thể loại
+    được lấy để hiển thị trong thanh bên.
+    """
+    # xác định số trang cho danh sách truyện ngắn và truyện dài
+    short_page = request.args.get("short_page", 1, type=int)
+    long_page = request.args.get("long_page", 1, type=int)
+    per_page = 10
+    # truyện ngắn (không bao gồm truyện ẩn)
+    short_query = (
+        Story.query.filter_by(story_type="short", is_hidden=False)
+        .order_by(Story.created_at.desc())
+    )
+    short_pagination = short_query.paginate(page=short_page, per_page=per_page, error_out=False)
+    short_stories = short_pagination.items
+    # truyện dài (không bao gồm truyện ẩn)
+    long_query = (
+        Story.query.filter_by(story_type="long", is_hidden=False)
+        .order_by(Story.created_at.desc())
+    )
+    long_pagination = long_query.paginate(page=long_page, per_page=per_page, error_out=False)
+    long_stories = long_pagination.items
+    # truyện nhiều người đọc nhất: giới hạn 20 theo lượt xem, không bao gồm truyện ẩn
+    trending = (
+        Story.query.filter_by(is_hidden=False).order_by(Story.views.desc()).limit(20).all()
+    )
+
+    # truyện hay nhất: sắp xếp theo trung bình đánh giá (rating_sum / rating_count)
+    # chỉ lấy những truyện đã có ít nhất 1 lượt đánh giá
+    best = (
+        Story.query.filter(Story.rating_count > 0, Story.is_hidden == False)
+        .order_by((Story.rating_sum / Story.rating_count).desc())
+        .limit(10)
+        .all()
+    )
+    # danh sách thể loại để hiển thị trong thanh bên
+    categories = Category.query.order_by(Category.name).all()
+    return render_template(
+        "index.html",
+        best=best,
+        trending=trending,
+        short_stories=short_stories,
+        long_stories=long_stories,
+        short_pagination=short_pagination,
+        long_pagination=long_pagination,
+        categories=categories,
+    )
+
+
+@app.route("/story/<int:story_id>")
+def story_detail(story_id: int):
+    """Trang chi tiết hiển thị nội dung truyện.
+
+    - Tăng lượt xem mỗi lần truy cập.
+    - Hỗ trợ hiển thị theo từng phần (chương). Nếu truyện có nhiều hơn một phần,
+      người đọc có thể chuyển tới phần trước/tiếp theo hoặc chọn phần cụ thể.
+    """
+    story = Story.query.get_or_404(story_id)
+    # tăng lượt xem
+    story.views = (story.views or 0) + 1
+    db.session.commit()
+    # Lấy danh sách tất cả các phần của truyện (sắp xếp theo số thứ tự)
+    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+    total_parts = len(parts)
+    # Xác định phần đang chọn từ query string (part=)
+    part_param = request.args.get("part", default=None, type=int)
+    # Nếu có tham số part và hợp lệ thì dùng, ngược lại mặc định phần 1
+    if part_param is not None and 1 <= part_param <= total_parts:
+        current_index = part_param
+    else:
+        current_index = 1
+    # Phần hiện tại cần hiển thị
+    current_part = None
+    if parts:
+        for p in parts:
+            if p.part_number == current_index:
+                current_part = p
+                break
+    return render_template(
+        "story.html",
+        story=story,
+        current_part=current_part,
+        current_index=current_index,
+        total_parts=total_parts,
+        parts=parts,
+    )
+
+
+@app.route("/upload", methods=["GET", "POST"])
+def upload():
+    """Trang quản lý truyện.
+
+    Cho phép:
+    * Tạo truyện mới (với phần/chương đầu tiên).
+    * Chỉnh sửa truyện đã có: cập nhật tiêu đề, tác giả, thể loại, loại truyện;
+      thêm phần mới; xoá phần cuối.
+    Yêu cầu nhập mật khẩu trong mỗi thao tác POST để bảo vệ quyền upload.
+    """
+    # Nếu người dùng chưa xác thực để vào trang upload, chuyển hướng tới trang đăng nhập
+    # Tạo một trang đăng nhập riêng để yêu cầu mật khẩu trước khi truy cập trang upload.
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+
+    # Mật khẩu upload; bạn có thể thay đổi hằng số này theo nhu cầu
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+
+    # Danh sách thể loại luôn cần cho các form
+    categories = Category.query.order_by(Category.name).all()
+    # Xử lý tham số tìm kiếm và phân trang cho danh sách truyện
+    # (áp dụng khi hiển thị danh sách truyện để chỉnh sửa ở chế độ GET)
+    page = request.args.get("page", 1, type=int)
+    search_query = request.args.get("q", "").strip()
+    search_type = request.args.get("stype", "title")
+
+    stories_query = Story.query.order_by(Story.created_at.desc())
+    # Bộ sưu tập snippet highlight khi tìm theo nội dung
+    highlight_snippets: dict[int, str] = {}
+
+    if search_query:
+        pattern = f"%{search_query}%"
+        if search_type == "content":
+            # tìm theo nội dung chương: join tới bảng Part
+            stories_query = (
+                Story.query.join(Part)
+                .filter(Part.content.ilike(pattern))
+                .distinct()
+                .order_by(Story.created_at.desc())
+            )
+        else:
+            # mặc định: tìm theo tiêu đề hoặc tác giả
+            stories_query = stories_query.filter(
+                (Story.title.ilike(pattern)) | (Story.author.ilike(pattern))
+            )
+    # Phân trang 25 truyện một trang
+    stories_pagination = stories_query.paginate(page=page, per_page=25, error_out=False)
+    stories = stories_pagination.items
+
+    # Nếu tìm theo nội dung, tạo đoạn trích có highlight cho từng truyện trong trang
+    if search_query and search_type == "content":
+        # Tách từ khoá để highlight riêng từng từ (có thể nhiều từ)
+        keywords = [kw.lower() for kw in search_query.split() if kw.strip()]
+        for st in stories:
+            # tìm chương đầu tiên chứa từ khoá
+            part_match = (
+                Part.query.filter(
+                    Part.story_id == st.id,
+                    Part.content.ilike(pattern),
+                )
+                .order_by(Part.part_number)
+                .first()
+            )
+            if part_match:
+                content_lower = part_match.content.lower()
+                idx = content_lower.find(search_query.lower())
+                if idx < 0:
+                    # nếu không tìm thấy nguyên chuỗi, thử tìm theo từ đầu tiên
+                    idx = content_lower.find(keywords[0]) if keywords else 0
+                start = max(0, idx - 50)
+                end = min(len(part_match.content), idx + len(search_query) + 50)
+                snippet = part_match.content[start:end]
+                # highlight tất cả từ khoá
+                def repl(m: re.Match) -> str:
+                    return f'<span class="highlight">{m.group(0)}</span>'
+                for kw in keywords:
+                    snippet = re.sub(
+                        rf"({re.escape(kw)})",
+                        repl,
+                        snippet,
+                        flags=re.IGNORECASE,
+                    )
+                highlight_snippets[st.id] = snippet
+
+    # Xử lý gửi form (POST)
+    if request.method == "POST":
+        # kiểm tra mật khẩu
+        password = request.form.get("password", "")
+        if password != UPLOAD_PASSWORD:
+            # giữ nguyên giao diện, thông báo lỗi
+            story_id = request.form.get("existing_story_id")
+            if story_id:
+                # nếu đang chỉnh sửa, tải lại trang edit
+                story = Story.query.get(int(story_id))
+                parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+                return render_template(
+                    "upload_edit.html",
+                    error="Mật khẩu sai.",
+                    story=story,
+                    parts=parts,
+                    categories=categories,
+                )
+            else:
+                return render_template(
+                    "upload_new.html",
+                    error="Mật khẩu sai.",
+                    categories=categories,
+                    stories=stories,
+                    pagination=stories_pagination,
+                    q=search_query,
+                    stype=search_type,
+                    highlight_snippets=highlight_snippets,
+                )
+
+        # Nếu có existing_story_id thì là thao tác trên truyện đã có
+        existing_story_id = request.form.get("existing_story_id")
+        action = request.form.get("action")
+        if existing_story_id:
+            story = Story.query.get_or_404(int(existing_story_id))
+            if action == "update_story":
+                # cập nhật thông tin truyện
+                story.title = request.form.get("title", "").strip()
+                story.author = request.form.get("author", "").strip()
+                story_type = request.form.get("story_type", "short")
+                story.story_type = story_type
+                # đánh dấu truyện hoàn thành hay chưa
+                story.is_completed = True if request.form.get("is_completed") else False
+                # danh sách thể loại được chọn (có thể nhiều)
+                cat_ids = request.form.getlist("category_ids")
+                # chuyển thành list int
+                cat_ids_int = [int(cid) for cid in cat_ids if cid]
+                # gán quan hệ nhiều‑nhiều
+                selected_categories = (
+                    Category.query.filter(Category.id.in_(cat_ids_int)).all()
+                    if cat_ids_int
+                    else []
+                )
+                story.categories = selected_categories
+                # đặt category_id bằng thể loại đầu tiên (nếu có) để đảm bảo tương thích
+                story.category_id = cat_ids_int[0] if cat_ids_int else None
+                db.session.commit()
+                return redirect(url_for("upload", story_id=story.id))
+            elif action == "add_part":
+                # thêm phần mới cho truyện
+                content = request.form.get("content", "").strip()
+                if not content:
+                    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+                    return render_template(
+                        "upload_edit.html",
+                        error="Nội dung phần mới không được trống.",
+                        story=story,
+                        parts=parts,
+                        categories=categories,
+                    )
+                # xác định số thứ tự phần mới
+                last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
+                next_number = last_part.part_number + 1 if last_part else 1
+                new_part = Part(story_id=story.id, part_number=next_number, content=content)
+                db.session.add(new_part)
+                db.session.commit()
+                return redirect(url_for("upload", story_id=story.id))
+            elif action == "delete_last":
+                # xoá phần cuối cùng nếu có
+                last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
+                if last_part:
+                    db.session.delete(last_part)
+                    db.session.commit()
+                return redirect(url_for("upload", story_id=story.id))
+            elif action == "toggle_hidden":
+                # ẩn hoặc hiện lại truyện
+                story.is_hidden = not (story.is_hidden or False)
+                db.session.commit()
+                return redirect(url_for("upload", story_id=story.id))
+            elif action == "delete_story":
+                # xoá hoàn toàn một truyện và các phần liên quan
+                # gỡ mối quan hệ với thể loại
+                story.categories = []
+                # xoá tất cả các chương của truyện
+                Part.query.filter_by(story_id=story.id).delete()
+                # xoá truyện
+                db.session.delete(story)
+                db.session.commit()
+                return redirect(url_for("upload"))
+            # không nhận ra action, trở lại trang edit
+            return redirect(url_for("upload", story_id=story.id))
+        else:
+            # tạo truyện mới
+            title = request.form.get("title", "").strip()
+            author = request.form.get("author", "").strip()
+            story_type = request.form.get("story_type", "short")
+            # trạng thái hoàn thành
+            is_completed = True if request.form.get("is_completed") else False
+            # nhận danh sách thể loại (có thể nhiều) từ form
+            cat_ids = request.form.getlist("category_ids")
+            content = request.form.get("content", "").strip()
+            if not title or not content:
+                return render_template(
+                    "upload_new.html",
+                    error="Vui lòng nhập đầy đủ tiêu đề và nội dung.",
+                    categories=categories,
+                    stories=stories,
+                    pagination=stories_pagination,
+                    q=search_query,
+                    stype=search_type,
+                    highlight_snippets=highlight_snippets,
+                )
+            # tạo truyện mới
+            story = Story(
+                title=title,
+                author=author,
+                story_type=story_type,
+                is_completed=is_completed,
+            )
+            # thiết lập thể loại many‑to‑many và category_id chính
+            cat_ids_int = [int(cid) for cid in cat_ids if cid]
+            if cat_ids_int:
+                selected_categories = Category.query.filter(Category.id.in_(cat_ids_int)).all()
+                story.categories = selected_categories
+                story.category_id = cat_ids_int[0]
+            else:
+                story.category_id = None
+            db.session.add(story)
+            db.session.commit()
+            # tạo phần đầu tiên
+            first_part = Part(story_id=story.id, part_number=1, content=content)
+            db.session.add(first_part)
+            db.session.commit()
+            return redirect(url_for("upload", story_id=story.id))
+
+    # Xử lý GET: hiển thị trang mới hoặc trang chỉnh sửa
+    story_id = request.args.get("story_id")
+    if story_id:
+        story = Story.query.get_or_404(int(story_id))
+        parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+        return render_template(
+            "upload_edit.html",
+            story=story,
+            parts=parts,
+            categories=categories,
+        )
+    # Mặc định: hiển thị form tạo truyện mới cùng danh sách truyện để chọn
+    return render_template(
+        "upload_new.html",
+        categories=categories,
+        stories=stories,
+        pagination=stories_pagination,
+        q=search_query,
+        stype=search_type,
+        highlight_snippets=highlight_snippets,
+    )
+
+
+# Hiển thị trang đăng nhập trước khi vào trang upload.
+# Người dùng cần nhập mật khẩu hợp lệ để tiếp tục.
+@app.route("/upload_login", methods=["GET", "POST"])
+def upload_login():
+    """Trang nhập mật khẩu trước khi vào trang quản trị đăng truyện.
+
+    Trang này hiển thị một form đơn giản yêu cầu mật khẩu. Nếu mật khẩu
+    hợp lệ, thiết lập session và chuyển hướng tới trang upload. Nếu sai,
+    hiển thị thông báo lỗi. Danh sách thể loại được truyền vào để hiện
+    trong sidebar, giống như các trang khác.
+    """
+    categories = Category.query.order_by(Category.name).all()
+    # Mật khẩu upload từ biến môi trường hoặc giá trị mặc định
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == UPLOAD_PASSWORD:
+            # Ghi nhớ rằng người dùng đã đăng nhập để tránh phải nhập lại trong phiên
+            session["upload_authenticated"] = True
+            return redirect(url_for("upload"))
+        else:
+            return render_template(
+                "upload_login.html",
+                error="Mật khẩu sai.",
+                categories=categories,
+            )
+    # GET: hiển thị form nhập mật khẩu
+    return render_template(
+        "upload_login.html",
+        categories=categories,
+    )
+
+
+@app.route("/category/<int:category_id>")
+def category_view(category_id: int):
+    """Hiển thị truyện theo thể loại với phân trang.
+
+    Lấy tất cả truyện thuộc thể loại có id ``category_id`` (kể cả truyện thuộc
+    nhiều thể loại), sắp xếp theo ngày đăng mới nhất và phân trang 10 truyện mỗi trang.
+    Tham số ``page`` trên URL dùng để chuyển trang. Trả về template list.html để
+    hiển thị danh sách.
+    """
+    category = Category.query.get_or_404(category_id)
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+    query = (
+        Story.query.join(story_categories)
+        .filter(
+            story_categories.c.category_id == category.id,
+            Story.is_hidden == False,
+        )
+        .order_by(Story.created_at.desc())
+    )
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    stories = pagination.items
+    categories = Category.query.order_by(Category.name).all()
+    prev_url = url_for("category_view", category_id=category.id, page=pagination.prev_num) if pagination.has_prev else None
+    next_url = url_for("category_view", category_id=category.id, page=pagination.next_num) if pagination.has_next else None
+    return render_template(
+        "list.html",
+        title=f"Thể loại: {category.name}",
+        filter_type="category",
+        filter_name=category.name,
+        stories=stories,
+        pagination=pagination,
+        prev_url=prev_url,
+        next_url=next_url,
+        categories=categories,
+    )
+
+
+@app.route("/author/<author>")
+def author_view(author: str):
+    """Hiển thị danh sách truyện của một tác giả."""
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+    query = (
+        Story.query.filter(Story.author == author, Story.is_hidden == False)
+        .order_by(Story.created_at.desc())
+    )
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    stories = pagination.items
+    categories = Category.query.order_by(Category.name).all()
+    # chuẩn bị liên kết chuyển trang cho template
+    prev_url = url_for("author_view", author=author, page=pagination.prev_num) if pagination.has_prev else None
+    next_url = url_for("author_view", author=author, page=pagination.next_num) if pagination.has_next else None
+    return render_template(
+        "list.html",
+        title=f"Tác giả: {author}",
+        filter_type="author",
+        filter_name=author,
+        stories=stories,
+        pagination=pagination,
+        prev_url=prev_url,
+        next_url=next_url,
+        categories=categories,
+    )
+
+
+@app.route("/type/<story_type>")
+def type_view(story_type: str):
+    """Hiển thị danh sách truyện theo loại ngắn/dài."""
+    if story_type not in ("short", "long"):
+        return page_not_found(404)
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+    query = (
+        Story.query.filter_by(story_type=story_type, is_hidden=False)
+        .order_by(Story.created_at.desc())
+    )
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    stories = pagination.items
+    categories = Category.query.order_by(Category.name).all()
+    # xác định tiêu đề tiếng Việt
+    title_vi = "Truyện Ngắn" if story_type == "short" else "Truyện Dài"
+    prev_url = url_for("type_view", story_type=story_type, page=pagination.prev_num) if pagination.has_prev else None
+    next_url = url_for("type_view", story_type=story_type, page=pagination.next_num) if pagination.has_next else None
+    return render_template(
+        "list.html",
+        title=title_vi,
+        filter_type="type",
+        filter_name=story_type,
+        stories=stories,
+        pagination=pagination,
+        prev_url=prev_url,
+        next_url=next_url,
+        categories=categories,
+    )
+
+
+@app.route("/search")
+def search():
+    """Tìm kiếm truyện theo tiêu đề hoặc nội dung.
+
+    Nhận tham số q trên URL, trả về danh sách truyện phù hợp.
+    """
+    query = request.args.get("q", "").strip()
+    stories = []
+    if query:
+        # tìm theo tiêu đề, tác giả hoặc nội dung phần truyện và loại bỏ truyện ẩn.
+        like_pattern = f"%{query}%"
+        stories = (
+            Story.query.outerjoin(Part)
+            .filter(
+                (Story.title.ilike(like_pattern))
+                | (Story.author.ilike(like_pattern))
+                | (Part.content.ilike(like_pattern))
+            )
+            .filter(Story.is_hidden == False)
+            .distinct()
+            .order_by(Story.created_at.desc())
+            .all()
+        )
+    categories = Category.query.order_by(Category.name).all()
+    return render_template(
+        "search.html",
+        query=query,
+        stories=stories,
+        categories=categories,
+    )
+
+
+# Đánh giá truyện: nhận giá trị rating 1-5 qua POST và cập nhật tổng/số lượng
+@app.route("/rate/<int:story_id>", methods=["POST"])
+def rate_story(story_id: int):
+    """Xử lý đánh giá truyện. Người đọc gửi rating từ 1 tới 5."""
+    story = Story.query.get_or_404(story_id)
+    try:
+        rating_value = int(request.form.get("rating", 0))
+    except ValueError:
+        rating_value = 0
+    # chỉ chấp nhận giá trị từ 1 đến 5
+    if 1 <= rating_value <= 5:
+        story.rating_sum = (story.rating_sum or 0) + rating_value
+        story.rating_count = (story.rating_count or 0) + 1
+        db.session.commit()
+    return redirect(url_for("story_detail", story_id=story_id))
+
+
+@app.route("/add-category", methods=["GET", "POST"])
+def add_category():
+    """Trang để tạo mới thể loại truyện.
+
+    Cho phép nhập tên thể loại và lưu vào cơ sở dữ liệu.
+    """
+    categories = Category.query.order_by(Category.name).all()
+    if request.method == "POST":
+        # yêu cầu mật khẩu như upload truyện
+        UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+        password = request.form.get("password", "")
+        name = request.form.get("name", "").strip()
+        if password != UPLOAD_PASSWORD:
+            return render_template(
+                "add_category.html",
+                error="Mật khẩu sai.",
+                categories=categories,
+            )
+        if name:
+            # kiểm tra xem đã tồn tại
+            existing = Category.query.filter_by(name=name).first()
+            if existing is None:
+                cat = Category(name=name)
+                db.session.add(cat)
+                db.session.commit()
+                return redirect(url_for("index"))
+            else:
+                return render_template(
+                    "add_category.html",
+                    error="Thể loại đã tồn tại",
+                    categories=categories,
+                )
+        return render_template(
+            "add_category.html",
+            error="Vui lòng nhập tên thể loại",
+            categories=categories,
+        )
+    return render_template(
+        "add_category.html",
+        categories=categories,
+    )
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """Trang lỗi 404 tuỳ chỉnh."""
+    return render_template("404.html"), 404
+
+
+if __name__ == "__main__":
+    # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
+    create_tables()
+    # Chạy ứng dụng khi chạy trực tiếp file này
+    app.run(debug=True)

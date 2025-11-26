@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}Đăng truyện mới{% endblock %}
+
+{% block content %}
+<h2>Đăng truyện mới</h2>
+<form method="post">
+  <div class="form-group">
+    <label for="title">Tiêu đề:</label><br>
+    <input type="text" id="title" name="title" required>
+  </div>
+  <div class="form-group">
+    <label for="author">Tác giả (tuỳ chọn):</label><br>
+    <input type="text" id="author" name="author">
+  </div>
+  {% if categories %}
+  <div class="form-group">
+    <label for="category_id">Thể loại:</label><br>
+    <select id="category_id" name="category_id">
+      <option value="" selected>-- Chọn thể loại --</option>
+      {% for cat in categories %}
+        <option value="{{ cat.id }}">{{ cat.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="form-group">
+    <label for="content">Nội dung:</label><br>
+    <textarea id="content" name="content" rows="15" cols="80" required></textarea>
+  </div>
+  <div class="form-group">
+    <button type="submit">Đăng truyện</button>
+  </div>
+</form>
+{% endblock %}

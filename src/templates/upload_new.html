@@ -1,0 +1,104 @@
+{% extends "layout.html" %}
+
+{% block title %}Đăng truyện mới{% endblock %}
+
+{% block content %}
+<h2>Đăng truyện mới</h2>
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+<form method="post">
+  <input type="hidden" name="existing_story_id" value="">
+  <div class="form-group">
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password" required>
+  </div>
+  <div class="form-group">
+    <label for="title">Tên truyện:</label><br>
+    <input type="text" id="title" name="title" required>
+  </div>
+  <div class="form-group">
+    <label for="author">Tác giả (tuỳ chọn):</label><br>
+    <input type="text" id="author" name="author">
+  </div>
+  <div class="form-group">
+    <label for="story_type">Loại truyện:</label><br>
+    <select id="story_type" name="story_type" required>
+      <option value="short">Truyện Ngắn</option>
+      <option value="long">Truyện Dài</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>
+      <input type="checkbox" id="is_completed" name="is_completed">
+      Đánh dấu truyện đã hoàn thành
+    </label>
+  </div>
+  <div class="form-group">
+    <label>Thể loại (có thể chọn nhiều):</label><br>
+    {% if categories %}
+      {% for cat in categories %}
+        <label>
+          <input type="checkbox" name="category_ids" value="{{ cat.id }}">
+          {{ cat.name }}
+        </label><br>
+      {% endfor %}
+      <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
+    {% else %}
+      <em>Chưa có thể loại nào.</em> <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
+    {% endif %}
+  </div>
+  <div class="form-group">
+    <label for="content">Nội dung chương đầu tiên:</label><br>
+    <textarea id="content" name="content" rows="15" cols="80" required></textarea>
+  </div>
+  <div class="form-group">
+    <button type="submit" name="action" value="create">Tạo truyện</button>
+  </div>
+</form>
+
+<h3>Hoặc chỉnh sửa truyện đã có</h3>
+<!-- Form tìm kiếm truyện để dễ tìm trong danh sách lớn -->
+<form method="get" class="search-existing-form">
+  <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ q|default('') }}">
+  <select name="stype">
+    <option value="title" {% if stype == 'title' %}selected{% endif %}>Tên truyện</option>
+    <option value="content" {% if stype == 'content' %}selected{% endif %}>Nội dung</option>
+  </select>
+  <button type="submit">Tìm</button>
+</form>
+{% if stories %}
+  <ul class="existing-stories">
+    {% for st in stories %}
+      <li>
+        <a href="{{ url_for('upload', story_id=st.id) }}">{{ st.title }}{% if st.author %} - {{ st.author }}{% endif %}</a>
+        <p class="existing-snippet">
+          {% if stype == 'content' and highlight_snippets and highlight_snippets.get(st.id) %}
+            {{ highlight_snippets.get(st.id)|safe }}
+          {% else %}
+            {# Hiển thị đoạn trích chương đầu tiên, tránh cắt chữ #}
+            {% set first_part = st.parts[0] %}
+            {% set snippet = first_part.content[:200] %}
+            {{ snippet.rsplit(' ', 1)[0] }}{% if first_part.content|length > 200 %}...{% endif %}
+          {% endif %}
+        </p>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if pagination and pagination.pages > 1 %}
+    <div class="pagination">
+      {% if pagination.page > 1 %}
+        <a href="{{ url_for('upload', page=1, q=q) }}">&laquo; Đầu</a>
+        <a href="{{ url_for('upload', page=pagination.prev_num, q=q) }}">&lsaquo; Trước</a>
+      {% endif %}
+      <span>Trang {{ pagination.page }} / {{ pagination.pages }}</span>
+      {% if pagination.page < pagination.pages %}
+        <a href="{{ url_for('upload', page=pagination.next_num, q=q) }}">Sau &rsaquo;</a>
+        <a href="{{ url_for('upload', page=pagination.pages, q=q) }}">Cuối &raquo;</a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% else %}
+  <p>Chưa có truyện nào.</p>
+{% endif %}
+{% endblock %}

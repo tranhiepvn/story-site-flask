@@ -1,0 +1,128 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ story.title }}{% endblock %}
+
+{% block content %}
+<article>
+  <h2>{{ story.title }}</h2>
+  <p class="meta">
+    {# Tác giả: nếu có tên tác giả thì liên kết tới trang tác giả #}
+    Tác giả:
+    {% if story.author %}
+      <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+    {% else %}
+      Ẩn danh
+    {% endif %}
+    |
+    Ngày: {{ story.created_at.strftime('%d/%m/%Y %H:%M') }}
+    |
+    Loại:
+    <a href="{{ url_for('type_view', story_type=story.story_type) }}">
+      {{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}
+    </a>
+    {# Thể loại: hiển thị danh sách các thể loại với liên kết #}
+    {% if story.categories %}
+      |
+      Thể loại:
+      {% for cat in story.categories %}
+        <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    {% endif %}
+  </p>
+
+  {# Hiển thị trạng thái hoàn thành của truyện #}
+  {% if story.is_completed %}
+    <p class="status-message completed-status">
+      Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+    </p>
+  {% else %}
+    <p class="status-message updating-status">
+      Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+    </p>
+  {% endif %}
+
+  {# Hiển thị nội dung từng phần của truyện. #}
+  {% if total_parts > 0 %}
+    {% if total_parts > 1 %}
+      <div class="part-navigation">
+        {% if current_index > 1 %}
+          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Chương trước</a>
+        {% endif %}
+        {% if current_index < total_parts %}
+          {# nếu truyện đã hoàn thành và đang ở phần cuối thì hiển thị "Chương cuối" thay cho "Chương sau" #}
+          {% if story.is_completed and (current_index + 1 == total_parts) %}
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương cuối &rarr;</a>
+          {% else %}
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương sau &rarr;</a>
+          {% endif %}
+        {% elif story.is_completed %}
+          {# nếu đang ở chương cuối của truyện hoàn thành, chỉ hiển thị nhãn #}
+          <span class="no-link">Chương cuối</span>
+        {% endif %}
+      </div>
+      <div class="part-list">
+        <p>Danh sách chương:</p>
+        <ul>
+          {% for p in parts %}
+            <li style="margin-bottom: 0.5em;">
+              {% if story.is_completed and p.part_number == total_parts %}
+                {# chương cuối của truyện hoàn thành #}
+                {% if p.part_number == current_index %}
+                  <strong>Chương cuối</strong>
+                {% else %}
+                  <a href="{{ url_for('story_detail', story_id=story.id, part=p.part_number) }}">Chương cuối</a>
+                {% endif %}
+              {% else %}
+                {% if p.part_number == current_index %}
+                  <strong>Chương {{ p.part_number }}</strong>
+                {% else %}
+                  <a href="{{ url_for('story_detail', story_id=story.id, part=p.part_number) }}">Chương {{ p.part_number }}</a>
+                {% endif %}
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <div class="story-part">
+      {# xử lý nội dung chương: dòng đầu tiên là tiêu đề chương, căn giữa và in đậm #}
+      {% if current_part %}
+        {% set _lines = current_part.content.split('\n', 1) %}
+        {% set chapter_title = _lines[0] %}
+        {% set chapter_body = _lines[1] if _lines|length > 1 else '' %}
+        <p class="chapter-title">{{ chapter_title }}</p>
+        {% if chapter_body %}
+          <p>{{ chapter_body.replace('\n', '<br>') | safe }}</p>
+        {% endif %}
+      {% endif %}
+    </div>
+    {# hiển thị đánh giá hiện tại và form đánh giá #}
+    <div class="rating-section">
+      {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+      <p>Đánh giá hiện tại:
+        <span class="rating">
+          {% for i in range(1, 6) %}
+            {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+          {% endfor %}
+          {% if story.rating_count > 0 %}
+            ({{ '%.1f'|format(avg) }})
+          {% else %}
+            (chưa có)
+          {% endif %}
+        </span>
+      </p>
+      <form method="post" action="{{ url_for('rate_story', story_id=story.id) }}">
+        <div class="rating-form">
+          {% for i in range(1, 6) %}
+            <label><input type="radio" name="rating" value="{{ i }}" required> {{ i }}</label>
+          {% endfor %}
+          <button type="submit">Đánh giá</button>
+        </div>
+      </form>
+    </div>
+  {% else %}
+    <p><em>Chưa có nội dung cho truyện này.</em></p>
+  {% endif %}
+  <p><a href="{{ url_for('index') }}">&larr; Quay lại danh sách</a></p>
+</article>
+{% endblock %}
