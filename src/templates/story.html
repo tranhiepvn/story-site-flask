@@ -20,15 +20,16 @@
     <a href="{{ url_for('type_view', story_type=story.story_type) }}">
       {{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}
     </a>
-    {# Thể loại: hiển thị danh sách các thể loại với liên kết #}
-    {% if story.categories %}
-      |
-      Thể loại:
-      {% for cat in story.categories %}
-        <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
-      {% endfor %}
-    {% endif %}
   </p>
+  {# Thể loại: hiển thị danh sách các thể loại với liên kết trên dòng riêng #}
+  {% if story.categories %}
+  <p class="meta">
+    Thể loại:
+    {% for cat in story.categories %}
+      <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
 
   {# Hiển thị trạng thái hoàn thành của truyện #}
   {% if story.is_completed %}

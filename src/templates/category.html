@@ -18,14 +18,18 @@
             {% endif %}
             | Ngày: {{ story.created_at.strftime('%d/%m/%Y') }}
             | Loại: <a href="{{ url_for('type_view', story_type=story.story_type) }}">{{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}</a>
-            {% if story.categories %}
-              | Thể loại:
-              {% for cat in story.categories %}
-                <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
-              {% endfor %}
-            {% endif %}
+          </p>
+          {% if story.categories %}
+          <p class="meta">
+            Thể loại:
+            {% for cat in story.categories %}
+              <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </p>
+          {% endif %}
+          <p class="meta">
             {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
-            | Đánh giá:
+            Đánh giá:
             <span class="rating">
               {% for i in range(1,6) %}
                 {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
