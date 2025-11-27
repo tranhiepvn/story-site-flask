@@ -1,0 +1,265 @@
+{% extends "layout.html" %}
+
+{#
+  Trang chủ hiển thị ba phần chính:
+  1. Truyện nổi bật: tối đa 20 truyện có lượt xem cao nhất. Mỗi mục hiển thị tiêu đề,
+     tác giả (có liên kết) và trích đoạn của phần đầu tiên.
+  2. Truyện Ngắn: danh sách 10 truyện ngắn mới nhất (truyện_type == 'short') cùng với
+     tác giả, thể loại và đoạn trích. Có liên kết tới trang truyện ngắn khi nhấp vào
+     tiêu đề phần. Hỗ trợ chuyển trang bằng tham số ``short_page``.
+  3. Truyện Dài: danh sách 10 truyện dài mới nhất (story_type == 'long') cùng các
+     thông tin tương tự như mục 2. Có chuyển trang bằng tham số ``long_page``.
+#}
+
+{% block title %}Đọc truyện hay{% endblock %}
+
+{% block content %}
+  <div class="section best">
+  <h2>Truyện hay nhất</h2>
+  {% if best %}
+    <ul class="story-list">
+      {% for story in best %}
+        <li>
+          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+          <p class="meta">
+            {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+            Đánh giá:
+            <span class="rating">
+              {% for i in range(1,6) %}
+                {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+              {% endfor %}
+              {% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}
+            </span>
+            {% if story.author %}
+              | Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+            {% else %}
+              | Tác giả: Ẩn danh
+            {% endif %}
+            {# hiển thị thể loại #}
+            {% if story.categories %}
+              | Thể loại:
+              {% for cat in story.categories %}
+                <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% endif %}
+          </p>
+          {# trạng thái hoàn thành/chưa hoàn thành #}
+          {% set total_parts = story.parts|length %}
+          {% if story.is_completed %}
+            <p class="status-message completed-status">
+              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+            </p>
+          {% else %}
+            <p class="status-message updating-status">
+              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+            </p>
+          {% endif %}
+          {% set first_part = story.parts|first %}
+          {% if first_part %}
+            {# Trích đoạn: cắt ở 200 ký tự và không cắt giữa từ #}
+            {% set snippet = first_part.content[:200] %}
+            {% if first_part.content|length > 200 %}
+              {% set snippet = snippet.rsplit(' ', 1)[0] %}
+            {% endif %}
+            <p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Chưa có truyện được đánh giá.</p>
+  {% endif %}
+  </div>
+
+  <div class="section trending">
+  <h2>Truyện nhiều người đọc nhất</h2>
+  {% if trending %}
+    <ul class="story-list">
+      {% for story in trending %}
+        <li>
+          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+          <p class="meta">
+            Lượt xem: {{ story.views }}
+            {% if story.author %}
+              | Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+            {% else %}
+              | Tác giả: Ẩn danh
+            {% endif %}
+            {% if story.categories %}
+              | Thể loại:
+              {% for cat in story.categories %}
+                <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% endif %}
+            {# hiển thị xếp hạng sao #}
+            {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+            | Đánh giá:
+            <span class="rating">
+              {% for i in range(1,6) %}
+                {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+              {% endfor %}
+              {% if story.rating_count > 0 %}
+                ({{ '%.1f'|format(avg) }})
+              {% else %}
+                (chưa có)
+              {% endif %}
+            </span>
+          </p>
+          {# trạng thái hoàn thành/chưa hoàn thành #}
+          {% set total_parts = story.parts|length %}
+          {% if story.is_completed %}
+            <p class="status-message completed-status">
+              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+            </p>
+          {% else %}
+            <p class="status-message updating-status">
+              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+            </p>
+          {% endif %}
+          {% set first_part = story.parts|first %}
+          {% if first_part %}
+            {# Trích đoạn: cắt ở 200 ký tự và không cắt giữa từ #}
+            {% set snippet = first_part.content[:200] %}
+            {% if first_part.content|length > 200 %}
+              {% set snippet = snippet.rsplit(' ', 1)[0] %}
+            {% endif %}
+            <p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Chưa có truyện nhiều người đọc nhất.</p>
+  {% endif %}
+  </div>
+
+  <div class="section short">
+  <h2><a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a></h2>
+  {% if short_stories %}
+    <ul class="story-list">
+      {% for story in short_stories %}
+        <li>
+          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+          <p class="meta">
+            {% if story.author %}
+              Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+            {% else %}
+              Tác giả: Ẩn danh
+            {% endif %}
+            {# thể loại #}
+            {% if story.categories %}
+              | Thể loại:
+              {% for cat in story.categories %}
+                <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% endif %}
+            {# hiển thị số sao trung bình #}
+            {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+            | Đánh giá:
+            <span class="rating">
+              {% for i in range(1,6) %}
+                {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+              {% endfor %}
+              {% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}
+            </span>
+          </p>
+          {# trạng thái hoàn thành/chưa hoàn thành #}
+          {% set total_parts = story.parts|length %}
+          {% if story.is_completed %}
+            <p class="status-message completed-status">
+              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+            </p>
+          {% else %}
+            <p class="status-message updating-status">
+              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+            </p>
+          {% endif %}
+          {% set first_part = story.parts|first %}
+          {% if first_part %}
+            {# Trích đoạn: cắt ở 200 ký tự và không cắt giữa từ #}
+            {% set snippet = first_part.content[:200] %}
+            {% if first_part.content|length > 200 %}
+              {% set snippet = snippet.rsplit(' ', 1)[0] %}
+            {% endif %}
+            <p class="snippet">{{ snippet.replace('\n',' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="pagination">
+      {% if short_pagination.has_prev %}
+        <a href="{{ url_for('index', short_page=short_pagination.prev_num, long_page=long_pagination.page) }}">&laquo; Trang trước</a>
+      {% endif %}
+      {% if short_pagination.has_next %}
+        <a href="{{ url_for('index', short_page=short_pagination.next_num, long_page=long_pagination.page) }}">Trang tiếp theo &raquo;</a>
+      {% endif %}
+    </div>
+  {% else %}
+    <p>Chưa có truyện ngắn.</p>
+  {% endif %}
+  </div>
+
+  <div class="section long">
+  <h2><a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a></h2>
+  {% if long_stories %}
+    <ul class="story-list">
+      {% for story in long_stories %}
+        <li>
+          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+          <p class="meta">
+            {% if story.author %}
+              Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+            {% else %}
+              Tác giả: Ẩn danh
+            {% endif %}
+            {% if story.categories %}
+              | Thể loại:
+              {% for cat in story.categories %}
+                <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% endif %}
+            {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+            | Đánh giá:
+            <span class="rating">
+              {% for i in range(1,6) %}
+                {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+              {% endfor %}
+              {% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}
+            </span>
+          </p>
+          {# trạng thái hoàn thành/chưa hoàn thành #}
+          {% set total_parts = story.parts|length %}
+          {% if story.is_completed %}
+            <p class="status-message completed-status">
+              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+            </p>
+          {% else %}
+            <p class="status-message updating-status">
+              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+            </p>
+          {% endif %}
+          {% set first_part = story.parts|first %}
+          {% if first_part %}
+            {# Trích đoạn: cắt ở 200 ký tự và không cắt giữa từ #}
+            {% set snippet = first_part.content[:200] %}
+            {% if first_part.content|length > 200 %}
+              {% set snippet = snippet.rsplit(' ', 1)[0] %}
+            {% endif %}
+            <p class="snippet">{{ snippet.replace('\n',' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="pagination">
+      {% if long_pagination.has_prev %}
+        <a href="{{ url_for('index', short_page=short_pagination.page, long_page=long_pagination.prev_num) }}">&laquo; Trang trước</a>
+      {% endif %}
+      {% if long_pagination.has_next %}
+        <a href="{{ url_for('index', short_page=short_pagination.page, long_page=long_pagination.next_num) }}">Trang tiếp theo &raquo;</a>
+      {% endif %}
+    </div>
+  {% else %}
+    <p>Chưa có truyện dài.</p>
+  {% endif %}
+  </div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+
+{% block title %}Đăng nhập{% endblock %}
+
+{% block content %}
+<h2>Nhập password để truy cập trang quản trị</h2>
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+<form method="post">
+  <div class="form-group">
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit">Tiếp tục</button>
+  </div>
+</form>
+{% endblock %}

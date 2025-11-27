@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+
+{% block title %}Quản lý thể loại{% endblock %}
+
+{% block content %}
+<h2>Quản lý thể loại</h2>
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+<form method="post" class="create-form">
+  <div class="form-group">
+    <label>Tên thể loại (tối đa 10):</label><br>
+    {# Cho phép nhập tối đa 10 thể loại cùng lúc, những ô trống sẽ bị bỏ qua #}
+    {% for i in range(10) %}
+      <input type="text" name="names" placeholder="Tên thể loại {{ i + 1 }}"><br>
+    {% endfor %}
+  </div>
+  <div class="form-group">
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password" required>
+  </div>
+  <input type="hidden" name="action" value="create">
+  <div class="form-group">
+    <button type="submit">Thêm</button>
+  </div>
+</form>
+
+{% if categories %}
+  <h3>Danh sách thể loại</h3>
+  <ul class="category-list">
+  {% for cat in categories %}
+    <li>
+      <form method="post" class="category-row">
+        <input type="hidden" name="category_id" value="{{ cat.id }}">
+        <span class="category-name">{{ cat.name }}</span>
+        <input type="text" name="name" value="{{ cat.name }}" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit" name="action" value="update" class="update-btn">Cập nhật</button>
+        <button type="submit" name="action" value="delete" class="danger">Xoá</button>
+      </form>
+    </li>
+  {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}
