@@ -292,6 +292,12 @@ button:hover {
   margin: 0.3em 0 0.5em 0;
 }
 
+/* đảm bảo ô nhập tên và mật khẩu trong form tạo mới thể loại sử dụng toàn bộ chiều rộng */
+.create-form input[type="text"],
+.create-form input[type="password"] {
+  width: 100%;
+}
+
 /* highlight từ khoá trong kết quả tìm kiếm nội dung */
 .highlight {
   color: #d32f2f;
@@ -354,30 +360,47 @@ button:hover {
 }
 
 /* Căn chỉnh hàng thể loại trong trang quản lý thể loại (grid để thẳng cột) */
+/*
+ * Căn chỉnh hàng thể loại trong trang quản lý thể loại
+ * Sử dụng lưới 5 cột: tên hiện tại, tên mới, mật khẩu, nút cập nhật, nút xoá.
+ * Hai cột đầu chia đều phần không gian để đảm bảo chúng đủ dài cho tên thể loại.
+ * Cột mật khẩu ngắn, nút cập nhật và xoá được đặt ở cuối và căn thẳng hàng.
+ */
 .category-row {
   display: grid;
-  grid-template-columns: 2fr 3fr 2fr auto auto;
+  grid-template-columns: 3fr 3fr minmax(80px, 100px) auto auto;
   align-items: center;
-  gap: 0.5em;
+  column-gap: 0.8em;
+  margin-bottom: 0.5em;
 }
+
+/* tên thể loại hiện tại luôn căn lề trái và in đậm */
 .category-row .category-name {
   font-weight: bold;
   text-align: left;
+  overflow-wrap: anywhere;
 }
+
+/* ô nhập tên mới */
 .category-row input[type="text"] {
   width: 100%;
-  padding: 0.2em 0.4em;
+  padding: 0.3em 0.5em;
   border: 1px solid #ccc;
   border-radius: 4px;
 }
+
+/* ô mật khẩu ngắn hơn; giới hạn chiều rộng tối đa */
 .category-row input[type="password"] {
   width: 100%;
-  padding: 0.2em 0.4em;
+  max-width: 100px;
+  padding: 0.3em 0.5em;
   border: 1px solid #ccc;
   border-radius: 4px;
 }
+
+/* kiểu chung cho các nút trong hàng thể loại */
 .category-row button {
-  padding: 0.3em 0.6em;
+  padding: 0.4em 0.8em;
   font-size: 0.85em;
   background-color: #007bff;
   color: #fff;
@@ -393,6 +416,11 @@ button:hover {
 }
 .category-row button.danger:hover {
   background-color: #c9302c;
+}
+
+/* tạo khoảng cách giữa ô mật khẩu và nút cập nhật */
+.category-row .update-btn {
+  margin-left: 0.6em;
 }
 
 /* select trong form tìm kiếm truyện trên trang upload */
