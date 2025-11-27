@@ -786,6 +786,41 @@ def import_data():
     return redirect(url_for("upload"))
 
 
+# ------ Delete all stories utility ------
+@app.route("/delete_all_stories", methods=["POST"])
+def delete_all_stories() -> Response:
+    """Xoá toàn bộ truyện hiện có trong hệ thống.
+
+    Yêu cầu người dùng đã đăng nhập trang quản trị (upload_authenticated). Khi nhận
+    yêu cầu, hàm xác nhận hai mật khẩu gửi kèm giống nhau và khớp với
+    UPLOAD_PASSWORD. Nếu hợp lệ, hàm xoá tất cả các liên kết
+    story_categories, xoá các chương (Part) và xoá các truyện (Story). Thể loại
+    (Category) được giữ nguyên. Sau khi hoàn thành sẽ hiển thị thông báo và
+    chuyển về trang upload.
+    """
+    # Kiểm tra quyền truy cập
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    # Mật khẩu upload để xác thực hành động xoá
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw1 = request.form.get("password1", "")
+    pw2 = request.form.get("password2", "")
+    if not pw1 or not pw2 or pw1 != pw2 or pw1 != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ hoặc hai mật khẩu không khớp.")
+        return redirect(url_for("upload"))
+    # Xoá toàn bộ dữ liệu liên quan tới truyện
+    try:
+        db.session.execute(story_categories.delete())
+        Part.query.delete()
+        Story.query.delete()
+        db.session.commit()
+        flash("Đã xoá toàn bộ truyện thành công!")
+    except Exception:
+        db.session.rollback()
+        flash("Đã xảy ra lỗi khi xoá truyện. Vui lòng thử lại.")
+    return redirect(url_for("upload"))
+
+
 
 @app.route("/category/<int:category_id>")
 def category_view(category_id: int):
