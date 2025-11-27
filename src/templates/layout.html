@@ -14,8 +14,7 @@
         <h1><a href="{{ url_for('index') }}" class="home-link">Trang web truyện</a></h1>
         <nav>
           <a href="{{ url_for('index') }}">Trang chủ</a><span class="separator">|</span>
-          <a href="{{ url_for('upload_login') }}">Đăng truyện</a><span class="separator">|</span>
-          <a href="{{ url_for('add_category') }}">Quản lý thể loại</a>
+          <a href="{{ url_for('upload_login') }}">Đăng truyện</a>
         </nav>
         <form action="{{ url_for('search') }}" method="get" class="search-form">
           {# Nếu đang ở trang tìm kiếm thì tự động focus vào ô tìm kiếm để người dùng tiếp tục gõ mà không cần click lại #}

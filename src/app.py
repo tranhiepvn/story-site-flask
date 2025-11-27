@@ -35,15 +35,29 @@ app = Flask(__name__)
 # giá trị này khi triển khai. Nếu không đặt, khóa mặc định sẽ được sử dụng.
 app.secret_key = os.environ.get("SECRET_KEY", "a-very-secret-key")
 
-# Cấu hình đường dẫn tới file cơ sở dữ liệu SQLite
-# Cơ sở dữ liệu được đặt trong thư mục ``data`` nằm cùng cấp với thư mục mã nguồn để tránh bị
-# ghi đè khi cập nhật mã. Nếu thư mục không tồn tại, tự động tạo. Khi triển khai, bạn chỉ
-# cần thay thế mã trong thư mục ``src`` mà không cần xoá thư mục ``data``.
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, "data"))
-os.makedirs(DATA_DIR, exist_ok=True)
-db_path = os.path.join(DATA_DIR, "stories.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+# Thiết lập chuỗi kết nối cơ sở dữ liệu.  
+# Ứng dụng ưu tiên sử dụng biến môi trường DATABASE_URL để kết nối tới PostgreSQL
+# (hoặc các hệ quản trị cơ sở dữ liệu khác). Nếu biến này không tồn tại, ứng dụng
+# sẽ mặc định sử dụng SQLite trong thư mục ``data`` bên ngoài ``src`` để tiện
+# phát triển và thử nghiệm trên máy local.
+db_url = os.environ.get("DATABASE_URL")
+if db_url:
+    # Khi triển khai trên Render với PostgreSQL, bạn nên đặt DATABASE_URL trong phần
+    # Environment Variables của dịch vụ. Render cung cấp cả Internal Database URL
+    # và External Database URL. Sử dụng Internal URL cho kết nối trong cùng
+    # Render để tối ưu hiệu suất và bảo mật.
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+else:
+    # Cấu hình đường dẫn tới file cơ sở dữ liệu SQLite
+    # Cơ sở dữ liệu được đặt trong thư mục ``data`` nằm cùng cấp với thư mục mã nguồn để tránh bị
+    # ghi đè khi cập nhật mã. Nếu thư mục không tồn tại, tự động tạo. Khi triển khai, bạn chỉ
+    # cần thay thế mã trong thư mục ``src`` mà không cần xoá thư mục ``data``.
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, "data"))
+    os.makedirs(DATA_DIR, exist_ok=True)
+    db_path = os.path.join(DATA_DIR, "stories.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Khởi tạo đối tượng SQLAlchemy
@@ -150,32 +164,33 @@ class Part(db.Model):
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
 with app.app_context():
     db.create_all()
-    # nâng cấp cơ sở dữ liệu nếu thiếu các cột mới
-    def upgrade_db():
-        """
-        Kiểm tra và thêm các cột mới vào bảng stories nếu chúng chưa tồn tại.
+    # Chỉ thực hiện nâng cấp cột nếu đang sử dụng SQLite. Đối với PostgreSQL hoặc
+    # các hệ quản trị khác, cần dùng migration (ví dụ Alembic) để thay đổi lược đồ.
+    if db.engine.dialect.name == "sqlite":
+        def upgrade_db():
+            """
+            Kiểm tra và thêm các cột mới vào bảng stories nếu chúng chưa tồn tại.
 
-        Khi cập nhật phiên bản mới, cơ sở dữ liệu cũ sẽ thiếu các cột như
-        `is_hidden`, `rating_sum` và `rating_count`. Hàm này sử dụng PRAGMA
-        để kiểm tra thông tin bảng và thực hiện ALTER TABLE nếu cần.
-        """
-        from sqlalchemy import text
-        with db.engine.connect() as conn:
-            result = conn.execute(text("PRAGMA table_info(stories)")).fetchall()
-            columns = [row[1] for row in result]
-            if "is_hidden" not in columns:
-                conn.execute(text("ALTER TABLE stories ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
-            if "rating_sum" not in columns:
-                conn.execute(text("ALTER TABLE stories ADD COLUMN rating_sum INTEGER DEFAULT 0"))
-            if "rating_count" not in columns:
-                conn.execute(text("ALTER TABLE stories ADD COLUMN rating_count INTEGER DEFAULT 0"))
+            Khi cập nhật phiên bản mới, cơ sở dữ liệu cũ sẽ thiếu các cột như
+            `is_hidden`, `rating_sum`, `rating_count` và `is_completed`. Hàm này
+            sử dụng PRAGMA để kiểm tra thông tin bảng và thực hiện ALTER TABLE
+            nếu cần. Lưu ý: Chỉ áp dụng cho SQLite.
+            """
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                result = conn.execute(text("PRAGMA table_info(stories)")).fetchall()
+                columns = [row[1] for row in result]
+                if "is_hidden" not in columns:
+                    conn.execute(text("ALTER TABLE stories ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+                if "rating_sum" not in columns:
+                    conn.execute(text("ALTER TABLE stories ADD COLUMN rating_sum INTEGER DEFAULT 0"))
+                if "rating_count" not in columns:
+                    conn.execute(text("ALTER TABLE stories ADD COLUMN rating_count INTEGER DEFAULT 0"))
+                if "is_completed" not in columns:
+                    conn.execute(text("ALTER TABLE stories ADD COLUMN is_completed BOOLEAN DEFAULT 0"))
 
-            # thêm cột is_completed nếu chưa có để đánh dấu truyện đã hoàn thành
-            if "is_completed" not in columns:
-                conn.execute(text("ALTER TABLE stories ADD COLUMN is_completed BOOLEAN DEFAULT 0"))
-
-    # gọi hàm nâng cấp sau khi tạo bảng
-    upgrade_db()
+        # gọi hàm nâng cấp sau khi tạo bảng
+        upgrade_db()
 
 
 def create_tables() -> None:
