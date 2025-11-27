@@ -715,41 +715,82 @@ def rate_story(story_id: int):
 
 @app.route("/add-category", methods=["GET", "POST"])
 def add_category():
-    """Trang để tạo mới thể loại truyện.
-
-    Cho phép nhập tên thể loại và lưu vào cơ sở dữ liệu.
+    """
+    Trang quản lý thể loại.
+    Cho phép tạo mới, cập nhật và xoá thể loại.
+    Tất cả hành động đều yêu cầu mật khẩu upload giống như trang upload truyện.
     """
     categories = Category.query.order_by(Category.name).all()
     if request.method == "POST":
-        # yêu cầu mật khẩu như upload truyện
         UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
         password = request.form.get("password", "")
+        action = request.form.get("action", "create")
+        category_id = request.form.get("category_id")
         name = request.form.get("name", "").strip()
+        # kiểm tra mật khẩu
         if password != UPLOAD_PASSWORD:
             return render_template(
                 "add_category.html",
-                error="Mật khẩu sai.",
+                error="Password sai.",
                 categories=categories,
             )
-        if name:
-            # kiểm tra xem đã tồn tại
-            existing = Category.query.filter_by(name=name).first()
-            if existing is None:
-                cat = Category(name=name)
-                db.session.add(cat)
-                db.session.commit()
-                return redirect(url_for("index"))
+        # xử lý xoá
+        if action == "delete":
+            if category_id:
+                cat = Category.query.get(int(category_id))
+                if cat:
+                    # nếu thể loại đang được dùng, không cho xoá
+                    # nếu thể loại liên kết với truyện qua quan hệ một‑nhiều hoặc nhiều‑nhiều thì không xoá
+                    if cat.stories or getattr(cat, "stories_multi", []):
+                        return render_template(
+                            "add_category.html",
+                            error="Không thể xoá thể loại đang được sử dụng.",
+                            categories=categories,
+                        )
+                    db.session.delete(cat)
+                    db.session.commit()
+                    return redirect(url_for("add_category"))
+        # xử lý cập nhật
+        elif action == "update":
+            if category_id and name:
+                cat = Category.query.get(int(category_id))
+                if cat:
+                    existing = Category.query.filter_by(name=name).first()
+                    if existing and existing.id != cat.id:
+                        return render_template(
+                            "add_category.html",
+                            error="Tên thể loại đã tồn tại.",
+                            categories=categories,
+                        )
+                    cat.name = name
+                    db.session.commit()
+                    return redirect(url_for("add_category"))
+        # xử lý tạo mới
+        else:
+            if name:
+                existing = Category.query.filter_by(name=name).first()
+                if existing is None:
+                    db.session.add(Category(name=name))
+                    db.session.commit()
+                    return redirect(url_for("add_category"))
+                else:
+                    return render_template(
+                        "add_category.html",
+                        error="Thể loại đã tồn tại.",
+                        categories=categories,
+                    )
             else:
                 return render_template(
                     "add_category.html",
-                    error="Thể loại đã tồn tại",
+                    error="Vui lòng nhập tên thể loại.",
                     categories=categories,
                 )
+        # nếu không đáp ứng điều kiện nào, reload danh sách
         return render_template(
             "add_category.html",
-            error="Vui lòng nhập tên thể loại",
             categories=categories,
         )
+    # phương thức GET
     return render_template(
         "add_category.html",
         categories=categories,

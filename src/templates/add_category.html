@@ -1,10 +1,13 @@
 {% extends "layout.html" %}
 
-{% block title %}Thêm thể loại{% endblock %}
+{% block title %}Quản lý thể loại{% endblock %}
 
 {% block content %}
-<h2>Thêm thể loại mới</h2>
-<form method="post">
+<h2>Quản lý thể loại</h2>
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+<form method="post" class="create-form">
   <div class="form-group">
     <label for="password">Password:</label><br>
     <input type="password" id="password" name="password" required>
@@ -13,8 +16,35 @@
     <label for="name">Tên thể loại:</label><br>
     <input type="text" id="name" name="name" required>
   </div>
+  <input type="hidden" name="action" value="create">
   <div class="form-group">
     <button type="submit">Thêm</button>
   </div>
 </form>
+
+{% if categories %}
+  <h3>Danh sách thể loại</h3>
+  <ul class="category-list">
+  {% for cat in categories %}
+    <li>
+      <strong>{{ cat.name }}</strong>
+      <span class="category-actions">
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="update">
+          <input type="hidden" name="category_id" value="{{ cat.id }}">
+          <input type="text" name="name" value="{{ cat.name }}" required>
+          <input type="password" name="password" placeholder="Password" required>
+          <button type="submit">Cập nhật</button>
+        </form>
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="category_id" value="{{ cat.id }}">
+          <input type="password" name="password" placeholder="Password" required>
+          <button type="submit" class="danger">Xoá</button>
+        </form>
+      </span>
+    </li>
+  {% endfor %}
+  </ul>
+{% endif %}
 {% endblock %}

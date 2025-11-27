@@ -298,6 +298,56 @@ button:hover {
   font-weight: bold;
 }
 
+/* danh sách thể loại và form chỉnh sửa trong trang quản lý thể loại */
+.category-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.category-list li {
+  margin-bottom: 0.5em;
+}
+.category-actions {
+  display: inline-block;
+}
+.inline-form {
+  display: inline-block;
+  margin-left: 0.5em;
+}
+.inline-form input[type="text"] {
+  width: auto;
+  padding: 0.2em 0.4em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.inline-form input[type="password"] {
+  width: 80px;
+  padding: 0.2em 0.4em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-left: 0.2em;
+}
+.inline-form button {
+  margin-left: 0.2em;
+  padding: 0.3em 0.6em;
+  font-size: 0.85em;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.inline-form button:hover {
+  background-color: #0056b3;
+}
+.inline-form button.danger {
+  background-color: #d9534f;
+  color: #fff;
+}
+.inline-form button.danger:hover {
+  background-color: #c9302c;
+}
+
 /* select trong form tìm kiếm truyện trên trang upload */
 .search-existing-form select {
   padding: 0.25em 0.5em;
