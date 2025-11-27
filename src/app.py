@@ -942,7 +942,7 @@ def import_data():
 
 # ------ Delete all stories utility ------
 @app.route("/delete_all_stories", methods=["POST"])
-def delete_all_stories() -> Response:
+def delete_all_stories():
     """Xoá toàn bộ truyện hiện có trong hệ thống.
 
     Yêu cầu người dùng đã đăng nhập trang quản trị (upload_authenticated). Khi nhận
