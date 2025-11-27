@@ -5,7 +5,7 @@ body {
   /* Nền xanh dương nhạt cho toàn trang để trông hiện đại hơn */
   background-color: #e6f2ff;
   color: #333;
-  /* tăng kích cỡ chữ toàn trang để dễ đọc hơn */
+  /* tăng kích cỡ chữ toàn trang để dễ đọc hơn; đặt mặc định 1.3em */
   font-size: 1.3em;
 }
 
@@ -201,13 +201,17 @@ button:hover {
 
 /* Phần nội dung truyện trong trang chi tiết */
 .story-part {
+  /* tạo khoảng cách với phần danh sách chương ở phía trên; tăng gấp đôi khoảng cách so với trước */
+  margin-top: 3em;
   margin-bottom: 1.5em;
 }
 
 /* Điều hướng chương và danh sách chương trong trang chi tiết */
 .part-navigation {
   text-align: center;
-  margin: 1em 0;
+  /* đẩy điều hướng xuống một chút để cách xa nội dung phía trên */
+  margin-top: 1.5em;
+  margin-bottom: 1em;
 }
 .part-navigation a {
   margin: 0 1em;
@@ -237,6 +241,8 @@ button:hover {
   text-align: center;
   font-weight: bold;
   margin-bottom: 0.5em;
+  /* đẩy tiêu đề chương xuống khoảng hai dòng để tạo khoảng cách với điều hướng */
+  margin-top: 1em;
 }
 
 /* Hiển thị xếp hạng sao */
