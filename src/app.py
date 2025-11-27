@@ -573,7 +573,7 @@ def upload():
                 return redirect(url_for("upload", story_id=story.id))
             elif action == "add_part":
                 # thêm phần mới cho truyện
-                content = request.form.get("content", "").strip()
+                content = request.form.get("content", "").rstrip()
                 if not content:
                     parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
                     return render_template(
@@ -583,6 +583,17 @@ def upload():
                         parts=parts,
                         categories=categories,
                     )
+                # Nếu dòng đầu tiên bắt đầu bằng '### Phần ' hoặc '## Phần ' thì thay bằng 'Chương '
+                lines = content.split('\n', 1)
+                first_line = lines[0]
+                if first_line.startswith("### Phần "):
+                    first_line = "Chương " + first_line[len("### Phần "):]
+                elif first_line.startswith("## Phần "):
+                    first_line = "Chương " + first_line[len("## Phần "):]
+                if len(lines) > 1:
+                    content = first_line + "\n" + lines[1]
+                else:
+                    content = first_line
                 # xác định số thứ tự phần mới
                 last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
                 next_number = last_part.part_number + 1 if last_part else 1
