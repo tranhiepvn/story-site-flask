@@ -27,22 +27,14 @@
   <ul class="category-list">
   {% for cat in categories %}
     <li>
-      <strong>{{ cat.name }}</strong>
-      <span class="category-actions">
-        <form method="post" class="inline-form">
-          <input type="hidden" name="action" value="update">
-          <input type="hidden" name="category_id" value="{{ cat.id }}">
-          <input type="text" name="name" value="{{ cat.name }}" required>
-          <input type="password" name="password" placeholder="Password" required>
-          <button type="submit">Cập nhật</button>
-        </form>
-        <form method="post" class="inline-form">
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="category_id" value="{{ cat.id }}">
-          <input type="password" name="password" placeholder="Password" required>
-          <button type="submit" class="danger">Xoá</button>
-        </form>
-      </span>
+      <form method="post" class="category-row">
+        <input type="hidden" name="category_id" value="{{ cat.id }}">
+        <span class="category-name">{{ cat.name }}</span>
+        <input type="text" name="name" value="{{ cat.name }}" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit" name="action" value="update">Cập nhật</button>
+        <button type="submit" name="action" value="delete" class="danger">Xoá</button>
+      </form>
     </li>
   {% endfor %}
   </ul>

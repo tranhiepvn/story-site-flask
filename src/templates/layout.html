@@ -8,7 +8,7 @@
     <!-- Favicon icon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   </head>
-  <body>
+  <body class="{{ request.endpoint }}">
     <div class="container">
       <header>
         <h1><a href="{{ url_for('index') }}" class="home-link">Trang web truyện</a></h1>

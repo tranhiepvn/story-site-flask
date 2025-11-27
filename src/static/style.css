@@ -348,6 +348,53 @@ button:hover {
   background-color: #c9302c;
 }
 
+/* Giảm chiều rộng sidebar trên trang quản lý thể loại */
+.add_category aside.sidebar {
+  width: 260px;
+}
+
+/* Căn chỉnh hàng thể loại trong trang quản lý thể loại (grid để thẳng cột) */
+.category-row {
+  display: grid;
+  grid-template-columns: 2fr 3fr 2fr auto auto;
+  align-items: center;
+  gap: 0.5em;
+}
+.category-row .category-name {
+  font-weight: bold;
+  text-align: left;
+}
+.category-row input[type="text"] {
+  width: 100%;
+  padding: 0.2em 0.4em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.category-row input[type="password"] {
+  width: 100%;
+  padding: 0.2em 0.4em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.category-row button {
+  padding: 0.3em 0.6em;
+  font-size: 0.85em;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.category-row button:hover {
+  background-color: #0056b3;
+}
+.category-row button.danger {
+  background-color: #d9534f;
+}
+.category-row button.danger:hover {
+  background-color: #c9302c;
+}
+
 /* select trong form tìm kiếm truyện trên trang upload */
 .search-existing-form select {
   padding: 0.25em 0.5em;
