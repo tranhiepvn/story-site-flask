@@ -135,6 +135,26 @@
   </div>
 </form>
 
+<h3>Tìm và thay cụm từ</h3>
+<form method="post">
+  <input type="hidden" name="existing_story_id" value="{{ story.id }}">
+  <div class="form-group">
+    <label for="search_string">Tìm:</label><br>
+    <input type="text" id="search_string" name="search_string" required>
+  </div>
+  <div class="form-group">
+    <label for="replacement_string">Thay bằng:</label><br>
+    <input type="text" id="replacement_string" name="replacement_string" required>
+  </div>
+  <div class="form-group">
+    <label for="password_replace">Password:</label><br>
+    <input type="password" id="password_replace" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit" name="action" value="replace_text">Thay</button>
+  </div>
+</form>
+
 <h3>Xoá truyện</h3>
 <form method="post" onsubmit="return confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?');">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">

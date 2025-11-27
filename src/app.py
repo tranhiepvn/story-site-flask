@@ -623,6 +623,25 @@ def upload():
                 db.session.delete(story)
                 db.session.commit()
                 return redirect(url_for("upload"))
+            elif action == "replace_text":
+                # Thay thế cụm từ trong tất cả các chương của truyện
+                search_str = request.form.get("search_string", "").strip()
+                replacement = request.form.get("replacement_string", "")
+                if not search_str:
+                    flash("Bạn phải nhập cụm từ cần tìm.")
+                    return redirect(url_for("upload", story_id=story.id))
+                parts = Part.query.filter_by(story_id=story.id).all()
+                replaced_count = 0
+                for part in parts:
+                    if search_str in part.content:
+                        part.content = part.content.replace(search_str, replacement)
+                        replaced_count += 1
+                if replaced_count > 0:
+                    db.session.commit()
+                    flash(f"Đã thay '{search_str}' bằng '{replacement}' trong {replaced_count} chương.")
+                else:
+                    flash("Không tìm thấy cụm từ trong các chương.")
+                return redirect(url_for("upload", story_id=story.id))
             elif action == "update_part":
                 # cập nhật nội dung của một chương cụ thể
                 part_id = request.form.get("part_id")
