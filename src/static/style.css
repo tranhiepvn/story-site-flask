@@ -5,6 +5,8 @@ body {
   /* Nền xanh dương nhạt cho toàn trang để trông hiện đại hơn */
   background-color: #e6f2ff;
   color: #333;
+  /* tăng kích cỡ chữ toàn trang để dễ đọc hơn */
+  font-size: 1.3em;
 }
 
 .container {
