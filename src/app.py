@@ -25,6 +25,8 @@ import re
 from datetime import datetime
 import json
 import io
+import smtplib
+from email.message import EmailMessage
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from flask_sqlalchemy import SQLAlchemy
@@ -161,6 +163,29 @@ class Part(db.Model):
         return f"<Part {self.part_number} of Story {self.story_id}>"
 
 
+# Bảng lưu bình luận cho truyện.
+class Comment(db.Model):
+    """Mô hình lưu trữ bình luận của người đọc.
+
+    Mỗi bình luận gắn với một truyện (story_id) và lưu đường dẫn (url) của trang
+    chương mà người dùng đăng bình luận. Ngoài ra còn lưu tên, email của
+    người bình luận để hiển thị và gửi thông báo khi có bình luận mới.
+    """
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    url = db.Column(db.String(1024), nullable=False)
+    name = db.Column(db.String(100), nullable=True)
+    email = db.Column(db.String(255), nullable=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    story = db.relationship("Story", backref=db.backref("comments", lazy=True))
+
+    def __repr__(self) -> str:
+        return f"<Comment {self.id} on Story {self.story_id}>"
+
+
 # Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
 # đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
@@ -202,6 +227,94 @@ def create_tables() -> None:
     """
     with app.app_context():
         db.create_all()
+
+
+# ------------------ Comment handling and notification ------------------
+
+def send_comment_notification(recipients: list[str], story: Story, comment_url: str) -> bool:
+    """Gửi email thông báo tới danh sách người nhận khi có bình luận mới.
+
+    Trả về True nếu gửi thành công, False nếu không gửi được. Hàm sẽ đọc các
+    cấu hình SMTP từ biến môi trường:
+      * SMTP_SERVER (mặc định smtp.gmail.com)
+      * SMTP_PORT (mặc định 587)
+      * SMTP_USERNAME
+      * SMTP_PASSWORD
+      * EMAIL_FROM_NAME (tên hiển thị, mặc định "Webdoctruyen Admin")
+      * EMAIL_FROM_ADDR (địa chỉ email hiển thị, mặc định "admin@webdoctruyen.org")
+
+    Mặc định, nếu không đặt SMTP_USERNAME hoặc SMTP_PASSWORD thì hàm trả về
+    False và không gửi email. Nếu gửi thất bại (ngoại lệ), hàm cũng trả về
+    False. Người gọi có thể dựa vào kết quả này để hiển thị thông báo cho
+    người dùng.
+    """
+    # Không có người nhận thì không cần gửi
+    if not recipients:
+        return False
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_username = os.environ.get("SMTP_USERNAME")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    if not smtp_username or not smtp_password:
+        return False
+    from_name = os.environ.get("EMAIL_FROM_NAME", "Webdoctruyen Admin")
+    from_addr = os.environ.get("EMAIL_FROM_ADDR", "admin@webdoctruyen.org")
+    # Tạo nội dung email
+    subject = f"Có bình luận mới cho truyện '{story.title}'"
+    body = (
+        "Xin chào,\n\n"
+        "Có người vừa bình luận một truyện mà bạn đã theo dõi. "
+        f"Bạn có thể xem bình luận và trả lời tại: {comment_url}\n\n"
+        f"Truyện: {story.title}\n"
+        "Cảm ơn bạn đã quan tâm tới webdoctruyen.org."
+    )
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["To"] = ", ".join(recipients)
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception:
+        return False
+
+
+@app.route("/comment/<int:story_id>", methods=["POST"])
+def post_comment(story_id: int):
+    """Xử lý việc đăng bình luận cho một truyện.
+
+    Nhận các trường ``name``, ``email``, ``content`` và ``url`` từ form. Lưu
+    bình luận vào cơ sở dữ liệu và gửi email thông báo tới những người đã
+    bình luận trước đó trên cùng truyện (trừ địa chỉ email của người vừa bình
+    luận). Sau khi xử lý xong, chuyển hướng về lại trang mà người dùng
+    bình luận. Thông báo lỗi sẽ được flash nếu nội dung rỗng.
+    """
+    story = Story.query.get_or_404(story_id)
+    name = request.form.get("name", "").strip()
+    # không sử dụng email trong phiên bản này
+    content = request.form.get("content", "").strip()
+    url = request.form.get("url", request.url)
+    if not content:
+        flash("Nội dung bình luận không được để trống.")
+        return redirect(request.referrer or url_for("story_detail", story_id=story_id))
+    comment = Comment(
+        story_id=story.id,
+        url=url,
+        name=name if name else None,
+        # Không lưu email vì tính năng thông báo đã bỏ
+        email=None,
+        content=content,
+    )
+    db.session.add(comment)
+    db.session.commit()
+    # Gửi email cho những người đã bình luận trước đó (có email và khác người hiện tại)
+    # Bỏ tính năng gửi thông báo qua email
+    flash("Bình luận đã được đăng.")
+    return redirect(url)
 
 
 @app.route("/")
@@ -289,6 +402,10 @@ def story_detail(story_id: int):
             if p.part_number == current_index:
                 current_part = p
                 break
+    # Lấy danh sách bình luận cho truyện (mới nhất lên đầu)
+    comments = Comment.query.filter_by(story_id=story.id).order_by(Comment.created_at.desc()).all()
+    # url hiện tại (bao gồm query string) để gắn vào form comment
+    current_url = request.url
     return render_template(
         "story.html",
         story=story,
@@ -296,6 +413,8 @@ def story_detail(story_id: int):
         current_index=current_index,
         total_parts=total_parts,
         parts=parts,
+        comments=comments,
+        current_url=current_url,
     )
 
 
@@ -650,6 +769,7 @@ def export_data():
     categories = Category.query.all()
     parts = Part.query.all()
     # Chuyển đổi dữ liệu sang dict
+    comments = Comment.query.all()
     data = {
         "categories": [
             {"id": c.id, "name": c.name} for c in categories
@@ -682,6 +802,18 @@ def export_data():
             }
             for p in parts
         ],
+        "comments": [
+            {
+                "id": c.id,
+                "story_id": c.story_id,
+                "url": c.url,
+                "name": c.name,
+                "email": c.email,
+                "content": c.content,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in comments
+        ],
     }
     # Chuyển đổi sang JSON và gửi file
     json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
@@ -709,8 +841,9 @@ def import_data():
     except Exception:
         flash("File import không hợp lệ.")
         return redirect(url_for("upload"))
-    # Xoá toàn bộ dữ liệu cũ
+    # Xoá toàn bộ dữ liệu cũ (categories, stories, parts, comments) và các quan hệ
     db.session.execute(story_categories.delete())
+    Comment.query.delete()
     Part.query.delete()
     Story.query.delete()
     Category.query.delete()
@@ -775,6 +908,26 @@ def import_data():
         cat_ids = st.get("categories", [])
         sobj.categories = [category_objs[cid] for cid in cat_ids if cid in category_objs]
     db.session.commit()
+    # Import comments
+    for c in data.get("comments", []):
+        ts = c.get("created_at")
+        c_created = None
+        if ts:
+            try:
+                c_created = datetime.fromisoformat(ts)
+            except Exception:
+                c_created = datetime.utcnow()
+        cm = Comment(
+            id=c.get("id"),
+            story_id=c.get("story_id"),
+            url=c.get("url"),
+            name=c.get("name"),
+            email=c.get("email"),
+            content=c.get("content"),
+            created_at=c_created,
+        )
+        db.session.add(cm)
+    db.session.commit()
     # Khôi phục sequence tự tăng cho PostgreSQL
     if db.engine.dialect.name == "postgresql":
         from sqlalchemy import text
@@ -782,6 +935,7 @@ def import_data():
             conn.execute(text("SELECT setval(pg_get_serial_sequence('categories','id'), COALESCE((SELECT MAX(id) FROM categories), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('stories','id'), COALESCE((SELECT MAX(id) FROM stories), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('parts','id'), COALESCE((SELECT MAX(id) FROM parts), 1), true)"))
+            conn.execute(text("SELECT setval(pg_get_serial_sequence('comments','id'), COALESCE((SELECT MAX(id) FROM comments), 1), true)"))
     flash("Import dữ liệu thành công!")
     return redirect(url_for("upload"))
 

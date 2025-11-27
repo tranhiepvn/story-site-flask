@@ -146,6 +146,41 @@
         </ul>
       </div>
     {% endif %}
+    {# Hiển thị khu vực bình luận sau nội dung chương và danh sách chương #}
+    <div class="comments-section">
+      <h3>Bình luận</h3>
+      <div class="comment-form">
+        <form method="post" action="{{ url_for('post_comment', story_id=story.id) }}">
+          <input type="hidden" name="url" value="{{ current_url }}">
+          <div class="form-group">
+            <label for="comment_name">Tên:</label><br>
+            <input type="text" id="comment_name" name="name" placeholder="Tên của bạn (tuỳ chọn)">
+          </div>
+          {# Bỏ trường email; chỉ thu thập tên và nội dung bình luận #}
+          <div class="form-group">
+            <label for="comment_content">Nội dung bình luận:</label><br>
+            <textarea id="comment_content" name="content" rows="4" required></textarea>
+          </div>
+          <div class="form-group">
+            <button type="submit">Đăng bình luận</button>
+          </div>
+        </form>
+      </div>
+      <div class="comment-list">
+        {% if comments %}
+          {% for cm in comments %}
+            <div class="comment">
+              <p class="comment-meta">
+                <strong>{{ cm.name or 'Ẩn danh' }}</strong> – {{ cm.created_at.strftime('%d/%m/%Y %H:%M') }}
+              </p>
+              <p class="comment-content">{{ cm.content.replace('\n', '<br>') | safe }}</p>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p>Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
+        {% endif %}
+      </div>
+    </div>
   {% else %}
     <p><em>Chưa có nội dung cho truyện này.</em></p>
   {% endif %}
