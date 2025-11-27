@@ -9,12 +9,15 @@
 {% endif %}
 <form method="post" class="create-form">
   <div class="form-group">
-    <label for="password">Password:</label><br>
-    <input type="password" id="password" name="password" required>
+    <label>Tên thể loại (tối đa 10):</label><br>
+    {# Cho phép nhập tối đa 10 thể loại cùng lúc, những ô trống sẽ bị bỏ qua #}
+    {% for i in range(10) %}
+      <input type="text" name="names" placeholder="Tên thể loại {{ i + 1 }}"><br>
+    {% endfor %}
   </div>
   <div class="form-group">
-    <label for="name">Tên thể loại:</label><br>
-    <input type="text" id="name" name="name" required>
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password" required>
   </div>
   <input type="hidden" name="action" value="create">
   <div class="form-group">

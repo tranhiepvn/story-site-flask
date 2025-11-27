@@ -37,6 +37,16 @@
           </aside>
         {% endif %}
         <main>
+          {# Hiển thị các thông báo flash (nếu có) #}
+          {% with messages = get_flashed_messages() %}
+            {% if messages %}
+              <ul class="flash-messages">
+                {% for msg in messages %}
+                  <li class="flash">{{ msg }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endwith %}
           {% if error %}
             <p class="error">{{ error }}</p>
           {% endif %}

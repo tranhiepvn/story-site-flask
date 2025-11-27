@@ -120,6 +120,45 @@
         </div>
       </form>
     </div>
+    {# lặp lại điều hướng và danh sách chương bên dưới nội dung để tiện cho người đọc #}
+    {% if total_parts > 1 %}
+      <div class="part-navigation">
+        {% if current_index > 1 %}
+          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Chương trước</a>
+        {% endif %}
+        {% if current_index < total_parts %}
+          {% if story.is_completed and (current_index + 1 == total_parts) %}
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương cuối &rarr;</a>
+          {% else %}
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương sau &rarr;</a>
+          {% endif %}
+        {% elif story.is_completed %}
+          <span class="no-link">Chương cuối</span>
+        {% endif %}
+      </div>
+      <div class="part-list">
+        <p>Danh sách chương:</p>
+        <ul>
+          {% for p in parts %}
+            <li style="margin-bottom: 0.5em;">
+              {% if story.is_completed and p.part_number == total_parts %}
+                {% if p.part_number == current_index %}
+                  <strong>Chương cuối</strong>
+                {% else %}
+                  <a href="{{ url_for('story_detail', story_id=story.id, part=p.part_number) }}">Chương cuối</a>
+                {% endif %}
+              {% else %}
+                {% if p.part_number == current_index %}
+                  <strong>Chương {{ p.part_number }}</strong>
+                {% else %}
+                  <a href="{{ url_for('story_detail', story_id=story.id, part=p.part_number) }}">Chương {{ p.part_number }}</a>
+                {% endif %}
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
   {% else %}
     <p><em>Chưa có nội dung cho truyện này.</em></p>
   {% endif %}

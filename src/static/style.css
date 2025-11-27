@@ -175,9 +175,59 @@ button:hover {
   background-color: #0056b3;
 }
 
+/* Thông báo flash (ví dụ như khi import dữ liệu thành công) */
+.flash-messages {
+  list-style: none;
+  padding: 0;
+  margin: 1em 0;
+}
+
+.flash {
+  background-color: #dff0d8; /* màu xanh nhạt cho thành công */
+  color: #3c763d;
+  padding: 0.5em;
+  border-radius: 4px;
+  margin-bottom: 0.5em;
+}
+
+/* khoảng cách cho form xuất/nhập dữ liệu trên trang upload */
+.export-form,
+.import-form {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
 /* Phần nội dung truyện trong trang chi tiết */
 .story-part {
   margin-bottom: 1.5em;
+}
+
+/* Điều hướng chương và danh sách chương trong trang chi tiết */
+.part-navigation {
+  text-align: center;
+  margin: 1em 0;
+}
+.part-navigation a {
+  margin: 0 1em;
+  text-decoration: none;
+  color: #007bff;
+  font-weight: bold;
+}
+.part-navigation a:hover {
+  text-decoration: underline;
+}
+.part-navigation .no-link {
+  color: #555;
+  margin: 0 1em;
+}
+
+/* danh sách chương: bỏ dấu chấm và khoảng cách giữa các mục */
+.part-list ul {
+  list-style: none;
+  padding: 0;
+}
+.part-list li {
+  margin-bottom: 0.5em;
 }
 
 /* Tiêu đề chương: căn giữa và in đậm */

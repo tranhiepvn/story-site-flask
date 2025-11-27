@@ -23,8 +23,10 @@ Chức năng chính:
 import os
 import re
 from datetime import datetime
+import json
+import io
 
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from flask_sqlalchemy import SQLAlchemy
 
 # Tạo ứng dụng Flask
@@ -392,12 +394,23 @@ def upload():
                 # nếu đang chỉnh sửa, tải lại trang edit
                 story = Story.query.get(int(story_id))
                 parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+                # nếu đang cập nhật một phần cụ thể, lấy lại thông tin phần đó để hiển thị
+                edit_part_id_form = request.form.get("part_id")
+                edit_part_obj = None
+                if edit_part_id_form:
+                    try:
+                        pid_int = int(edit_part_id_form)
+                        edit_part_obj = Part.query.get(pid_int)
+                    except Exception:
+                        edit_part_obj = None
                 return render_template(
                     "upload_edit.html",
                     error="Mật khẩu sai.",
                     story=story,
                     parts=parts,
                     categories=categories,
+                    edit_part=edit_part_obj,
+                    error_update=None,
                 )
             else:
                 return render_template(
@@ -480,6 +493,34 @@ def upload():
                 db.session.delete(story)
                 db.session.commit()
                 return redirect(url_for("upload"))
+            elif action == "update_part":
+                # cập nhật nội dung của một chương cụ thể
+                part_id = request.form.get("part_id")
+                content = request.form.get("content", "").strip()
+                # kiểm tra dữ liệu hợp lệ
+                if not part_id or not content:
+                    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+                    edit_part_obj = None
+                    try:
+                        edit_part_obj = Part.query.get(int(part_id))
+                    except Exception:
+                        pass
+                    return render_template(
+                        "upload_edit.html",
+                        story=story,
+                        parts=parts,
+                        categories=categories,
+                        edit_part=edit_part_obj,
+                        error_update="Nội dung không được để trống.",
+                    )
+                try:
+                    part_obj = Part.query.get(int(part_id))
+                except Exception:
+                    part_obj = None
+                if part_obj and part_obj.story_id == story.id:
+                    part_obj.content = content
+                    db.session.commit()
+                return redirect(url_for("upload", story_id=story.id))
             # không nhận ra action, trở lại trang edit
             return redirect(url_for("upload", story_id=story.id))
         else:
@@ -531,11 +572,21 @@ def upload():
     if story_id:
         story = Story.query.get_or_404(int(story_id))
         parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+        # Kiểm tra xem có tham số edit_part trên URL để hiển thị form cập nhật chương
+        edit_part_id = request.args.get("edit_part", type=int)
+        edit_part_obj = None
+        if edit_part_id:
+            edit_part_obj = Part.query.get(edit_part_id)
+            # chỉ hiển thị nếu chương thuộc truyện đang chỉnh sửa
+            if edit_part_obj and edit_part_obj.story_id != story.id:
+                edit_part_obj = None
         return render_template(
             "upload_edit.html",
             story=story,
             parts=parts,
             categories=categories,
+            edit_part=edit_part_obj,
+            error_update=None,
         )
     # Mặc định: hiển thị form tạo truyện mới cùng danh sách truyện để chọn
     return render_template(
@@ -580,6 +631,160 @@ def upload_login():
         "upload_login.html",
         categories=categories,
     )
+
+
+# --------- Export/Import data utilities ---------
+
+@app.route("/export_data", methods=["POST"])
+def export_data():
+    """Export tất cả dữ liệu về truyện, phần và thể loại ra một file JSON.
+
+    Người dùng phải đăng nhập trang quản trị (upload_authenticated) mới được phép tải dữ liệu.
+    Sau khi thu thập dữ liệu, hàm trả về file JSON để người dùng tải xuống.
+    """
+    # Kiểm tra quyền truy cập
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    # Lấy dữ liệu từ cơ sở dữ liệu
+    stories = Story.query.all()
+    categories = Category.query.all()
+    parts = Part.query.all()
+    # Chuyển đổi dữ liệu sang dict
+    data = {
+        "categories": [
+            {"id": c.id, "name": c.name} for c in categories
+        ],
+        "stories": [
+            {
+                "id": s.id,
+                "title": s.title,
+                "author": s.author,
+                "story_type": s.story_type,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "views": s.views,
+                "is_hidden": s.is_hidden,
+                "is_completed": s.is_completed,
+                "rating_sum": s.rating_sum,
+                "rating_count": s.rating_count,
+                "category_id": s.category_id,
+                # danh sách id thể loại liên kết (nhiều‑nhiều)
+                "categories": [cat.id for cat in s.categories],
+            }
+            for s in stories
+        ],
+        "parts": [
+            {
+                "id": p.id,
+                "story_id": p.story_id,
+                "part_number": p.part_number,
+                "content": p.content,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in parts
+        ],
+    }
+    # Chuyển đổi sang JSON và gửi file
+    json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    buf = io.BytesIO(json_bytes)
+    filename = f"stories_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    return send_file(buf, as_attachment=True, download_name=filename, mimetype="application/json")
+
+
+@app.route("/import_data", methods=["POST"])
+def import_data():
+    """Nhận file JSON và nhập toàn bộ dữ liệu vào cơ sở dữ liệu hiện tại.
+
+    Khi import, dữ liệu cũ sẽ bị xoá để tránh trùng lặp. Chỉ người dùng đã đăng nhập
+    trang quản trị mới được phép thao tác. Sau khi hoàn thành, hàm chuyển hướng
+    về trang upload với thông báo.
+    """
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    uploaded_file = request.files.get("import_file")
+    if not uploaded_file:
+        flash("Không tìm thấy file để import.")
+        return redirect(url_for("upload"))
+    try:
+        data = json.load(uploaded_file)
+    except Exception:
+        flash("File import không hợp lệ.")
+        return redirect(url_for("upload"))
+    # Xoá toàn bộ dữ liệu cũ
+    db.session.execute(story_categories.delete())
+    Part.query.delete()
+    Story.query.delete()
+    Category.query.delete()
+    db.session.commit()
+    # Import categories
+    category_objs = {}
+    for cat in data.get("categories", []):
+        cobj = Category(id=cat.get("id"), name=cat.get("name"))
+        db.session.add(cobj)
+        category_objs[cobj.id] = cobj
+    db.session.commit()
+    # Import stories
+    story_objs = {}
+    for st in data.get("stories", []):
+        ts = st.get("created_at")
+        created_at = None
+        if ts:
+            try:
+                created_at = datetime.fromisoformat(ts)
+            except Exception:
+                created_at = datetime.utcnow()
+        sobj = Story(
+            id=st.get("id"),
+            title=st.get("title"),
+            author=st.get("author"),
+            story_type=st.get("story_type", "short"),
+            created_at=created_at,
+            views=st.get("views", 0),
+            is_hidden=st.get("is_hidden", False),
+            is_completed=st.get("is_completed", False),
+            rating_sum=st.get("rating_sum", 0),
+            rating_count=st.get("rating_count", 0),
+            category_id=st.get("category_id"),
+        )
+        db.session.add(sobj)
+        story_objs[sobj.id] = sobj
+    db.session.commit()
+    # Import parts
+    for part in data.get("parts", []):
+        ts = part.get("created_at")
+        p_created_at = None
+        if ts:
+            try:
+                p_created_at = datetime.fromisoformat(ts)
+            except Exception:
+                p_created_at = datetime.utcnow()
+        pobj = Part(
+            id=part.get("id"),
+            story_id=part.get("story_id"),
+            part_number=part.get("part_number"),
+            content=part.get("content"),
+            created_at=p_created_at,
+        )
+        db.session.add(pobj)
+    db.session.commit()
+    # Gán quan hệ nhiều‑nhiều story_categories
+    for st in data.get("stories", []):
+        s_id = st.get("id")
+        sobj = story_objs.get(s_id)
+        if not sobj:
+            continue
+        cat_ids = st.get("categories", [])
+        sobj.categories = [category_objs[cid] for cid in cat_ids if cid in category_objs]
+    db.session.commit()
+    # Khôi phục sequence tự tăng cho PostgreSQL
+    if db.engine.dialect.name == "postgresql":
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT setval(pg_get_serial_sequence('categories','id'), COALESCE((SELECT MAX(id) FROM categories), 1), true)"))
+            conn.execute(text("SELECT setval(pg_get_serial_sequence('stories','id'), COALESCE((SELECT MAX(id) FROM stories), 1), true)"))
+            conn.execute(text("SELECT setval(pg_get_serial_sequence('parts','id'), COALESCE((SELECT MAX(id) FROM parts), 1), true)"))
+    flash("Import dữ liệu thành công!")
+    return redirect(url_for("upload"))
+
 
 
 @app.route("/category/<int:category_id>")
@@ -742,6 +947,8 @@ def add_category():
         action = request.form.get("action", "create")
         category_id = request.form.get("category_id")
         name = request.form.get("name", "").strip()
+        # hỗ trợ nhập nhiều tên thể loại cùng lúc (danh sách names)
+        names = request.form.getlist("names")
         # kiểm tra mật khẩu
         if password != UPLOAD_PASSWORD:
             return render_template(
@@ -782,7 +989,30 @@ def add_category():
                     return redirect(url_for("add_category"))
         # xử lý tạo mới
         else:
-            if name:
+            # ưu tiên danh sách nhiều tên thể loại nếu được gửi từ form
+            # nếu có ít nhất một tên trong danh sách, xử lý từng tên
+            if names and any(n.strip() for n in names):
+                added_any = False
+                for nm in names:
+                    nm_strip = nm.strip()
+                    if not nm_strip:
+                        continue
+                    existing = Category.query.filter_by(name=nm_strip).first()
+                    if existing is None:
+                        db.session.add(Category(name=nm_strip))
+                        added_any = True
+                if added_any:
+                    db.session.commit()
+                    return redirect(url_for("add_category"))
+                else:
+                    # tất cả các thể loại đã tồn tại
+                    return render_template(
+                        "add_category.html",
+                        error="Tất cả các thể loại này đã tồn tại.",
+                        categories=categories,
+                    )
+            # nếu không có danh sách, fallback dùng một tên
+            elif name:
                 existing = Category.query.filter_by(name=name).first()
                 if existing is None:
                     db.session.add(Category(name=name))

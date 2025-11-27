@@ -57,6 +57,16 @@
   </div>
 </form>
 
+<!-- Xuất/Nhập dữ liệu -->
+<h3>Xuất / Nhập dữ liệu</h3>
+<form method="post" action="{{ url_for('export_data') }}" class="export-form">
+  <button type="submit">Export dữ liệu</button>
+</form>
+<form method="post" action="{{ url_for('import_data') }}" enctype="multipart/form-data" class="import-form">
+  <input type="file" name="import_file" required>
+  <button type="submit">Import dữ liệu</button>
+</form>
+
 <h3>Hoặc chỉnh sửa truyện đã có</h3>
 <!-- Form tìm kiếm truyện để dễ tìm trong danh sách lớn -->
 <form method="get" class="search-existing-form">
