@@ -54,6 +54,8 @@
           {% if error %}
             <p class="error">{{ error }}</p>
           {% endif %}
+          {# Khu vực hiển thị danh sách truyện theo các thể loại được chọn #}
+          <div id="selected-categories-container" class="section selected-categories"></div>
           {% block content %}{% endblock %}
         </main>
       </div>
@@ -62,6 +64,109 @@
       </footer>
     </div>
     {# Block dành cho scripts, cho phép trang con chèn thêm mã JavaScript #}
-    {% block scripts %}{% endblock %}
+{% block scripts %}
+    <script>
+      // Script để xử lý việc chọn nhiều thể loại trên tất cả các trang của trang truyện
+      document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('selected-categories-container');
+        if (!container) return;
+        function renderCategorySection(catId, catName, data) {
+          let html = '';
+          const page = data.page;
+          const total = data.total_pages;
+          const stories = data.stories;
+          html += `<div class="category-section" id="selected-category-${catId}" data-current-page="${page}" data-total-pages="${total}">`;
+          html += `<h2>Truyện thể loại ${catName}</h2>`;
+          if (stories.length > 0) {
+            html += '<ul class="story-list">';
+            stories.forEach(function(story) {
+              let stars = '';
+              const avg = story.rating || 0;
+              for (let i = 1; i <= 5; i++) {
+                stars += i <= Math.floor(avg) ? '★' : '☆';
+              }
+              const ratingText = story.rating_count > 0 ? ` (${avg.toFixed(1)})` : ' (chưa có)';
+              const authorHtml = story.author ? `Tác giả: <a href="/author/${encodeURIComponent(story.author)}">${story.author}</a>` : 'Tác giả: Ẩn danh';
+              let categoriesHtml = '';
+              if (story.categories && story.categories.length > 0) {
+                categoriesHtml = 'Thể loại: ' + story.categories.map(function(n) { return `<span>${n}</span>`; }).join(', ');
+              }
+              html += '<li>';
+              html += `<h3><a href="/story/${story.id}">${story.title}</a></h3>`;
+              html += `<p class="meta">${authorHtml}</p>`;
+              if (categoriesHtml) {
+                html += `<p class="meta">${categoriesHtml}</p>`;
+              }
+              html += `<p class="meta">Đánh giá: <span class="rating">${stars}${ratingText}</span></p>`;
+              if (story.is_completed) {
+                html += `<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">${story.part_count} chương</em>)</p>`;
+              } else {
+                html += `<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương ${story.part_count}</em>)</p>`;
+              }
+              if (story.snippet) {
+                html += `<p class="snippet">${story.snippet}</p>`;
+              }
+              html += '</li>';
+            });
+            html += '</ul>';
+          } else {
+            html += '<p>Chưa có truyện trong thể loại này.</p>';
+          }
+          html += '<div class="pagination">';
+          if (data.has_prev) {
+            html += `<a href="#" data-cat-id="${catId}" data-page="1">&laquo;&laquo; Trang đầu</a>`;
+            html += `<a href="#" data-cat-id="${catId}" data-page="${page - 1}">&laquo; Trang trước</a>`;
+          }
+          if (data.has_next) {
+            html += `<a href="#" data-cat-id="${catId}" data-page="${page + 1}">Trang sau &raquo;</a>`;
+            html += `<a href="#" data-cat-id="${catId}" data-page="${total}">Trang cuối &raquo;&raquo;</a>`;
+          }
+          html += '</div>';
+          html += '</div>';
+          return html;
+        }
+        function loadCategory(catId, catName, page = 1) {
+          fetch(`/api/category_stories/${catId}?page=${page}&limit=25`)
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+              const sectionId = `selected-category-${catId}`;
+              let section = document.getElementById(sectionId);
+              const html = renderCategorySection(catId, catName, data);
+              if (section) {
+                section.outerHTML = html;
+              } else {
+                container.insertAdjacentHTML('beforeend', html);
+              }
+            });
+        }
+        const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
+        checkboxes.forEach(function(cb) {
+          cb.addEventListener('change', function() {
+            const catId = this.getAttribute('data-cat-id');
+            const catName = this.getAttribute('data-cat-name');
+            if (this.checked) {
+              loadCategory(catId, catName, 1);
+            } else {
+              const sec = document.getElementById(`selected-category-${catId}`);
+              if (sec) sec.remove();
+            }
+          });
+        });
+        container.addEventListener('click', function(evt) {
+          const link = evt.target.closest('a');
+          if (link && link.dataset.catId && link.dataset.page) {
+            evt.preventDefault();
+            const catId = link.dataset.catId;
+            const page = parseInt(link.dataset.page);
+            const cb = document.querySelector(`.category-list input[data-cat-id="${catId}"]`);
+            if (cb && cb.checked) {
+              const catName = cb.getAttribute('data-cat-name');
+              loadCategory(catId, catName, page);
+            }
+          }
+        });
+      });
+    </script>
+    {% endblock %}
   </body>
 </html>
