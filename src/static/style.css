@@ -60,6 +60,18 @@ aside.sidebar a:hover {
   text-decoration: underline;
 }
 
+/* Section hiển thị truyện theo các thể loại được chọn ở trang chủ */
+.selected-categories {
+  margin-bottom: 2em;
+}
+
+/* Mỗi category-section chứa danh sách truyện của một thể loại */
+.category-section {
+  margin-top: 2em;
+  border-top: 2px solid #ccc;
+  padding-top: 1em;
+}
+
 .search-form {
   /* bỏ margin-top để form nằm cân bằng theo chiều dọc trong header */
   margin-top: 0;

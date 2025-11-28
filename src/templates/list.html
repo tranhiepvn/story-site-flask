@@ -76,11 +76,21 @@
     </ul>
     {% if pagination %}
       <div class="pagination">
+        {# Link tới trang đầu #}
+        {% if first_url %}
+          <a href="{{ first_url }}">&laquo;&laquo; Trang đầu</a>
+        {% endif %}
+        {# Link tới trang trước #}
         {% if prev_url %}
           <a href="{{ prev_url }}">&laquo; Trang trước</a>
         {% endif %}
+        {# Link tới trang tiếp theo #}
         {% if next_url %}
-          <a href="{{ next_url }}">Trang tiếp theo &raquo;</a>
+          <a href="{{ next_url }}">Trang sau &raquo;</a>
+        {% endif %}
+        {# Link tới trang cuối #}
+        {% if last_url %}
+          <a href="{{ last_url }}">Trang cuối &raquo;&raquo;</a>
         {% endif %}
       </div>
     {% endif %}

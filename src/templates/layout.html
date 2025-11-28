@@ -29,9 +29,13 @@
         {% if categories %}
           <aside class="sidebar">
             <h3>Thể loại</h3>
-            <ul>
+            <ul class="category-list">
               {% for cat in categories %}
-                <li><a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a></li>
+                <li>
+                  <!-- Checkbox để chọn nhiều thể loại. data-cat-id và data-cat-name dùng cho script -->
+                  <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
+                  <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
+                </li>
               {% endfor %}
             </ul>
           </aside>
@@ -57,5 +61,7 @@
         <p>&copy; {{ datetime.utcnow().year }} Trang web truyện. Cảm ơn bạn đã đến đây, chúc bạn xem truyện được thoải mái và vui vẽ. Chúc một ngày hạnh phúc nha bạn!</p>
       </footer>
     </div>
+    {# Block dành cho scripts, cho phép trang con chèn thêm mã JavaScript #}
+    {% block scripts %}{% endblock %}
   </body>
 </html>

@@ -14,6 +14,8 @@
 {% block title %}Đọc truyện hay{% endblock %}
 
 {% block content %}
+  <!-- Vùng hiển thị các truyện thuộc thể loại được chọn -->
+  <div id="selected-categories-container" class="section selected-categories"></div>
   {# Mục truyện mới cập nhật: hiển thị những truyện có chương mới được thêm gần đây nhất #}
   <div class="section recent">
   <h2>Truyện mới cập nhật</h2>
@@ -335,4 +337,126 @@
     <p>Chưa có truyện dài.</p>
   {% endif %}
   </div>
+{% endblock %}
+
+{# Khối scripts: chèn JavaScript xử lý chọn nhiều thể loại trên trang chính #}
+{% block scripts %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const container = document.getElementById('selected-categories-container');
+
+      /**
+       * Tạo HTML cho danh sách truyện của một thể loại với phân trang.
+       * @param {string} catId ID của thể loại
+       * @param {string} catName Tên thể loại
+       * @param {Object} data Đối tượng trả về từ API gồm stories, page, total_pages, has_prev, has_next
+       */
+      function renderCategorySection(catId, catName, data) {
+        let html = '';
+        const page = data.page;
+        const total = data.total_pages;
+        const stories = data.stories;
+        html += `<div class="category-section" id="selected-category-${catId}" data-current-page="${page}" data-total-pages="${total}">`;
+        html += `<h2>Truyện thể loại ${catName}</h2>`;
+        if (stories.length > 0) {
+          html += '<ul class="story-list">';
+          stories.forEach(function(story) {
+            let stars = '';
+            const avg = story.rating || 0;
+            for (let i = 1; i <= 5; i++) {
+              stars += i <= Math.floor(avg) ? '★' : '☆';
+            }
+            const ratingText = story.rating_count > 0 ? ` (${avg.toFixed(1)})` : ' (chưa có)';
+            const authorHtml = story.author ? `Tác giả: <a href="/author/${encodeURIComponent(story.author)}">${story.author}</a>` : 'Tác giả: Ẩn danh';
+            let categoriesHtml = '';
+            if (story.categories && story.categories.length > 0) {
+              categoriesHtml = 'Thể loại: ' + story.categories.map(function(n) { return `<span>${n}</span>`; }).join(', ');
+            }
+            html += '<li>';
+            html += `<h3><a href="/story/${story.id}">${story.title}</a></h3>`;
+            html += `<p class="meta">${authorHtml}</p>`;
+            if (categoriesHtml) {
+              html += `<p class="meta">${categoriesHtml}</p>`;
+            }
+            html += `<p class="meta">Đánh giá: <span class="rating">${stars}${ratingText}</span></p>`;
+            if (story.is_completed) {
+              html += `<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">${story.part_count} chương</em>)</p>`;
+            } else {
+              html += `<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương ${story.part_count}</em>)</p>`;
+            }
+            if (story.snippet) {
+              html += `<p class="snippet">${story.snippet}</p>`;
+            }
+            html += '</li>';
+          });
+          html += '</ul>';
+        } else {
+          html += '<p>Chưa có truyện trong thể loại này.</p>';
+        }
+        // Tạo thanh điều hướng phân trang
+        html += '<div class="pagination">';
+        if (data.has_prev) {
+          html += `<a href="#" data-cat-id="${catId}" data-page="1">&laquo;&laquo; Trang đầu</a>`;
+          html += `<a href="#" data-cat-id="${catId}" data-page="${page - 1}">&laquo; Trang trước</a>`;
+        }
+        if (data.has_next) {
+          html += `<a href="#" data-cat-id="${catId}" data-page="${page + 1}">Trang sau &raquo;</a>`;
+          html += `<a href="#" data-cat-id="${catId}" data-page="${total}">Trang cuối &raquo;&raquo;</a>`;
+        }
+        html += '</div>';
+        html += '</div>';
+        return html;
+      }
+
+      /**
+       * Tải dữ liệu trang cho thể loại
+       * @param {string} catId ID thể loại
+       * @param {string} catName Tên thể loại
+       * @param {number} page Số trang cần tải
+       */
+      function loadCategoryPage(catId, catName, page) {
+        fetch(`/api/category_stories/${catId}?page=${page}&limit=25`)
+          .then(function(resp) { return resp.json(); })
+          .then(function(data) {
+            const sectionHtml = renderCategorySection(catId, catName, data);
+            const existing = document.getElementById('selected-category-' + catId);
+            if (existing) {
+              existing.outerHTML = sectionHtml;
+            } else {
+              container.insertAdjacentHTML('beforeend', sectionHtml);
+            }
+          });
+      }
+
+      // Xử lý click trên các nút phân trang trong các khu vực thể loại
+      container.addEventListener('click', function(event) {
+        const target = event.target;
+        if (target.tagName === 'A' && target.hasAttribute('data-cat-id') && target.hasAttribute('data-page')) {
+          event.preventDefault();
+          const catId = target.getAttribute('data-cat-id');
+          const page = parseInt(target.getAttribute('data-page'), 10);
+          const checkbox = document.querySelector(`.category-list input[data-cat-id="${catId}"]`);
+          const catName = checkbox ? checkbox.getAttribute('data-cat-name') : '';
+          loadCategoryPage(catId, catName, page);
+        }
+      });
+
+      // Lắng nghe thay đổi checkbox để nạp dữ liệu hoặc xoá mục
+      document.querySelectorAll('.category-list input[type="checkbox"]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          const catId = cb.getAttribute('data-cat-id');
+          const catName = cb.getAttribute('data-cat-name');
+          if (cb.checked) {
+            // tải trang đầu tiên khi chọn
+            loadCategoryPage(catId, catName, 1);
+          } else {
+            const existing = document.getElementById('selected-category-' + catId);
+            if (existing) {
+              existing.parentNode.removeChild(existing);
+            }
+          }
+        });
+      });
+    });
+  </script>
 {% endblock %}

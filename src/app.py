@@ -29,9 +29,10 @@ import io
 import smtplib
 from email.message import EmailMessage
 
-from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError
 
 # Tạo ứng dụng Flask
 app = Flask(__name__)
@@ -1156,20 +1157,47 @@ def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple
     overwritten_count = 0
     skipped_count = 0
 
-    # Tạo hoặc lấy các thể loại dựa trên tên (không phân biệt chữ hoa/thường)
+    # Tạo hoặc lấy các thể loại dựa trên tên (không phân biệt chữ hoa/thường).
+    # Thay vì flush từng bản ghi và bắt lỗi, chúng ta thu thập trước các tên thể loại
+    # và chỉ tạo mới những tên chưa tồn tại, sau đó flush một lần. Điều này tránh
+    # lỗi UNIQUE constraint khi gặp tên trùng.
     category_objs: dict[int, Category] = {}
+    existing_categories: dict[str, Category] = {c.name.lower(): c for c in Category.query.all()}
+    # Duyệt qua danh sách thể loại trong file JSON
     for cat in data.get("categories", []):
-        name = cat.get("name")
+        name = (cat.get("name") or "").strip()
         if not name:
             continue
-        existing = Category.query.filter(func.lower(Category.name) == name.lower()).first()
-        if existing:
-            cobj = existing
+        lower_name = name.lower()
+        # Nếu thể loại đã tồn tại, dùng lại
+        if lower_name in existing_categories:
+            cobj = existing_categories[lower_name]
         else:
+            # Tạo mới thể loại nhưng chưa flush ngay
             cobj = Category(name=name)
             db.session.add(cobj)
-            db.session.flush()
+            existing_categories[lower_name] = cobj
         category_objs[cat.get("id")] = cobj
+    # Flush một lần để tạo id cho các thể loại mới tạo
+    try:
+        db.session.flush()
+    except IntegrityError:
+        # Nếu vẫn bị lỗi trùng (trong trường hợp chạy đồng thời), rollback và ánh xạ lại
+        db.session.rollback()
+        existing_categories = {c.name.lower(): c for c in Category.query.all()}
+        for cat in data.get("categories", []):
+            name = (cat.get("name") or "").strip()
+            if not name:
+                continue
+            lower_name = name.lower()
+            cobj = existing_categories.get(lower_name)
+            if not cobj:
+                cobj = Category(name=name)
+                db.session.add(cobj)
+                existing_categories[lower_name] = cobj
+            category_objs[cat.get("id")] = cobj
+        db.session.flush()
+    # Commit thay đổi thể loại trước khi xử lý truyện
     db.session.commit()
 
     # mapping từ id cũ sang id mới
@@ -1366,13 +1394,13 @@ def category_view(category_id: int):
     """Hiển thị truyện theo thể loại với phân trang.
 
     Lấy tất cả truyện thuộc thể loại có id ``category_id`` (kể cả truyện thuộc
-    nhiều thể loại), sắp xếp theo ngày đăng mới nhất và phân trang 10 truyện mỗi trang.
+    nhiều thể loại), sắp xếp theo ngày đăng mới nhất và phân trang 25 truyện mỗi trang.
     Tham số ``page`` trên URL dùng để chuyển trang. Trả về template list.html để
     hiển thị danh sách.
     """
     category = Category.query.get_or_404(category_id)
     page = request.args.get("page", 1, type=int)
-    per_page = 10
+    per_page = 25
     query = (
         Story.query.join(story_categories)
         .filter(
@@ -1384,8 +1412,11 @@ def category_view(category_id: int):
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     stories = pagination.items
     categories = Category.query.order_by(Category.name).all()
+    # Chuẩn bị các URL chuyển trang: đầu tiên, cuối cùng, trước và sau
+    first_url = url_for("category_view", category_id=category.id, page=1) if pagination.page > 1 else None
     prev_url = url_for("category_view", category_id=category.id, page=pagination.prev_num) if pagination.has_prev else None
     next_url = url_for("category_view", category_id=category.id, page=pagination.next_num) if pagination.has_next else None
+    last_url = url_for("category_view", category_id=category.id, page=pagination.pages) if pagination.page < pagination.pages else None
     return render_template(
         "list.html",
         title=f"Thể loại: {category.name}",
@@ -1393,8 +1424,10 @@ def category_view(category_id: int):
         filter_name=category.name,
         stories=stories,
         pagination=pagination,
+        first_url=first_url,
         prev_url=prev_url,
         next_url=next_url,
+        last_url=last_url,
         categories=categories,
     )
 
@@ -1403,7 +1436,7 @@ def category_view(category_id: int):
 def author_view(author: str):
     """Hiển thị danh sách truyện của một tác giả."""
     page = request.args.get("page", 1, type=int)
-    per_page = 10
+    per_page = 25
     query = (
         Story.query.filter(Story.author == author, Story.is_hidden == False)
         .order_by(Story.created_at.desc())
@@ -1411,9 +1444,11 @@ def author_view(author: str):
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     stories = pagination.items
     categories = Category.query.order_by(Category.name).all()
-    # chuẩn bị liên kết chuyển trang cho template
+    # chuẩn bị liên kết chuyển trang cho template: đầu, cuối, trước, sau
+    first_url = url_for("author_view", author=author, page=1) if pagination.page > 1 else None
     prev_url = url_for("author_view", author=author, page=pagination.prev_num) if pagination.has_prev else None
     next_url = url_for("author_view", author=author, page=pagination.next_num) if pagination.has_next else None
+    last_url = url_for("author_view", author=author, page=pagination.pages) if pagination.page < pagination.pages else None
     return render_template(
         "list.html",
         title=f"Tác giả: {author}",
@@ -1421,8 +1456,10 @@ def author_view(author: str):
         filter_name=author,
         stories=stories,
         pagination=pagination,
+        first_url=first_url,
         prev_url=prev_url,
         next_url=next_url,
+        last_url=last_url,
         categories=categories,
     )
 
@@ -1433,7 +1470,7 @@ def type_view(story_type: str):
     if story_type not in ("short", "long"):
         return page_not_found(404)
     page = request.args.get("page", 1, type=int)
-    per_page = 10
+    per_page = 25
     query = (
         Story.query.filter_by(story_type=story_type, is_hidden=False)
         .order_by(Story.created_at.desc())
@@ -1443,8 +1480,10 @@ def type_view(story_type: str):
     categories = Category.query.order_by(Category.name).all()
     # xác định tiêu đề tiếng Việt
     title_vi = "Truyện Ngắn" if story_type == "short" else "Truyện Dài"
+    first_url = url_for("type_view", story_type=story_type, page=1) if pagination.page > 1 else None
     prev_url = url_for("type_view", story_type=story_type, page=pagination.prev_num) if pagination.has_prev else None
     next_url = url_for("type_view", story_type=story_type, page=pagination.next_num) if pagination.has_next else None
+    last_url = url_for("type_view", story_type=story_type, page=pagination.pages) if pagination.page < pagination.pages else None
     return render_template(
         "list.html",
         title=title_vi,
@@ -1452,8 +1491,10 @@ def type_view(story_type: str):
         filter_name=story_type,
         stories=stories,
         pagination=pagination,
+        first_url=first_url,
         prev_url=prev_url,
         next_url=next_url,
+        last_url=last_url,
         categories=categories,
     )
 
@@ -1614,6 +1655,76 @@ def add_category():
         "add_category.html",
         categories=categories,
     )
+
+
+# -----------------------------------------------------------------------------
+# API endpoints
+#
+# Trả về danh sách truyện thuộc một thể loại dưới dạng JSON. Sử dụng khi người
+# dùng chọn nhiều thể loại trên trang chủ để hiển thị thêm truyện theo từng
+# thể loại. Kết quả trả về là danh sách JSON gồm các trường id, title,
+# author, categories (tên), rating trung bình, số lượt đánh giá, trạng thái
+# hoàn thành, số chương và đoạn trích của chương đầu tiên.
+@app.route("/api/category_stories/<int:category_id>")
+def api_category_stories(category_id: int):
+    """Trả về danh sách truyện của thể loại ở dạng JSON, hỗ trợ phân trang.
+
+    Endpoint này phục vụ tính năng chọn nhiều thể loại ở trang chủ. Nó nhận
+    tham số ``page`` (số trang bắt đầu từ 1) và ``limit`` (số mục mỗi trang,
+    mặc định 25) trong query string. Kết quả trả về bao gồm danh sách
+    truyện theo trang, cùng thông tin phân trang (số trang, có trang trước/sau).
+
+    Mỗi mục trong ``stories`` chứa id, title, author, categories (danh sách
+    tên), rating trung bình, số lượt đánh giá, cờ hoàn thành, số chương
+    và trích đoạn của chương đầu tiên.
+    """
+    page = request.args.get("page", 1, type=int)
+    limit = request.args.get("limit", 25, type=int)
+    if limit <= 0:
+        limit = 25
+    # Lấy thể loại, trả 404 nếu không tồn tại
+    category = Category.query.get_or_404(category_id)
+    # Truy vấn truyện theo thể loại, sắp xếp mới nhất và không ẩn
+    query = (
+        Story.query.join(story_categories)
+        .filter(
+            story_categories.c.category_id == category.id,
+            Story.is_hidden == False,
+        )
+        .order_by(Story.created_at.desc())
+    )
+    pagination = query.paginate(page=page, per_page=limit, error_out=False)
+    stories_items = pagination.items
+    result = []
+    for st in stories_items:
+        snippet = ""
+        if st.parts:
+            first_part = st.parts[0]
+            snippet = first_part.content[:200]
+            if len(first_part.content) > 200:
+                snippet = snippet.rsplit(" ", 1)[0] + "..."
+            snippet = snippet.replace("\n", " ")
+        avg = (st.rating_sum / st.rating_count) if st.rating_count else 0
+        result.append(
+            {
+                "id": st.id,
+                "title": st.title,
+                "author": st.author,
+                "categories": [c.name for c in st.categories],
+                "rating": avg,
+                "rating_count": st.rating_count,
+                "is_completed": st.is_completed,
+                "part_count": len(st.parts),
+                "snippet": snippet,
+            }
+        )
+    return jsonify({
+        "page": pagination.page,
+        "total_pages": pagination.pages,
+        "has_next": pagination.has_next,
+        "has_prev": pagination.has_prev,
+        "stories": result,
+    })
 
 
 @app.errorhandler(404)
