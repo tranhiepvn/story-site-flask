@@ -27,7 +27,9 @@ body {
 
 aside.sidebar {
   /* tăng chiều ngang cho cột thể loại để không bị xuống hàng khi tên dài */
-  width: 400px;
+  /* Mở rộng cột thể loại bên trái để dễ đọc hơn */
+  /* tăng chiều ngang cho cột thể loại: ban đầu 400px, rồi tăng lên 600px, giờ gấp đôi để rộng rãi hơn */
+  width: 800px;
   margin-right: 1em;
   /* nền sidebar hơi xanh để đồng nhất với tông màu trang */
   background-color: #eaf3ff;
@@ -199,6 +201,79 @@ button:hover {
   margin-top: 0.25em;
 }
 
+/*
+ * Video input fields and previews
+ * Ensure each URL input appears above its preview, has the same width as
+ * the preview (400px) and adequate spacing between inputs/previews.
+ */
+
+/*
+ * Video input fields and previews
+ * Each video entry consists of a URL input and a preview iframe.
+ * Inputs live inside a responsive grid defined by .video-grid and .video-item.
+ */
+.video-input {
+  /* Inputs should span the full width of their container */
+  display: block;
+  width: 100%;
+  /* Add a small margin above each input to separate it from the previous preview */
+  margin-top: 0.5em;
+}
+
+/* Container for a set of video inputs/previews arranged in rows of three */
+.video-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+}
+
+/* Each video item occupies roughly one third of the available width,
+   capped at the typical preview size */
+.video-item {
+  flex: 1 0 calc(33.333% - 1em);
+  /* Giảm kích thước khung preview trong trang upload */
+  max-width: 300px;
+}
+
+/* Ensure the input within a video item uses the full available width */
+.video-item input[type="url"] {
+  width: 100%;
+  /* giảm hơn nữa khoảng cách giữa ô nhập URL và khung preview để sát hơn */
+  /* đặt margin nhỏ hơn một nửa so với trước đó */
+  margin-top: 0.15em;
+}
+
+/* Style the preview iframe inside a video item */
+.video-item iframe {
+  width: 100%;
+  /* Giảm chiều cao khung preview ở trang upload để hình chữ nhật nhỏ hơn */
+  height: 180px;
+  /* Giảm khoảng cách giữa ô nhập URL và khung xem xuống một nửa, sát hơn */
+  margin-top: 0.1em;
+  /* giữ khoảng cách dưới để tách mỗi khung preview */
+  margin-bottom: 1em;
+  display: block;
+}
+
+/* Center video players on the story page */
+.video-section {
+  text-align: center;
+}
+
+.video-section iframe {
+  display: block;
+  /* Center the iframe horizontally */
+  margin-left: auto;
+  margin-right: auto;
+  /* retain top and bottom margins for spacing */
+  margin-top: 1em;
+  margin-bottom: 1em;
+  /* tăng chiều cao khung video trên trang đọc truyện để dễ xem hơn */
+  height: 500px;
+  /* giới hạn chiều rộng về 80% để khung nằm gọn trong trang và giữ tỉ lệ hình chữ nhật */
+  width: 80%;
+}
+
 /* Thông báo flash (ví dụ như khi import dữ liệu thành công) */
 .flash-messages {
   list-style: none;
@@ -293,6 +368,31 @@ button:hover {
 }
 .rating-form button:hover {
   background-color: #0056b3;
+}
+
+/* Danh sách truyện/phim trùng khi import */
+.duplicate-item {
+  margin-bottom: 1.5em;
+  padding: 0.5em 0;
+  border-bottom: 1px solid #ccc;
+}
+.duplicate-item:last-child {
+  border-bottom: none;
+}
+.duplicate-item p {
+  margin: 0.25em 0;
+}
+.duplicate-item .snippet-db {
+  color: #28a745; /* xanh lá cây */
+  margin-left: 1em;
+}
+.duplicate-item .snippet-json {
+  color: #d9534f; /* đỏ */
+  margin-left: 1em;
+}
+.duplicate-item .decision {
+  margin-left: 1em;
+  margin-top: 0.3em;
 }
 
 /* trạng thái hoàn thành/chưa hoàn thành */

@@ -14,6 +14,67 @@
 {% block title %}Đọc truyện hay{% endblock %}
 
 {% block content %}
+  {# Mục truyện mới cập nhật: hiển thị những truyện có chương mới được thêm gần đây nhất #}
+  <div class="section recent">
+  <h2>Truyện mới cập nhật</h2>
+  {% if recent_stories %}
+    <ul class="story-list">
+      {% for story in recent_stories %}
+        <li>
+          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+          <p class="meta">
+            {% if story.author %}
+              Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+            {% else %}
+              Tác giả: Ẩn danh
+            {% endif %}
+          </p>
+          {% if story.categories %}
+          <p class="meta">
+            Thể loại:
+            {% for cat in story.categories %}
+              <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </p>
+          {% endif %}
+          <p class="meta">
+            {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+            Đánh giá:
+            <span class="rating">
+              {% for i in range(1,6) %}
+                {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+              {% endfor %}
+              {% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}
+            </span>
+          </p>
+          {# trạng thái hoàn thành/chưa hoàn thành #}
+          {% set total_parts = story.parts|length %}
+          {% if story.is_completed %}
+            <p class="status-message completed-status">
+              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+            </p>
+          {% else %}
+            <p class="status-message updating-status">
+              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+            </p>
+          {% endif %}
+          {% set first_part = story.parts|first %}
+          {% if first_part %}
+            {# Trích đoạn: cắt ở 200 ký tự và không cắt giữa từ #}
+            {% set snippet = first_part.content[:200] %}
+            {% if first_part.content|length > 200 %}
+              {% set snippet = snippet.rsplit(' ', 1)[0] %}
+            {% endif %}
+            <p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Chưa có truyện mới cập nhật.</p>
+  {% endif %}
+  </div>
+
   <div class="section best">
   <h2>Truyện hay nhất</h2>
   {% if best %}

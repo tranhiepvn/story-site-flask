@@ -22,6 +22,7 @@ Chức năng chính:
 
 import os
 import re
+import uuid
 from datetime import datetime
 import json
 import io
@@ -30,6 +31,7 @@ from email.message import EmailMessage
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func, text
 
 # Tạo ứng dụng Flask
 app = Flask(__name__)
@@ -70,9 +72,48 @@ db = SQLAlchemy(app)
 # Cung cấp đối tượng datetime cho tất cả template Jinja.
 # Điều này cho phép dùng {{ datetime.utcnow().year }} trong layout.html
 # mà không gặp lỗi UndefinedError.
+# Define a helper to convert Google Drive sharing links into embeddable preview URLs.
+def drive_embed(url: str) -> str:
+    """
+    Convert a Google Drive sharing link into an embeddable preview URL.
+
+    If the provided URL matches the pattern of a Google Drive file link
+    (either ``https://drive.google.com/file/d/<id>/...`` or contains ``id=<id>``),
+    this function returns the corresponding preview URL (``.../preview``).
+    If the URL does not match, it is returned unchanged.
+
+    Args:
+        url: The original Google Drive sharing URL.
+    Returns:
+        A URL pointing to the embeddable preview of the file, or an
+        empty string if no pattern is recognised.
+    """
+    if not url:
+        return ""
+    # Match /file/d/<id>/ path
+    m = re.search(r"/file/d/([A-Za-z0-9_-]+)", url)
+    if not m:
+        # Fallback: match id=... parameter
+        m = re.search(r"[?&]id=([A-Za-z0-9_-]+)", url)
+    if m:
+        fid = m.group(1)
+        return f"https://drive.google.com/file/d/{fid}/preview"
+    return ""
+
+
+# Provide utilities (datetime, range, drive_embed) to all Jinja templates.
 @app.context_processor
-def inject_datetime():
-    return {"datetime": datetime}
+def inject_utilities():
+    """Inject common utilities into Jinja templates.
+
+    Returns a dictionary mapping names to functions/objects that should be available
+    in the Jinja environment, including:
+
+      * ``datetime``: allows access to current time, e.g., ``datetime.utcnow()``.
+      * ``range``: built-in function for iterating a fixed number of times.
+      * ``drive_embed``: convert a Google Drive link to an embeddable preview URL.
+    """
+    return {"datetime": datetime, "range": range, "drive_embed": drive_embed}
 
 
 class Story(db.Model):
@@ -186,6 +227,35 @@ class Comment(db.Model):
         return f"<Comment {self.id} on Story {self.story_id}>"
 
 
+
+# Bảng lưu video liên kết cho từng chương (part) của truyện.
+# Mỗi bản ghi lưu URL của một video kèm theo khóa ngoại tới phần chứa video.
+class PartVideo(db.Model):
+    """Mô hình lưu trữ các liên kết video cho từng phần (chương) của truyện.
+
+    Sử dụng để đính kèm tối đa 10 video cho mỗi phần. Các video được lưu
+    riêng biệt khỏi nội dung để dễ dàng thêm, sửa và xoá mà không ảnh
+    hưởng tới nội dung chữ của phần truyện.
+    """
+
+    __tablename__ = "part_videos"
+    id = db.Column(db.Integer, primary_key=True)
+    # Khoá ngoại trỏ tới bảng parts. Một phần có thể có nhiều video liên kết.
+    part_id = db.Column(db.Integer, db.ForeignKey("parts.id"), nullable=False)
+    # URL tới video. Các URL này nên là liên kết nhúng (embed) của Google Drive.
+    url = db.Column(db.String(1024), nullable=False)
+
+    # Thiết lập quan hệ ngược để có thể truy cập các video từ đối tượng Part.
+    # Sử dụng cascade="all, delete-orphan" để xoá các video khi phần bị xoá.
+    part = db.relationship(
+        "Part",
+        backref=db.backref("videos", cascade="all, delete-orphan", lazy=True),
+    )
+
+    def __repr__(self) -> str:
+        return f"<PartVideo {self.id} for Part {self.part_id}>"
+
+
 # Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
 # đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
@@ -203,7 +273,6 @@ with app.app_context():
             sử dụng PRAGMA để kiểm tra thông tin bảng và thực hiện ALTER TABLE
             nếu cần. Lưu ý: Chỉ áp dụng cho SQLite.
             """
-            from sqlalchemy import text
             with db.engine.connect() as conn:
                 result = conn.execute(text("PRAGMA table_info(stories)")).fetchall()
                 columns = [row[1] for row in result]
@@ -359,6 +428,20 @@ def index():
         .limit(10)
         .all()
     )
+    # Lấy danh sách truyện có chương được thêm mới nhất (truyện mới cập nhật)
+    # Sử dụng subquery để lấy thời gian tạo phần mới nhất cho mỗi truyện
+    recent_parts = (
+        db.session.query(Part.story_id, db.func.max(Part.created_at).label("latest_part"))
+        .group_by(Part.story_id)
+        .subquery()
+    )
+    recent_stories = (
+        Story.query.join(recent_parts, Story.id == recent_parts.c.story_id)
+        .filter(Story.is_hidden == False)
+        .order_by(recent_parts.c.latest_part.desc())
+        .limit(10)
+        .all()
+    )
     # danh sách thể loại để hiển thị trong thanh bên
     categories = Category.query.order_by(Category.name).all()
     return render_template(
@@ -370,6 +453,7 @@ def index():
         short_pagination=short_pagination,
         long_pagination=long_pagination,
         categories=categories,
+        recent_stories=recent_stories,
     )
 
 
@@ -600,6 +684,14 @@ def upload():
                 new_part = Part(story_id=story.id, part_number=next_number, content=content)
                 db.session.add(new_part)
                 db.session.commit()
+                # Lưu các liên kết video cho phần mới
+                video_urls = request.form.getlist("video_urls")
+                # Chỉ lấy tối đa 9 liên kết video để tránh quá nhiều mục
+                for url in video_urls[:9]:
+                    url = (url or "").strip()
+                    if url:
+                        db.session.add(PartVideo(part_id=new_part.id, url=url))
+                db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
             elif action == "delete_last":
                 # xoá phần cuối cùng nếu có
@@ -668,6 +760,14 @@ def upload():
                     part_obj = None
                 if part_obj and part_obj.story_id == story.id:
                     part_obj.content = content
+                    # Cập nhật các liên kết video: xoá cũ và thêm mới
+                    # Xoá toàn bộ video cũ của phần
+                    PartVideo.query.filter_by(part_id=part_obj.id).delete()
+                    video_urls = request.form.getlist("video_urls")
+                    for url in video_urls[:9]:
+                        url = (url or "").strip()
+                        if url:
+                            db.session.add(PartVideo(part_id=part_obj.id, url=url))
                     db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
             # không nhận ra action, trở lại trang edit
@@ -713,6 +813,13 @@ def upload():
             # tạo phần đầu tiên
             first_part = Part(story_id=story.id, part_number=1, content=content)
             db.session.add(first_part)
+            db.session.commit()
+            # Lưu các liên kết video cho chương đầu
+            video_urls = request.form.getlist("video_urls")
+            for url in video_urls[:9]:
+                url = (url or "").strip()
+                if url:
+                    db.session.add(PartVideo(part_id=first_part.id, url=url))
             db.session.commit()
             return redirect(url_for("upload", story_id=story.id))
 
@@ -786,20 +893,27 @@ def upload_login():
 
 @app.route("/export_data", methods=["POST"])
 def export_data():
-    """Export tất cả dữ liệu về truyện, phần và thể loại ra một file JSON.
+    """Export tất cả dữ liệu về truyện, phần, video, bình luận và thể loại ra một file JSON.
 
-    Người dùng phải đăng nhập trang quản trị (upload_authenticated) mới được phép tải dữ liệu.
+    Người dùng phải đăng nhập trang quản trị và cung cấp mật khẩu hợp lệ để tải dữ liệu.
     Sau khi thu thập dữ liệu, hàm trả về file JSON để người dùng tải xuống.
     """
-    # Kiểm tra quyền truy cập
+    # Chỉ cho phép khi đã đăng nhập trang upload
     if not session.get("upload_authenticated"):
         return redirect(url_for("upload_login"))
+    # Kiểm tra mật khẩu được gửi kèm trong form
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload"))
     # Lấy dữ liệu từ cơ sở dữ liệu
     stories = Story.query.all()
     categories = Category.query.all()
     parts = Part.query.all()
-    # Chuyển đổi dữ liệu sang dict
+    videos = PartVideo.query.all()
     comments = Comment.query.all()
+    # Chuyển đổi dữ liệu sang dict
     data = {
         "categories": [
             {"id": c.id, "name": c.name} for c in categories
@@ -817,7 +931,6 @@ def export_data():
                 "rating_sum": s.rating_sum,
                 "rating_count": s.rating_count,
                 "category_id": s.category_id,
-                # danh sách id thể loại liên kết (nhiều‑nhiều)
                 "categories": [cat.id for cat in s.categories],
             }
             for s in stories
@@ -844,6 +957,14 @@ def export_data():
             }
             for c in comments
         ],
+        "videos": [
+            {
+                "id": v.id,
+                "part_id": v.part_id,
+                "url": v.url,
+            }
+            for v in videos
+        ],
     }
     # Chuyển đổi sang JSON và gửi file
     json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
@@ -854,14 +975,24 @@ def export_data():
 
 @app.route("/import_data", methods=["POST"])
 def import_data():
-    """Nhận file JSON và nhập toàn bộ dữ liệu vào cơ sở dữ liệu hiện tại.
+    """Xử lý yêu cầu import dữ liệu từ file JSON.
 
-    Khi import, dữ liệu cũ sẽ bị xoá để tránh trùng lặp. Chỉ người dùng đã đăng nhập
-    trang quản trị mới được phép thao tác. Sau khi hoàn thành, hàm chuyển hướng
-    về trang upload với thông báo.
+    Bổ sung xác thực mật khẩu trước khi import. Hàm sẽ kiểm tra trùng tên truyện
+    dựa trên tiêu đề (không phân biệt chữ hoa/thường) và nếu phát hiện, hiển
+    thị một trang xem xét để người dùng quyết định ghi đè hoặc bỏ qua từng
+    truyện trùng tên. Nếu không có trùng, dữ liệu sẽ được import ngay lập tức.
     """
+    # Chỉ cho phép người dùng đã đăng nhập vào trang upload
     if not session.get("upload_authenticated"):
         return redirect(url_for("upload_login"))
+
+    # Kiểm tra mật khẩu gửi kèm
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload"))
+
     uploaded_file = request.files.get("import_file")
     if not uploaded_file:
         flash("Không tìm thấy file để import.")
@@ -871,103 +1002,320 @@ def import_data():
     except Exception:
         flash("File import không hợp lệ.")
         return redirect(url_for("upload"))
-    # Xoá toàn bộ dữ liệu cũ (categories, stories, parts, comments) và các quan hệ
-    db.session.execute(story_categories.delete())
-    Comment.query.delete()
-    Part.query.delete()
-    Story.query.delete()
-    Category.query.delete()
-    db.session.commit()
-    # Import categories
-    category_objs = {}
-    for cat in data.get("categories", []):
-        cobj = Category(id=cat.get("id"), name=cat.get("name"))
-        db.session.add(cobj)
-        category_objs[cobj.id] = cobj
-    db.session.commit()
-    # Import stories
-    story_objs = {}
+
+    # Đảm bảo tồn tại các khoá cơ bản trong file JSON
+    for key in ("categories", "stories", "parts", "comments", "videos"):
+        if key not in data:
+            data[key] = []
+
+    # Xác định tiêu đề truyện đã tồn tại trong cơ sở dữ liệu (không phân biệt chữ hoa/thường)
+    existing_titles = {s.title.lower() for s in Story.query.all()}
+    duplicates = []
+    non_duplicates = []
     for st in data.get("stories", []):
-        ts = st.get("created_at")
-        created_at = None
-        if ts:
+        title = (st.get("title") or "").strip()
+        if title.lower() in existing_titles:
+            duplicates.append(st)
+        else:
+            non_duplicates.append(st)
+
+    # Nếu có trùng tên, chuẩn bị danh sách chi tiết để hỏi người dùng
+    if duplicates:
+        duplicate_info_list = []
+        for st in duplicates:
+            json_id = st.get("id")
+            title = st.get("title", "")
+            # Tìm truyện hiện có trong DB
+            existing_story = Story.query.filter(func.lower(Story.title) == title.lower()).first()
+            # Lấy phần đầu tiên của truyện trên web
+            db_snippet = ""
+            if existing_story:
+                db_first_part = (
+                    Part.query.filter_by(story_id=existing_story.id)
+                    .order_by(Part.part_number)
+                    .first()
+                )
+                if db_first_part and db_first_part.content:
+                    # Ghép nội dung vào một dòng và lấy tối đa 400 ký tự, cắt tới từ gần nhất
+                    db_text = db_first_part.content.replace("\n", " ")
+                    snippet = db_text[:400]
+                    if len(db_text) > 400:
+                        snippet = snippet.rsplit(" ", 1)[0] + "..."
+                    db_snippet = snippet
+            # Lấy phần đầu tiên của truyện trong file JSON
+            json_snippet = ""
+            for p in data.get('parts', []):
+                if p.get('story_id') == json_id and p.get('part_number') == 1:
+                    content = (p.get('content') or "").replace("\n", " ")
+                    snippet = content[:400]
+                    if len(content) > 400:
+                        snippet = snippet.rsplit(" ", 1)[0] + "..."
+                    json_snippet = snippet
+                    break
+            duplicate_info_list.append({
+                'json_id': json_id,
+                'db_id': existing_story.id if existing_story else None,
+                'title': title,
+                'db_snippet': db_snippet,
+                'json_snippet': json_snippet,
+            })
+        # Lưu dữ liệu import vào file tạm để sử dụng ở bước xác nhận
+        BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+        DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, "data"))
+        os.makedirs(DATA_DIR, exist_ok=True)
+        temp_filename = f"import_{uuid.uuid4().hex}.json"
+        temp_path = os.path.join(DATA_DIR, temp_filename)
+        try:
+            with open(temp_path, 'w', encoding='utf8') as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception:
+            flash("Không thể lưu tệp tạm thời để import.")
+            return redirect(url_for("upload"))
+        # Chuyển sang trang xác nhận import, truyền danh sách trùng và tên file tạm
+        return render_template(
+            "import_review.html",
+            duplicates=duplicate_info_list,
+            temp_file=temp_filename,
+            success_count=len(non_duplicates),
+        )
+    # Không có trùng tên, thực hiện import trực tiếp
+    imported_count, overwritten_count, skipped_count = perform_import(data, decisions=None)
+    flash(f"Import thành công {imported_count} truyện.")
+    return redirect(url_for("upload"))
+
+
+# Route xử lý bước xác nhận import sau khi người dùng lựa chọn cách xử lý các truyện trùng tên.
+@app.route("/import_confirm", methods=["POST"])
+def import_confirm():
+    """Nhận quyết định import cuối cùng từ trang xác nhận và thực hiện import dữ liệu.
+
+    Người dùng cần đã đăng nhập vào trang upload. Hàm đọc lại tệp tạm đã lưu chứa
+    dữ liệu JSON, kiểm tra mật khẩu một lần nữa và áp dụng quyết định skip/overwrite
+    cho từng truyện trùng tên (được truyền qua các trường form ``decision_<json_id>``).
+    """
+    # Yêu cầu đã đăng nhập
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    # Kiểm tra mật khẩu gửi kèm để xác nhận import
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload"))
+    temp_file = request.form.get("temp_file")
+    if not temp_file:
+        flash("Thiếu file tạm để import.")
+        return redirect(url_for("upload"))
+    # Thu thập quyết định cho các truyện trùng tên
+    decisions: dict[str, str] = {}
+    for key, value in request.form.items():
+        if key.startswith("decision_"):
+            json_id = key.split("decision_", 1)[1]
+            decisions[json_id] = value
+    # Đọc lại dữ liệu từ file tạm
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, "data"))
+    temp_path = os.path.join(DATA_DIR, temp_file)
+    try:
+        with open(temp_path, 'r', encoding='utf8') as f:
+            data = json.load(f)
+    except Exception:
+        flash("Không thể đọc dữ liệu import.")
+        return redirect(url_for("upload"))
+    # Xoá file tạm sau khi đọc
+    try:
+        os.remove(temp_path)
+    except Exception:
+        pass
+    # Đảm bảo khoá mặc định tồn tại
+    for key in ("categories", "stories", "parts", "comments", "videos"):
+        if key not in data:
+            data[key] = []
+    imported_count, overwritten_count, skipped_count = perform_import(data, decisions)
+    flash(
+        f"Import hoàn tất. Đã import {imported_count} truyện, ghi đè {overwritten_count} và bỏ qua {skipped_count}."
+    )
+    return redirect(url_for("upload"))
+
+
+def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple[int, int, int]:
+    """Nhập dữ liệu từ dict JSON vào cơ sở dữ liệu.
+
+    Hàm này xây dựng lại toàn bộ cấu trúc dữ liệu (thể loại, truyện, chương,
+    bình luận và video) dựa trên nội dung của ``data``. Các truyện bị đánh dấu
+    ``skip`` trong ``decisions`` sẽ bị bỏ qua. Các truyện có quyết định ``overwrite``
+    sẽ xoá truyện hiện có (cùng tiêu đề, không phân biệt chữ hoa/thường) trước khi
+    import lại. Các truyện còn lại được import như bình thường.
+
+    Trả về bộ ba ``(imported_count, overwritten_count, skipped_count)`` để hiển thị
+    thống kê số lượng truyện được tạo mới, số bị ghi đè và số bị bỏ qua.
+    """
+    if decisions is None:
+        decisions = {}
+    imported_count = 0
+    overwritten_count = 0
+    skipped_count = 0
+
+    # Tạo hoặc lấy các thể loại dựa trên tên (không phân biệt chữ hoa/thường)
+    category_objs: dict[int, Category] = {}
+    for cat in data.get("categories", []):
+        name = cat.get("name")
+        if not name:
+            continue
+        existing = Category.query.filter(func.lower(Category.name) == name.lower()).first()
+        if existing:
+            cobj = existing
+        else:
+            cobj = Category(name=name)
+            db.session.add(cobj)
+            db.session.flush()
+        category_objs[cat.get("id")] = cobj
+    db.session.commit()
+
+    # mapping từ id cũ sang id mới
+    story_map: dict[int, int] = {}
+    part_map: dict[int, int] = {}
+
+    # Import truyện
+    for st in data.get("stories", []):
+        old_id = st.get("id")
+        title = (st.get("title") or "").strip()
+        # Lấy quyết định: có thể là skip, overwrite hoặc None (mặc định là import)
+        decision = decisions.get(str(old_id)) or decisions.get(old_id)
+        # Bỏ qua truyện nếu được đánh dấu skip
+        if decision == "skip":
+            skipped_count += 1
+            continue
+        # Nếu quyết định overwrite, xoá truyện hiện có cùng tên (case-insensitive)
+        if decision == "overwrite":
+            existing_story = Story.query.filter(func.lower(Story.title) == title.lower()).first()
+            if existing_story:
+                # Gỡ liên kết thể loại
+                existing_story.categories = []
+                # Xoá video của các phần
+                for part in existing_story.parts:
+                    PartVideo.query.filter_by(part_id=part.id).delete()
+                # Xoá các phần
+                Part.query.filter_by(story_id=existing_story.id).delete()
+                # Xoá bình luận
+                Comment.query.filter_by(story_id=existing_story.id).delete()
+                # Xoá truyện
+                db.session.delete(existing_story)
+                db.session.commit()
+                overwritten_count += 1
+        # Tạo truyện mới (luôn tạo mới để tránh xung đột id)
+        created_at_str = st.get("created_at")
+        if created_at_str:
             try:
-                created_at = datetime.fromisoformat(ts)
+                created_at_dt = datetime.fromisoformat(created_at_str)
             except Exception:
-                created_at = datetime.utcnow()
-        sobj = Story(
-            id=st.get("id"),
+                created_at_dt = datetime.utcnow()
+        else:
+            created_at_dt = datetime.utcnow()
+        new_story = Story(
             title=st.get("title"),
             author=st.get("author"),
             story_type=st.get("story_type", "short"),
-            created_at=created_at,
+            created_at=created_at_dt,
             views=st.get("views", 0),
             is_hidden=st.get("is_hidden", False),
             is_completed=st.get("is_completed", False),
             rating_sum=st.get("rating_sum", 0),
             rating_count=st.get("rating_count", 0),
-            category_id=st.get("category_id"),
         )
-        db.session.add(sobj)
-        story_objs[sobj.id] = sobj
-    db.session.commit()
-    # Import parts
-    for part in data.get("parts", []):
-        ts = part.get("created_at")
-        p_created_at = None
-        if ts:
-            try:
-                p_created_at = datetime.fromisoformat(ts)
-            except Exception:
-                p_created_at = datetime.utcnow()
-        pobj = Part(
-            id=part.get("id"),
-            story_id=part.get("story_id"),
-            part_number=part.get("part_number"),
-            content=part.get("content"),
-            created_at=p_created_at,
-        )
-        db.session.add(pobj)
-    db.session.commit()
-    # Gán quan hệ nhiều‑nhiều story_categories
-    for st in data.get("stories", []):
-        s_id = st.get("id")
-        sobj = story_objs.get(s_id)
-        if not sobj:
-            continue
+        db.session.add(new_story)
+        db.session.flush()
+        story_map[old_id] = new_story.id
+        imported_count += 1
+        # Thiết lập danh sách thể loại
         cat_ids = st.get("categories", [])
-        sobj.categories = [category_objs[cid] for cid in cat_ids if cid in category_objs]
+        selected_cats = [category_objs[cid] for cid in cat_ids if cid in category_objs]
+        new_story.categories = selected_cats
+        # category_id gốc chỉ dùng để tham chiếu, đặt theo thể loại đầu tiên nếu có
+        if selected_cats:
+            new_story.category_id = selected_cats[0].id
+        else:
+            new_story.category_id = None
+        db.session.flush()
     db.session.commit()
-    # Import comments
-    for c in data.get("comments", []):
-        ts = c.get("created_at")
-        c_created = None
-        if ts:
+
+    # Import các phần cho mỗi truyện
+    for part in data.get("parts", []):
+        old_story_id = part.get("story_id")
+        # Nếu truyện cũ không được import (do skip) thì bỏ qua phần
+        if old_story_id not in story_map:
+            continue
+        created_at_str = part.get("created_at")
+        if created_at_str:
             try:
-                c_created = datetime.fromisoformat(ts)
+                part_created = datetime.fromisoformat(created_at_str)
+            except Exception:
+                part_created = datetime.utcnow()
+        else:
+            part_created = datetime.utcnow()
+        new_part = Part(
+            story_id=story_map[old_story_id],
+            part_number=part.get("part_number"),
+            content=part.get("content", ""),
+            created_at=part_created,
+        )
+        db.session.add(new_part)
+        db.session.flush()
+        part_map[part.get("id")] = new_part.id
+    db.session.commit()
+
+    # Import bình luận (sử dụng id mới của truyện); cập nhật lại url nếu có chứa /story/<id>
+    for c in data.get("comments", []):
+        old_story_id = c.get("story_id")
+        new_story_id = story_map.get(old_story_id)
+        if not new_story_id:
+            continue  # bỏ qua bình luận của truyện đã skip
+        created_at_str = c.get("created_at")
+        if created_at_str:
+            try:
+                c_created = datetime.fromisoformat(created_at_str)
             except Exception:
                 c_created = datetime.utcnow()
-        cm = Comment(
-            id=c.get("id"),
-            story_id=c.get("story_id"),
-            url=c.get("url"),
+        else:
+            c_created = datetime.utcnow()
+        url = c.get("url", "")
+        try:
+            import re
+            url = re.sub(r"/story/(\d+)", lambda m: f"/story/{new_story_id}", url)
+        except Exception:
+            pass
+        new_comment = Comment(
+            story_id=new_story_id,
+            url=url,
             name=c.get("name"),
             email=c.get("email"),
             content=c.get("content"),
             created_at=c_created,
         )
-        db.session.add(cm)
+        db.session.add(new_comment)
     db.session.commit()
-    # Khôi phục sequence tự tăng cho PostgreSQL
+
+    # Import video liên kết cho các phần
+    for vid in data.get("videos", []):
+        old_part_id = vid.get("part_id")
+        new_part_id = part_map.get(old_part_id)
+        if not new_part_id:
+            continue
+        url = vid.get("url")
+        if url:
+            db.session.add(PartVideo(part_id=new_part_id, url=url))
+    db.session.commit()
+
+    # Cập nhật sequence tự tăng khi sử dụng PostgreSQL
     if db.engine.dialect.name == "postgresql":
-        from sqlalchemy import text
         with db.engine.connect() as conn:
             conn.execute(text("SELECT setval(pg_get_serial_sequence('categories','id'), COALESCE((SELECT MAX(id) FROM categories), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('stories','id'), COALESCE((SELECT MAX(id) FROM stories), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('parts','id'), COALESCE((SELECT MAX(id) FROM parts), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('comments','id'), COALESCE((SELECT MAX(id) FROM comments), 1), true)"))
-    flash("Import dữ liệu thành công!")
-    return redirect(url_for("upload"))
+            conn.execute(text("SELECT setval(pg_get_serial_sequence('part_videos','id'), COALESCE((SELECT MAX(id) FROM part_videos), 1), true)"))
+    return imported_count, overwritten_count, skipped_count
+
 
 
 # ------ Delete all stories utility ------
@@ -992,10 +1340,17 @@ def delete_all_stories():
     if not pw1 or not pw2 or pw1 != pw2 or pw1 != UPLOAD_PASSWORD:
         flash("Mật khẩu không hợp lệ hoặc hai mật khẩu không khớp.")
         return redirect(url_for("upload"))
-    # Xoá toàn bộ dữ liệu liên quan tới truyện
+    # Xoá toàn bộ dữ liệu liên quan tới truyện, bao gồm cả video và bình luận
     try:
+        # Gỡ quan hệ nhiều-nhiều giữa truyện và thể loại
         db.session.execute(story_categories.delete())
+        # Xoá bình luận trước để tránh khoá ngoại tới story
+        Comment.query.delete()
+        # Xoá liên kết video của các chương
+        PartVideo.query.delete()
+        # Xoá tất cả các chương
         Part.query.delete()
+        # Xoá truyện
         Story.query.delete()
         db.session.commit()
         flash("Đã xoá toàn bộ truyện thành công!")

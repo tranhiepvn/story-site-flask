@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block title %}Xác nhận import dữ liệu{% endblock %}
+
+{% block content %}
+<h2>Xác nhận import dữ liệu</h2>
+<p>Có {{ duplicates|length }} truyện trùng tên. Số truyện không trùng: {{ success_count }}.</p>
+<p>Vui lòng chọn hành động cho từng truyện trùng tên: "Overwrite" để xoá truyện hiện có và import truyện từ file JSON, hoặc "Skip" để bỏ qua và giữ nguyên truyện hiện có.</p>
+<form method="post" action="{{ url_for('import_confirm') }}">
+  <input type="hidden" name="temp_file" value="{{ temp_file }}">
+  {% for dup in duplicates %}
+  <div class="duplicate-item">
+    <p><strong>{{ loop.index }}: {{ dup.title }}</strong></p>
+    {# đoạn trích phần đầu chương 1 từ cơ sở dữ liệu, hiển thị màu xanh lá #}
+    <p class="snippet-db">{{ dup.db_snippet }}</p>
+    {# đoạn trích phần đầu chương 1 từ file JSON, hiển thị màu đỏ #}
+    <p class="snippet-json">{{ dup.json_snippet }}</p>
+    <p class="decision">
+      <label><input type="radio" name="decision_{{ dup.json_id }}" value="overwrite" checked> Overwrite</label>
+      <label style="margin-left:1em;"><input type="radio" name="decision_{{ dup.json_id }}" value="skip"> Skip</label>
+    </p>
+  </div>
+  {% endfor %}
+  <div class="form-group">
+    <label for="import_password">Password:</label><br>
+    <input type="password" id="import_password" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit">Thực hiện import</button>
+  </div>
+</form>
+{% endblock %}

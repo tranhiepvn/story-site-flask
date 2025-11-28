@@ -90,6 +90,15 @@
         {% endif %}
       {% endif %}
     </div>
+    {# Hiển thị các video liên kết (nếu có) ngay dưới nội dung chương #}
+    {% if current_part and current_part.videos %}
+      <div class="video-section">
+        {% for vid in current_part.videos %}
+          {# Sử dụng hàm drive_embed để chuyển đổi URL thành liên kết xem trước của Google Drive #}
+          <iframe src="{{ drive_embed(vid.url) }}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        {% endfor %}
+      </div>
+    {% endif %}
     {# hiển thị đánh giá hiện tại và form đánh giá #}
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
