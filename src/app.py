@@ -70,6 +70,47 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Khởi tạo đối tượng SQLAlchemy
 db = SQLAlchemy(app)
 
+# Helper to sort categories into special order
+def get_category_groups() -> tuple[list["Category"], list["Category"], list["Category"]]:
+    """
+    Return categories divided into three groups with a specific ordering:
+
+    - Group 1 (special): categories named "Truyện Chỉ Có 1 Chương" or "Phim Chỉ Có 1 Tập"
+      and categories named "Truyện Có Nhiều Chương" or "Phim Có Nhiều Tập".  These appear
+      first in the sidebar.
+    - Group 2 (uppercase): categories whose name starts with an uppercase letter (A–Z)
+      excluding those already placed in group 1.
+    - Group 3 (lowercase/other): all remaining categories, sorted by name (case-insensitive).
+
+    Each group is sorted alphabetically (case-insensitive) except for group 1 which preserves
+    the order defined by ``first_candidates_1`` and ``first_candidates_2``.
+    """
+    cats = Category.query.all()
+    # define names for special groups. preserve order within these lists.
+    first_candidates_1 = ["Truyện Chỉ Có 1 Chương", "Phim Chỉ Có 1 Tập"]
+    first_candidates_2 = ["Truyện Có Nhiều Chương", "Phim Có Nhiều Tập"]
+    # prepare containers
+    group1: list[Category] = []
+    group2: list[Category] = []
+    group3: list[Category] = []
+    # assign categories to groups
+    for c in cats:
+        if c.name in first_candidates_1:
+            group1.append(c)
+        elif c.name in first_candidates_2:
+            group1.append(c)
+        else:
+            # categorize by first character
+            first_char = c.name[0] if c.name else ''
+            if first_char.isalpha() and first_char.isupper():
+                group2.append(c)
+            else:
+                group3.append(c)
+    # sort group2 and group3 by name case-insensitive
+    group2 = sorted(group2, key=lambda c: c.name.lower())
+    group3 = sorted(group3, key=lambda c: c.name.lower())
+    return group1, group2, group3
+
 # Cung cấp đối tượng datetime cho tất cả template Jinja.
 # Điều này cho phép dùng {{ datetime.utcnow().year }} trong layout.html
 # mà không gặp lỗi UndefinedError.
@@ -114,7 +155,18 @@ def inject_utilities():
       * ``range``: built-in function for iterating a fixed number of times.
       * ``drive_embed``: convert a Google Drive link to an embeddable preview URL.
     """
-    return {"datetime": datetime, "range": range, "drive_embed": drive_embed}
+    # Additionally inject category groups so templates can access them without passing explicitly.
+    cat1, cat2, cat3 = get_category_groups()
+    # Provide a combined list of all categories as 'categories' for templates that still reference it
+    return {
+        "datetime": datetime,
+        "range": range,
+        "drive_embed": drive_embed,
+        "categories": cat1 + cat2 + cat3,
+        "categories_group1": cat1,
+        "categories_group2": cat2,
+        "categories_group3": cat3,
+    }
 
 
 class Story(db.Model):
@@ -444,7 +496,7 @@ def index():
         .all()
     )
     # danh sách thể loại để hiển thị trong thanh bên
-    categories = Category.query.order_by(Category.name).all()
+    categories_group1, categories_group2, categories_group3 = get_category_groups()
     return render_template(
         "index.html",
         best=best,
@@ -453,7 +505,9 @@ def index():
         long_stories=long_stories,
         short_pagination=short_pagination,
         long_pagination=long_pagination,
-        categories=categories,
+        categories_group1=categories_group1,
+        categories_group2=categories_group2,
+        categories_group3=categories_group3,
         recent_stories=recent_stories,
     )
 
@@ -868,7 +922,7 @@ def upload_login():
     hiển thị thông báo lỗi. Danh sách thể loại được truyền vào để hiện
     trong sidebar, giống như các trang khác.
     """
-    categories = Category.query.order_by(Category.name).all()
+    categories_group1, categories_group2, categories_group3 = get_category_groups()
     # Mật khẩu upload từ biến môi trường hoặc giá trị mặc định
     UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
     if request.method == "POST":
@@ -881,12 +935,16 @@ def upload_login():
             return render_template(
                 "upload_login.html",
                 error="Mật khẩu sai.",
-                categories=categories,
+                categories_group1=categories_group1,
+                categories_group2=categories_group2,
+                categories_group3=categories_group3,
             )
     # GET: hiển thị form nhập mật khẩu
     return render_template(
         "upload_login.html",
-        categories=categories,
+        categories_group1=categories_group1,
+        categories_group2=categories_group2,
+        categories_group3=categories_group3,
     )
 
 
@@ -1113,6 +1171,14 @@ def import_confirm():
         if key.startswith("decision_"):
             json_id = key.split("decision_", 1)[1]
             decisions[json_id] = value
+    # Xử lý tuỳ chọn áp dụng chung: skip_all hoặc overwrite_all
+    apply_all = request.form.get("apply_all", "none")
+    if apply_all == "skip_all":
+        for k in list(decisions.keys()):
+            decisions[k] = "skip"
+    elif apply_all == "overwrite_all":
+        for k in list(decisions.keys()):
+            decisions[k] = "overwrite"
     # Đọc lại dữ liệu từ file tạm
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, os.pardir, "data"))
@@ -1411,7 +1477,7 @@ def category_view(category_id: int):
     )
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     stories = pagination.items
-    categories = Category.query.order_by(Category.name).all()
+    categories_group1, categories_group2, categories_group3 = get_category_groups()
     # Chuẩn bị các URL chuyển trang: đầu tiên, cuối cùng, trước và sau
     first_url = url_for("category_view", category_id=category.id, page=1) if pagination.page > 1 else None
     prev_url = url_for("category_view", category_id=category.id, page=pagination.prev_num) if pagination.has_prev else None
@@ -1428,7 +1494,9 @@ def category_view(category_id: int):
         prev_url=prev_url,
         next_url=next_url,
         last_url=last_url,
-        categories=categories,
+        categories_group1=categories_group1,
+        categories_group2=categories_group2,
+        categories_group3=categories_group3,
     )
 
 
@@ -1443,7 +1511,7 @@ def author_view(author: str):
     )
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     stories = pagination.items
-    categories = Category.query.order_by(Category.name).all()
+    categories_group1, categories_group2, categories_group3 = get_category_groups()
     # chuẩn bị liên kết chuyển trang cho template: đầu, cuối, trước, sau
     first_url = url_for("author_view", author=author, page=1) if pagination.page > 1 else None
     prev_url = url_for("author_view", author=author, page=pagination.prev_num) if pagination.has_prev else None
@@ -1460,7 +1528,9 @@ def author_view(author: str):
         prev_url=prev_url,
         next_url=next_url,
         last_url=last_url,
-        categories=categories,
+        categories_group1=categories_group1,
+        categories_group2=categories_group2,
+        categories_group3=categories_group3,
     )
 
 
@@ -1477,7 +1547,7 @@ def type_view(story_type: str):
     )
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     stories = pagination.items
-    categories = Category.query.order_by(Category.name).all()
+    categories_group1, categories_group2, categories_group3 = get_category_groups()
     # xác định tiêu đề tiếng Việt
     title_vi = "Truyện Ngắn" if story_type == "short" else "Truyện Dài"
     first_url = url_for("type_view", story_type=story_type, page=1) if pagination.page > 1 else None
@@ -1495,7 +1565,9 @@ def type_view(story_type: str):
         prev_url=prev_url,
         next_url=next_url,
         last_url=last_url,
-        categories=categories,
+        categories_group1=categories_group1,
+        categories_group2=categories_group2,
+        categories_group3=categories_group3,
     )
 
 
@@ -1522,12 +1594,14 @@ def search():
             .order_by(Story.created_at.desc())
             .all()
         )
-    categories = Category.query.order_by(Category.name).all()
+    categories_group1, categories_group2, categories_group3 = get_category_groups()
     return render_template(
         "search.html",
         query=query,
         stories=stories,
-        categories=categories,
+        categories_group1=categories_group1,
+        categories_group2=categories_group2,
+        categories_group3=categories_group3,
     )
 
 
@@ -1555,7 +1629,7 @@ def add_category():
     Cho phép tạo mới, cập nhật và xoá thể loại.
     Tất cả hành động đều yêu cầu mật khẩu upload giống như trang upload truyện.
     """
-    categories = Category.query.order_by(Category.name).all()
+    categories = get_sorted_categories()
     if request.method == "POST":
         UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
         password = request.form.get("password", "")

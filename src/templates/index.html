@@ -340,6 +340,4 @@
 
 {# Khối scripts: chèn JavaScript xử lý chọn nhiều thể loại trên trang chính #}
 {# Override scripts block để bao gồm script của layout (multi-category) #}
-{% block scripts %}
-  {{ super() }}
-{% endblock %}
+{# Không cần override block scripts ở trang chủ để script trong layout hoạt động #}

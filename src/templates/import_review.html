@@ -22,6 +22,12 @@
   </div>
   {% endfor %}
   <div class="form-group">
+    <p>Áp dụng cho tất cả:</p>
+    <label><input type="radio" name="apply_all" value="none" checked> None</label>
+    <label style="margin-left:1em;"><input type="radio" name="apply_all" value="skip_all"> Skip all</label>
+    <label style="margin-left:1em;"><input type="radio" name="apply_all" value="overwrite_all"> Overwrite all</label>
+  </div>
+  <div class="form-group">
     <label for="import_password">Password:</label><br>
     <input type="password" id="import_password" name="password" required>
   </div>
@@ -29,4 +35,32 @@
     <button type="submit">Thực hiện import</button>
   </div>
 </form>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Đặt mặc định cho tất cả truyện trùng là Skip
+    document.querySelectorAll('.duplicate-item').forEach(function(item) {
+      var skipRadio = item.querySelector('input[type="radio"][value="skip"]');
+      if (skipRadio) {
+        skipRadio.checked = true;
+      }
+    });
+    // Xử lý tuỳ chọn áp dụng chung: skip_all hoặc overwrite_all
+    var applyRadios = document.querySelectorAll('input[name="apply_all"]');
+    applyRadios.forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        if (this.value === 'skip_all' || this.value === 'overwrite_all') {
+          var desired = this.value === 'skip_all' ? 'skip' : 'overwrite';
+          document.querySelectorAll('.duplicate-item').forEach(function(item) {
+            var radios = item.querySelectorAll('input[type="radio"]');
+            radios.forEach(function(r) {
+              if (r.value === desired) {
+                r.checked = true;
+              }
+            });
+          });
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}
