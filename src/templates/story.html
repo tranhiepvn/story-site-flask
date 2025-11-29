@@ -32,13 +32,13 @@
   {% endif %}
 
   {# Hiển thị trạng thái hoàn thành của truyện #}
-  {% if story.is_completed %}
+    {% if story.is_completed %}
     <p class="status-message completed-status">
-      Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+      Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)
     </p>
   {% else %}
     <p class="status-message updating-status">
-      Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+      Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
     </p>
   {% endif %}
 
@@ -47,22 +47,22 @@
     {% if total_parts > 1 %}
       <div class="part-navigation">
         {% if current_index > 1 %}
-          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Chương trước</a>
+          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
         {% endif %}
         {% if current_index < total_parts %}
           {# nếu truyện đã hoàn thành và đang ở phần cuối thì hiển thị "Chương cuối" thay cho "Chương sau" #}
           {% if story.is_completed and (current_index + 1 == total_parts) %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương cuối &rarr;</a>
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần cuối &rarr;</a>
           {% else %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương sau &rarr;</a>
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
           {% endif %}
         {% elif story.is_completed %}
           {# nếu đang ở chương cuối của truyện hoàn thành, chỉ hiển thị nhãn #}
-          <span class="no-link">Chương cuối</span>
+          <span class="no-link">Phần cuối</span>
         {% endif %}
       </div>
       <div class="part-list">
-        <p>Danh sách chương:</p>
+        <p>Danh sách phần:</p>
         <ul>
           {% for p in parts %}
             <li style="margin-bottom: 0.5em;">
@@ -127,20 +127,20 @@
     {% if total_parts > 1 %}
       <div class="part-navigation">
         {% if current_index > 1 %}
-          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Chương trước</a>
+          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
         {% endif %}
         {% if current_index < total_parts %}
           {% if story.is_completed and (current_index + 1 == total_parts) %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương cuối &rarr;</a>
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần cuối &rarr;</a>
           {% else %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Chương sau &rarr;</a>
+            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
           {% endif %}
         {% elif story.is_completed %}
-          <span class="no-link">Chương cuối</span>
+          <span class="no-link">Phần cuối</span>
         {% endif %}
       </div>
       <div class="part-list">
-        <p>Danh sách chương:</p>
+        <p>Danh sách phần:</p>
         <ul>
           {% for p in parts %}
             <li style="margin-bottom: 0.5em;">

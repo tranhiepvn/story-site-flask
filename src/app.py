@@ -722,13 +722,26 @@ def upload():
                         parts=parts,
                         categories=categories,
                     )
-                # Nếu dòng đầu tiên bắt đầu bằng '### Phần ' hoặc '## Phần ' thì thay bằng 'Chương '
+                # Chuẩn hoá tiêu đề phần/chương đầu tiên: loại bỏ ký hiệu markdown (##, ###) và
+                # luôn sử dụng tiền tố "Phần " ở đầu dòng. Nếu dòng bắt đầu bằng "###" hoặc "##"
+                # và sau đó là "Phần " hoặc "Chương ", ta chuyển sang "Phần ". Đồng thời nếu
+                # dòng đầu tiên bắt đầu bằng "Chương ", chuyển thành "Phần " để đồng bộ.
                 lines = content.split('\n', 1)
                 first_line = lines[0]
-                if first_line.startswith("### Phần "):
-                    first_line = "Chương " + first_line[len("### Phần "):]
-                elif first_line.startswith("## Phần "):
-                    first_line = "Chương " + first_line[len("## Phần "):]
+                # Loại bỏ level heading '### ' hoặc '## '
+                for heading_prefix in ["### ", "## "]:
+                    if first_line.startswith(heading_prefix + "Phần "):
+                        first_line = "Phần " + first_line[len(heading_prefix + "Phần "):]
+                        break
+                    if first_line.startswith(heading_prefix + "Chương "):
+                        first_line = "Phần " + first_line[len(heading_prefix + "Chương "):]
+                        break
+                else:
+                    # Nếu không có heading, nhưng bắt đầu bằng "Chương ", đổi thành "Phần "
+                    if first_line.startswith("Chương "):
+                        first_line = "Phần " + first_line[len("Chương "):]
+                    # Nếu đã bắt đầu bằng "Phần ", giữ nguyên
+                # Ghép lại nội dung với dòng đầu đã chuẩn hoá
                 if len(lines) > 1:
                     content = first_line + "\n" + lines[1]
                 else:
@@ -785,9 +798,9 @@ def upload():
                         replaced_count += 1
                 if replaced_count > 0:
                     db.session.commit()
-                    flash(f"Đã thay '{search_str}' bằng '{replacement}' trong {replaced_count} chương.")
+                    flash(f"Đã thay '{search_str}' bằng '{replacement}' trong {replaced_count} phần.")
                 else:
-                    flash("Không tìm thấy cụm từ trong các chương.")
+                    flash("Không tìm thấy cụm từ trong các phần.")
                 return redirect(url_for("upload", story_id=story.id))
             elif action == "update_part":
                 # cập nhật nội dung của một chương cụ thể
@@ -1454,6 +1467,56 @@ def delete_all_stories():
     return redirect(url_for("upload"))
 
 
+@app.route("/replace_prefix_all", methods=["POST"])
+def replace_prefix_all():
+    """
+    Thay thế cụm từ ở đầu dòng đầu tiên của tất cả các chương của tất cả truyện.
+
+    Yêu cầu người dùng đã đăng nhập trang upload và cung cấp mật khẩu hợp lệ.
+    Form gửi cần các trường:
+      - find_prefix: cụm từ cần tìm ở đầu dòng.
+      - replace_prefix: cụm từ dùng để thay thế.
+      - password: mật khẩu xác thực.
+    Hàm sẽ kiểm tra password, duyệt qua tất cả các chương (Part) và nếu dòng
+    đầu tiên của nội dung chương bắt đầu bằng ``find_prefix`` thì thay thế
+    bằng ``replace_prefix``. Sau khi hoàn tất, hiển thị thông báo số chương đã
+    được cập nhật và chuyển hướng về trang upload.
+    """
+    # Chỉ cho phép sau khi đã đăng nhập trang upload
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    # Lấy mật khẩu cấu hình
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    search_prefix = request.form.get("find_prefix", "").strip()
+    replacement = request.form.get("replace_prefix", "")
+    pw = request.form.get("password", "")
+    # Xác thực mật khẩu
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload"))
+    if not search_prefix:
+        flash("Bạn phải nhập cụm từ cần tìm.")
+        return redirect(url_for("upload"))
+    replaced_count = 0
+    # Duyệt qua tất cả các chương và thay thế nếu phù hợp
+    parts = Part.query.all()
+    for part in parts:
+        lines = part.content.split('\n', 1)
+        if lines and lines[0].startswith(search_prefix):
+            new_first = replacement + lines[0][len(search_prefix):]
+            if len(lines) > 1:
+                part.content = new_first + '\n' + lines[1]
+            else:
+                part.content = new_first
+            replaced_count += 1
+    if replaced_count > 0:
+        db.session.commit()
+        flash(f"Đã thay '{search_prefix}' bằng '{replacement}' ở dòng đầu của {replaced_count} phần.")
+    else:
+        flash("Không tìm thấy cụm từ ở đầu dòng trong bất kỳ phần nào.")
+    return redirect(url_for("upload"))
+
+
 
 @app.route("/category/<int:category_id>")
 def category_view(category_id: int):
@@ -1812,3 +1875,68 @@ if __name__ == "__main__":
     create_tables()
     # Chạy ứng dụng khi chạy trực tiếp file này
     app.run(debug=True)
+
+@app.route("/skip_comments", methods=["POST"])
+def skip_comments():
+    # Mark comments as seen for stories
+    latest_comment_time = db.session.query(func.max(Comment.created_at)).scalar()
+    if latest_comment_time:
+        session['last_comment_seen_at_stories'] = latest_comment_time.isoformat()
+    return redirect(url_for("upload"))
+
+@app.context_processor
+def inject_comment_notifications():
+    def get_comment_notifications():
+        """
+        Return a tuple (show, commented) where `show` indicates whether to display
+        the comment notification and `commented` contains a list of stories with
+        new comments since the last time the user clicked "Bỏ qua". If no previous
+        skip exists, all commented stories are returned.
+        """
+        latest_comment_time = db.session.query(func.max(Comment.created_at)).scalar()
+        show = False
+        commented = []
+        if latest_comment_time:
+            # retrieve the last time the admin dismissed comments
+            last_seen_str = session.get('last_comment_seen_at_stories')
+            try:
+                last_seen = datetime.fromisoformat(last_seen_str) if last_seen_str else None
+            except Exception:
+                last_seen = None
+            if last_seen:
+                # only show stories with comments newer than last skip
+                commented = (
+                    db.session.query(Story)
+                    .join(Comment, Story.id == Comment.story_id)
+                    .filter(Comment.created_at > last_seen)
+                    .filter(Story.is_hidden == False)
+                    .distinct()
+                    .all()
+                )
+            else:
+                # no last_seen means it's the first load, show all commented stories
+                commented = (
+                    db.session.query(Story)
+                    .join(Comment, Story.id == Comment.story_id)
+                    .filter(Story.is_hidden == False)
+                    .distinct()
+                    .all()
+                )
+            if commented:
+                show = True
+        return show, commented
+    # Expose the helper to Jinja templates
+    return {"get_comment_notifications": get_comment_notifications}
+
+
+@app.route("/view_all_comments")
+def view_all_comments():
+    """Render a page listing all stories with comments."""
+    commented = (
+        db.session.query(Story)
+        .join(Comment, Story.id == Comment.story_id)
+        .filter(Story.is_hidden == False)
+        .distinct()
+        .all()
+    )
+    return render_template("comments_list.html", commented_stories=commented)

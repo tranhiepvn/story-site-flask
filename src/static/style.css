@@ -28,7 +28,7 @@ body {
 aside.sidebar {
   /* tăng chiều ngang cho cột thể loại để không bị xuống hàng khi tên dài */
   /* Mở rộng cột thể loại bên trái để dễ đọc hơn */
-  /* tăng chiều ngang cho cột thể loại: ban đầu 400px, rồi tăng lên 600px, giờ gấp đôi để rộng rãi hơn */
+  /* tăng chiều ngang cột thể loại lên gấp đôi so với bản trước (600px -> 800px) */
   width: 800px;
   margin-right: 1em;
   /* nền sidebar hơi xanh để đồng nhất với tông màu trang */
@@ -60,6 +60,13 @@ aside.sidebar a:hover {
   text-decoration: underline;
 }
 
+/* Khoảng trắng giữa các nhóm thể loại trong sidebar */
+aside.sidebar li.group-separator {
+  list-style: none;
+  margin: 0.7em 0;
+  height: 0;
+}
+
 /* Màu sắc đặc biệt cho các thể loại đầu tiên và chữ hoa */
 aside.sidebar li.special-cat > a {
   color: #c89a00; /* vàng đậm */
@@ -70,19 +77,12 @@ aside.sidebar li.uppercase-cat > a {
   font-weight: bold;
 }
 
-/* Dùng để tạo khoảng trắng giữa các nhóm thể loại trong sidebar */
-aside.sidebar li.group-separator {
-  list-style: none;
-  margin: 0.7em 0; /* tạo khoảng trắng dọc rõ ràng */
-  height: 0;
-}
-
-/* Section hiển thị truyện theo các thể loại được chọn ở trang chủ */
+/* Section hiển thị phim theo các thể loại được chọn ở trang chính */
 .selected-categories {
   margin-bottom: 2em;
 }
 
-/* Mỗi category-section chứa danh sách truyện của một thể loại */
+/* Mỗi category-section chứa danh sách phim của một thể loại */
 .category-section {
   margin-top: 2em;
   border-top: 2px solid #ccc;
@@ -267,8 +267,7 @@ button:hover {
 /* Ensure the input within a video item uses the full available width */
 .video-item input[type="url"] {
   width: 100%;
-  /* giảm hơn nữa khoảng cách giữa ô nhập URL và khung preview để sát hơn */
-  /* đặt margin nhỏ hơn một nửa so với trước đó */
+  /* giảm khoảng cách giữa ô nhập URL và khung preview xuống hơn nữa để sát hơn */
   margin-top: 0.15em;
 }
 
@@ -277,9 +276,8 @@ button:hover {
   width: 100%;
   /* Giảm chiều cao khung preview ở trang upload để hình chữ nhật nhỏ hơn */
   height: 180px;
-  /* Giảm khoảng cách giữa ô nhập URL và khung xem xuống một nửa, sát hơn */
+  /* Giảm khoảng cách giữa ô nhập URL và khung xem xuống một nửa */
   margin-top: 0.1em;
-  /* giữ khoảng cách dưới để tách mỗi khung preview */
   margin-bottom: 1em;
   display: block;
 }
@@ -297,9 +295,8 @@ button:hover {
   /* retain top and bottom margins for spacing */
   margin-top: 1em;
   margin-bottom: 1em;
-  /* tăng chiều cao khung video trên trang đọc truyện để dễ xem hơn */
+  /* tăng kích thước khung video để xem phim thoải mái hơn */
   height: 500px;
-  /* giới hạn chiều rộng về 80% để khung nằm gọn trong trang và giữ tỉ lệ hình chữ nhật */
   width: 100%;
 }
 
@@ -704,4 +701,77 @@ footer {
   text-align: center;
   font-size: 0.8em;
   color: #666;
+}
+
+/* Comment notification section styling */
+.comment-notification {
+  margin-bottom: 2em;
+}
+.comment-notification ul {
+  list-style: none;
+  padding: 0;
+}
+.comment-notification li {
+  margin-bottom: 0.5em;
+}
+.comment-notification .button-row {
+  display: flex;
+  justify-content: center;
+  gap: 2em;
+  margin-top: 0.5em;
+  margin-bottom: 1em;
+}
+.comment-notification .button-row button {
+  padding: 0.4em 0.8em;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.comment-notification .button-row button:hover {
+  background-color: #0056b3;
+}
+/* Comment list page spacing */
+.comment-list {
+  list-style: none;
+  padding: 0;
+}
+.comment-list li {
+  margin-bottom: 0.5em;
+}
+
+/*
+ * Đảm bảo rằng trên trang xem nội dung truyện, cột thể loại (sidebar)
+ * có chiều ngang đủ rộng giống trang phim. Sử dụng !important để tránh
+ * bị ghi đè bởi các quy tắc khác.
+ */
+
+
+/* ---------- Customizations to address sidebar width issues ---------- */
+/* On story detail pages, fix the width of the sidebar so it remains consistent across stories
+   and parts. Without an explicit flex-basis, the sidebar can shrink when the main content
+   overflows, leading to inconsistent widths on different stories. By setting both a fixed
+   width and a matching flex-basis, the sidebar stays the same size regardless of content. */
+/* On the upload page, widen the sidebar by 20% compared to the default width (800px → 960px).
+   The flex-basis is set to the same value to prevent flexbox from shrinking the sidebar when
+   the content area is wide. Additionally, the container on the upload page is expanded to
+   accommodate the wider sidebar so the main content still has reasonable space. */
+
+/* ---------- Fixed sidebar widths as requested ---------- */
+/* On story detail pages (trang xem nội dung), set the sidebar to 40% of its original width.
+   Use percentages for both width and flex-basis to ensure the sidebar maintains a consistent
+   proportion relative to the container and does not shrink when the content changes. */
+body.story_detail aside.sidebar {
+  width: 320px;
+  flex: 0 0 320px;
+  box-sizing: border-box;
+}
+
+/* On the upload page (trang upload), set the sidebar to 35% of its original width. This keeps
+   the column narrower while still giving room for category names. */
+body.upload aside.sidebar {
+  width: 280px;
+  flex: 0 0 280px;
+  box-sizing: border-box;
 }

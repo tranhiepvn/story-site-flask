@@ -68,13 +68,13 @@
   </div>
 </form>
 
-<h3>Danh sách chương</h3>
+<h3>Danh sách phần</h3>
 {% if parts %}
   <ol class="chapter-list">
     {% for part in parts %}
       <li style="margin-bottom: 0.5em;">
         <a href="{{ url_for('upload', story_id=story.id, edit_part=part.id) }}">
-          <strong>Chương {{ part.part_number }}</strong>
+          <strong>Phần {{ part.part_number }}</strong>
         </a>
         : {{ part.content[:100].replace('\n',' ') }}{% if part.content|length > 100 %}...{% endif %} ({{ part.created_at.strftime('%d/%m/%Y') }})
       </li>
@@ -86,7 +86,7 @@
 
 {# Hiển thị form cập nhật nội dung cho chương nếu có edit_part được chọn #}
 {% if edit_part %}
-  <h3>Cập nhật chương {{ edit_part.part_number }}</h3>
+  <h3>Cập nhật phần {{ edit_part.part_number }}</h3>
   {% if error_update %}
     <p class="error">{{ error_update }}</p>
   {% endif %}
@@ -94,7 +94,7 @@
     <input type="hidden" name="existing_story_id" value="{{ story.id }}">
     <input type="hidden" name="part_id" value="{{ edit_part.id }}">
     <div class="form-group">
-      <label for="edit_content">Nội dung chương:</label><br>
+      <label for="edit_content">Nội dung phần:</label><br>
       <textarea id="edit_content" name="content" rows="30" cols="80" required>{{ edit_part.content }}</textarea>
     </div>
     <div class="form-group">
@@ -113,16 +113,16 @@
       <input type="password" id="password_update" name="password" required>
     </div>
     <div class="form-group">
-      <button type="submit" name="action" value="update_part">Cập nhật chương</button>
+      <button type="submit" name="action" value="update_part">Cập nhật phần</button>
     </div>
   </form>
 {% endif %}
 
-<h3>Thêm chương mới</h3>
+<h3>Thêm phần mới</h3>
 <form method="post">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
   <div class="form-group">
-    <label for="new_content">Nội dung chương mới:</label><br>
+    <label for="new_content">Nội dung phần mới:</label><br>
     <textarea id="new_content" name="content" rows="30" cols="80" required></textarea>
   </div>
   <div class="form-group">
@@ -141,11 +141,11 @@
     <input type="password" id="password2" name="password" required>
   </div>
   <div class="form-group">
-    <button type="submit" name="action" value="add_part">Thêm chương</button>
+    <button type="submit" name="action" value="add_part">Thêm phần</button>
   </div>
 </form>
 
-<h3>Xoá chương cuối</h3>
+<h3>Xoá phần cuối</h3>
 <form method="post" onsubmit="return confirm('Bạn có chắc muốn xoá phần cuối không?');">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
   <div class="form-group">
@@ -153,7 +153,7 @@
     <input type="password" id="password3" name="password" required>
   </div>
   <div class="form-group">
-    <button type="submit" name="action" value="delete_last">Xoá chương cuối</button>
+    <button type="submit" name="action" value="delete_last">Xoá phần cuối</button>
   </div>
 </form>
 

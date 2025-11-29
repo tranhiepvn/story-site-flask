@@ -121,9 +121,9 @@
               }
               html += `<p class="meta">Đánh giá: <span class="rating">${stars}${ratingText}</span></p>`;
               if (story.is_completed) {
-                html += `<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">${story.part_count} chương</em>)</p>`;
+                html += `<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">${story.part_count} phần</em>)</p>`;
               } else {
-                html += `<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương ${story.part_count}</em>)</p>`;
+              html += `<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần ${story.part_count}</em>)</p>`;
               }
               if (story.snippet) {
                 html += `<p class="snippet">${story.snippet}</p>`;

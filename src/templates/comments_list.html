@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+
+{% block title %}Danh sách truyện có bình luận{% endblock %}
+
+{% block content %}
+<h2>Danh sách truyện có bình luận</h2>
+{% if commented_stories %}
+<ul class="comment-list">
+{% for st in commented_stories %}
+  <li><a href="{{ url_for('story_detail', story_id=st.id) }}">{{ st.title }}{% if st.author %} - {{ st.author }}{% endif %}</a></li>
+{% endfor %}
+</ul>
+{% else %}
+<p>Chưa có bình luận nào.</p>
+{% endif %}
+{% endblock %}

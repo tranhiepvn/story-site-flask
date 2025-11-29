@@ -41,11 +41,11 @@
           {% set total_parts = story.parts|length %}
           {% if story.is_completed %}
             <p class="status-message completed-status">
-              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} chương</em>)
+              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)
             </p>
           {% else %}
             <p class="status-message updating-status">
-              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến chương {{ total_parts }}</em>)
+              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
             </p>
           {% endif %}
           {% set first_part = story.parts|first %}

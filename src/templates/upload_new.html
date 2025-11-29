@@ -4,6 +4,26 @@
 
 {% block content %}
 <h2>Đăng truyện mới</h2>
+{% set show_comments, commented_stories = get_comment_notifications() %}
+{% if show_comments and commented_stories %}
+<div class="comment-notification">
+  <h3>Truyện có bình luận mới</h3>
+  <ul>
+    {% for st in commented_stories %}
+      <li><a href="{{ url_for('story_detail', story_id=st.id) }}">{{ st.title }}{% if st.author %} - {{ st.author }}{% endif %}</a></li>
+    {% endfor %}
+  </ul>
+  <div class="button-row">
+    <form method="post" action="{{ url_for('skip_comments') }}">
+      <button type="submit">Bỏ qua</button>
+    </form>
+    <form method="get" action="{{ url_for('view_all_comments') }}">
+      <button type="submit">Xem tất cả</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {% if error %}
   <p class="error">{{ error }}</p>
 {% endif %}
@@ -49,12 +69,12 @@
     {% endif %}
   </div>
   <div class="form-group">
-    <label for="content">Nội dung chương đầu tiên:</label><br>
+    <label for="content">Nội dung phần đầu tiên:</label><br>
     <textarea id="content" name="content" rows="45" cols="80" required></textarea>
   </div>
-  {# Thêm trường nhập video cho chương đầu tiên #}
+  {# Thêm trường nhập video cho phần đầu tiên #}
   <div class="form-group">
-    <label>Video chương đầu (tối đa 9):</label><br>
+    <label>Video phần đầu (tối đa 9):</label><br>
     <div class="video-grid">
       {% for i in range(9) %}
       <div class="video-item">
@@ -70,6 +90,26 @@
 </form>
 
 <!-- Xuất/Nhập dữ liệu -->
+<!-- Thay thế cụm từ đầu dòng trong tất cả phần của tất cả truyện -->
+<h3>Tìm và thay cụm từ đầu phần</h3>
+<form method="post" action="{{ url_for('replace_prefix_all') }}" class="replace-form">
+  <div class="form-group">
+    <label for="find_prefix">Cụm từ cần tìm (đầu dòng):</label><br>
+    <input type="text" id="find_prefix" name="find_prefix" required>
+  </div>
+  <div class="form-group">
+    <label for="replace_prefix">Cụm từ thay thế:</label><br>
+    <input type="text" id="replace_prefix" name="replace_prefix" required>
+  </div>
+  <div class="form-group">
+    <label for="replace_password">Password:</label><br>
+    <input type="password" id="replace_password" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit">Thực hiện thay thế</button>
+  </div>
+</form>
+
 <h3>Xuất / Nhập dữ liệu</h3>
 <form method="post" action="{{ url_for('export_data') }}" class="export-form">
   <label for="export_password">Password:</label><br>
