@@ -775,3 +775,18 @@ body.upload aside.sidebar {
   flex: 0 0 280px;
   box-sizing: border-box;
 }
+
+/* Styling for continuation and thank-you messages on the story detail page */
+.continuation {
+  margin-top: 1em;
+  color: #c00; /* đỏ đậm */
+  font-weight: bold;
+  text-align: left;
+}
+
+.thank-you {
+  margin-top: 1em;
+  color: #006400; /* xanh lá cây đậm */
+  font-weight: bold;
+  text-align: center;
+}

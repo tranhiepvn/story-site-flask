@@ -99,6 +99,12 @@
         {% endfor %}
       </div>
     {% endif %}
+    {# Khi đang xem phần cuối cùng và truyện chưa hoàn thành, hiển thị thông báo tiếp tục #}
+{% if not story.is_completed and current_index == total_parts %}
+  <p class="continuation">Còn tiếp…</p>
+{% endif %}
+  <p class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
+
     {# hiển thị đánh giá hiện tại và form đánh giá #}
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
