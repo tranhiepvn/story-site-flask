@@ -111,6 +111,13 @@ def get_category_groups() -> tuple[list["Category"], list["Category"], list["Cat
     group3 = sorted(group3, key=lambda c: c.name.lower())
     return group1, group2, group3
 
+# Hàm mới: Trả về danh sách tất cả categories đã sắp xếp theo tên (case-insensitive)
+def get_sorted_categories() -> list["Category"]:
+    """
+    Trả về danh sách tất cả các thể loại (Category), sắp xếp theo tên (case-insensitive).
+    """
+    return sorted(Category.query.all(), key=lambda c: c.name.lower())
+
 # Cung cấp đối tượng datetime cho tất cả template Jinja.
 # Điều này cho phép dùng {{ datetime.utcnow().year }} trong layout.html
 # mà không gặp lỗi UndefinedError.
@@ -441,7 +448,7 @@ def post_comment(story_id: int):
 
 @app.route("/")
 def index():
-    """Trang chủ hiển thị danh sách truyện nổi bật, truyện ngắn và truyện dài.
+    """ Trang chủ hiển thị danh sách truyện nổi bật, truyện ngắn và truyện dài.
 
     - Truyện nổi bật: tối đa 20 truyện có lượt xem cao nhất.
     - Truyện ngắn: phân trang 10 truyện mỗi trang, sắp xếp theo ngày đăng mới nhất.
@@ -514,7 +521,7 @@ def index():
 
 @app.route("/story/<int:story_id>")
 def story_detail(story_id: int):
-    """Trang chi tiết hiển thị nội dung truyện.
+    """ Trang chi tiết hiển thị nội dung truyện.
 
     - Tăng lượt xem mỗi lần truy cập.
     - Hỗ trợ hiển thị theo từng phần (chương). Nếu truyện có nhiều hơn một phần,
@@ -559,7 +566,7 @@ def story_detail(story_id: int):
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
-    """Trang quản lý truyện.
+    """ Trang quản lý truyện.
 
     Cho phép:
     * Tạo truyện mới (với phần/chương đầu tiên).
@@ -1866,7 +1873,7 @@ def api_category_stories(category_id: int):
 
 @app.errorhandler(404)
 def page_not_found(e):
-    """Trang lỗi 404 tuỳ chỉnh."""
+    """ Trang lỗi 404 tuỳ chỉnh."""
     return render_template("404.html"), 404
 
 
