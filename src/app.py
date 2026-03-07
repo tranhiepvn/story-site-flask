@@ -360,7 +360,7 @@ def create_tables() -> None:
 
 # ------------------ Comment handling and notification ------------------
 
-def send_comment_notification(recipients: list[str], story: Story, comment_url: str) -> bool:
+def send_comment_notification(recipient: list[str], story: Story, comment_url: str) -> bool:
     """Gửi email thông báo tới danh sách người nhận khi có bình luận mới.
 
     Trả về True nếu gửi thành công, False nếu không gửi được. Hàm sẽ đọc các
@@ -518,11 +518,9 @@ def index():
         recent_stories=recent_stories,
     )
 
-
 @app.route("/story/<int:story_id>")
 def story_detail(story_id: int):
     """ Trang chi tiết hiển thị nội dung truyện.
-
     - Tăng lượt xem mỗi lần truy cập.
     - Hỗ trợ hiển thị theo từng phần (chương). Nếu truyện có nhiều hơn một phần,
       người đọc có thể chuyển tới phần trước/tiếp theo hoặc chọn phần cụ thể.
@@ -543,10 +541,21 @@ def story_detail(story_id: int):
         current_index = 1
     # Phần hiện tại cần hiển thị
     current_part = None
+    chapter_title = ""
+    content_processed = ""
     if parts:
         for p in parts:
             if p.part_number == current_index:
                 current_part = p
+                # Tách tiêu đề và body
+                lines = current_part.content.split('\n', 1)
+                chapter_title = lines[0]
+                chapter_body = lines[1] if len(lines) > 1 else ''
+                # Highlight: giữa "..." thành xanh lá đậm, giữa '...' thành đỏ đậm, giữ nguyên dấu nháy
+                chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
+                chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
+                # Thay \n thành <br> cho body để giữ định dạng dòng
+                content_processed = chapter_body.replace('\n', '<br>')
                 break
     # Lấy danh sách bình luận cho truyện (mới nhất lên đầu)
     comments = Comment.query.filter_by(story_id=story.id).order_by(Comment.created_at.desc()).all()
@@ -556,13 +565,14 @@ def story_detail(story_id: int):
         "story.html",
         story=story,
         current_part=current_part,
+        chapter_title=chapter_title,
+        content_processed=content_processed,
         current_index=current_index,
         total_parts=total_parts,
         parts=parts,
         comments=comments,
         current_url=current_url,
     )
-
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():

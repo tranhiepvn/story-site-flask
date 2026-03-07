@@ -1,7 +1,5 @@
 {% extends "layout.html" %}
-
 {% block title %}{{ story.title }}{% endblock %}
-
 {% block content %}
 <article>
   <h2>{{ story.title }}</h2>
@@ -30,7 +28,6 @@
     {% endfor %}
   </p>
   {% endif %}
-
   {# Hiển thị trạng thái hoàn thành của truyện #}
     {% if story.is_completed %}
     <p class="status-message completed-status">
@@ -41,7 +38,6 @@
       Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
     </p>
   {% endif %}
-
   {# Hiển thị nội dung từng phần của truyện. #}
   {% if total_parts > 0 %}
     {% if total_parts > 1 %}
@@ -79,15 +75,13 @@
       </div>
     {% endif %}
     <div class="story-part">
-      {# xử lý nội dung chương: dòng đầu tiên là tiêu đề chương, căn giữa và in đậm #}
-      {% if current_part %}
-        {% set _lines = current_part.content.split('\n', 1) %}
-        {% set chapter_title = _lines[0] %}
-        {% set chapter_body = _lines[1] if _lines|length > 1 else '' %}
+      {# Hiển thị tiêu đề chương #}
+      {% if chapter_title %}
         <p class="chapter-title">{{ chapter_title }}</p>
-        {% if chapter_body %}
-          <p>{{ chapter_body.replace('\n', '<br>') | safe }}</p>
-        {% endif %}
+      {% endif %}
+      {# Hiển thị nội dung đã highlight và test #}
+      {% if content_processed %}
+        <p>{{ content_processed | safe }}</p>
       {% endif %}
     </div>
     {# Hiển thị các video liên kết (nếu có) ngay dưới nội dung chương #}
@@ -100,11 +94,10 @@
       </div>
     {% endif %}
     {# Khi đang xem phần cuối cùng và truyện chưa hoàn thành, hiển thị thông báo tiếp tục #}
-{% if not story.is_completed and current_index == total_parts %}
-  <p class="continuation">Còn tiếp…</p>
-{% endif %}
-  <p class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
-
+    {% if not story.is_completed and current_index == total_parts %}
+      <p class="continuation">Còn tiếp…</p>
+    {% endif %}
+    <p class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
     {# hiển thị đánh giá hiện tại và form đánh giá #}
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
@@ -201,4 +194,12 @@
   {% endif %}
   <p><a href="{{ url_for('index') }}">&larr; Quay lại danh sách</a></p>
 </article>
+<style>
+  .highlight-green {
+    color: #006400; /* Màu xanh lá đậm */
+  }
+  .highlight-red {
+    color: #8B0000; /* Màu đỏ đậm */
+  }
+</style>
 {% endblock %}
