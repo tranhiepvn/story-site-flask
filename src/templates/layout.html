@@ -7,6 +7,107 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <!-- Favicon icon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <!-- Thêm CSS default màu nền đen và chữ xanh dương nhạt -->
+    <!-- Override CSS để nền đen và chữ xanh cyan nhạt -->
+    <style>
+        /* Nền đen cho toàn body/site */
+        body {
+            background-color: #000000 !important; /* Đen hoàn toàn */
+            color: #6687cb !important; /* Chữ xanh dương nhạt anh thích */
+            font-family: Arial, sans-serif; /* Font đơn giản, dễ đọc */
+        }
+        /* Override cho các phần nội dung cụ thể (để đè lên default nếu có nền trắng) */
+        .container, article, div, p, h2, .meta, .status-message, .story-part, .chapter-title {
+            background-color: #000000 !important;
+            color: #6687cb !important;
+        }
+        /* Link: Làm nổi bật hơn trên nền đen */
+        a {
+            color: #00BFFF !important; /* Xanh dương sáng */
+        }
+        a:hover {
+            color: #6687cb !important; /* Hover thành xanh dương nhạt */
+        }
+        /* Giữ highlight cho "" (xanh lá đậm) và '' (đỏ đậm) - anh chỉnh thành xanh lá sáng */
+        .highlight-green {
+            color: #1fa943 !important; /* Xanh lá đậm (custom của anh) */
+        }
+        .highlight-red {
+            color: #00FF00 !important; /* Xanh lá sáng (anh muốn đỏ thì chỉnh #8B0000 nhé!) */
+        }
+        /* Nếu có sidebar hoặc header, override luôn - nhưng giữ header xanh dương như screenshot */
+        header {
+            background-color: #4A90E2 !important; /* Giữ xanh dương cho header */
+            color: #FFFFFF !important; /* Chữ trắng trong header (đã chỉnh như anh muốn) */
+        }
+        footer, .sidebar {
+            background-color: #000000 !important;
+            color: #6687cb !important;
+        }
+        /* Override input, textarea, button cho form (nếu có) */
+        input, textarea, button {
+            background-color: #1C1C1C !important; /* Xám đen cho form nổi bật */
+            color: #6687cb !important;
+            border: 1px solid #6687cb !important; /* Border xanh nhạt hợp tông (em chỉnh từ #00FFFF để match) */
+            border-radius: 4px; /* Làm bo góc mượt hơn, optional */
+        }
+        /* Giữ search box trong header trắng như screenshot */
+        header input {
+            background-color: #FFFFFF !important; /* Trắng cho search box */
+            color: #000000 !important; /* Chữ đen trong search */
+            border: 1px solid #FFFFFF !important;
+        }
+        header button {
+            background-color: #4A90E2 !important; /* Giữ xanh cho button "Tìm" */
+            color: #FFFFFF !important; /* Chữ trắng */
+            border: 1px solid #FFFFFF !important; /* Thêm border trắng để fix không có viền */
+            border-radius: 4px; /* Bo góc */
+            padding: 5px 10px; /* Padding để nút rộng hơn */
+            cursor: pointer; /* Con trỏ tay khi hover */
+        }
+        header button:hover {
+            background-color: #357ABD !important; /* Hover tối hơn tí cho đẹp */
+        }
+        /* Làm chữ trong header trắng luôn (bao gồm tiêu đề, nav link, separator) */
+        header h1 a, header nav a, .separator {
+            color: #FFFFFF !important; /* Chữ trắng cho header */
+        }
+        header nav a:hover {
+            color: #E0E0E0 !important; /* Hover xám nhạt cho link nav */
+        }
+        /* Fix màu tình trạng truyện giữ nguyên như site cũ (xanh lá không đậm cho hoàn thành, đỏ cho chưa hoàn thành) */
+        .completed-status {
+            color: #32CD32 !important; /* Xanh lá cây (không đậm) cho "Truyện đã hoàn thành" như anh yêu cầu */
+        }
+        .updating-status {
+            color: #FF0000 !important; /* Đỏ cho "Truyện chưa hoàn thành" */
+        }
+        /* Fix quy luật màu cho cột thể loại (sidebar) - giữ màu riêng cho từng nhóm */
+        .sidebar h3 {
+            color: #FFFFFF !important; /* Tiêu đề "Thể loại" trắng */
+        }
+        .category-list li {
+            color: #6687cb !important; /* Default cho nhóm 3: Xanh dương nhạt */
+        }
+        .category-list .special-cat {
+            color: #FFD700 !important; /* Nhóm 1 (special): Vàng bold như cũ */
+            font-weight: bold !important;
+        }
+        .category-list .uppercase-cat {
+            color: #00BFFF !important; /* Nhóm 2 (uppercase): Xanh dương sáng */
+            text-transform: uppercase !important; /* Chữ hoa nếu cần */
+        }
+        .category-list a {
+            color: inherit !important; /* Link theo màu li cha để giữ quy luật */
+        }
+        /* Làm chữ "1 phần" hoặc "Cập nhật đến phần 1" theo màu của status cha */
+        .completed-status em.completed {
+            color: #32CD32 !important; /* Xanh lá cây (không đậm) cho "1 phần" như anh yêu cầu */
+        }
+        .updating-status em.updating {
+            color: #FF0000 !important; /* Đỏ cho "Cập nhật đến phần 1" */
+        }
+    </style>
   </head>
   <body class="{{ request.endpoint }}">
     <div class="container">
@@ -86,7 +187,7 @@
       </footer>
     </div>
     {# Block dành cho scripts, cho phép trang con chèn thêm mã JavaScript #}
-{% block scripts %}
+    {% block scripts %}
     <script>
       // Script để xử lý việc chọn nhiều thể loại trên tất cả các trang của trang truyện
       document.addEventListener('DOMContentLoaded', function() {
