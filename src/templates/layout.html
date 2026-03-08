@@ -107,6 +107,23 @@
         .updating-status em.updating {
             color: #FF0000 !important; /* Đỏ cho "Cập nhật đến phần 1" */
         }
+        /* Fix màu cho button "Phần Trước" và "Phần Sau" - giữ quy luật hover, hợp tông đen-cyan */
+        .part-navigation a {
+            background-color: #1C1C1C !important; /* Nền xám đen để nổi bật như button */
+            color: #FFFFFF !important; /* Chữ trắng */
+            border: 1px solid #6687cb !important; /* Viền xanh nhạt hợp tông */
+            border-radius: 4px !important; /* Bo góc để giống button */
+            padding: 5px 10px !important; /* Padding để button rộng hơn */
+            text-decoration: none !important; /* Không gạch chân */
+        }
+        .part-navigation a:hover {
+            background-color: #357ABD !important; /* Hover xanh dương tối, thay đổi rõ ràng */
+            color: #FFFFFF !important; /* Giữ trắng */
+            border-color: #00BFFF !important; /* Viền sáng hơn khi hover */
+        }
+        .part-navigation .no-link {  /* Nếu có span "Phần cuối" không link */
+            color: #6687cb !important; /* Xanh nhạt để hợp tông */
+        }
     </style>
   </head>
   <body class="{{ request.endpoint }}">
