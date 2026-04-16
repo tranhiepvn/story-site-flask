@@ -1,0 +1,117 @@
+{% extends "layout.html" %}
+{% block title %}Xem Views 7 ngày - Admin{% endblock %}
+
+{% block content %}
+<style>
+  /* Ẩn sidebar */
+  .sidebar, aside.sidebar { display: none !important; }
+  .content-wrapper, main { margin-left: 0 !important; width: 100% !important; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #1C1C1C;
+    color: #FFFFFF;
+  }
+  th, td {
+    padding: 14px 10px;
+    border-bottom: 1px solid #333;
+  }
+  th {
+    background: #4A90E2;
+    color: white;
+    text-align: center;
+  }
+
+  /* Cột rộng */
+  .col-stt     { width: 60px; text-align: center; }
+  .col-name    { width: 48%; text-align: left; }
+  .col-total   { width: 120px; text-align: center; }
+  .col-week    { width: 120px; text-align: center; }
+  .col-day     { width: 82px; text-align: center; }
+  .col-change  { width: 130px; text-align: center; }
+  .col-trend   { width: 90px; text-align: center; }
+
+  td.col-name a {
+    color: #00BFFF;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  /* Màu cột ngày */
+  td.col-day {
+    font-weight: 500;
+  }
+  td.col-day.zero {
+    color: #FFFFFF !important;           /* = 0 → trắng */
+  }
+  td.col-day.positive {
+    color: #00BFFF !important;           /* > 0 → xanh dương nhạt */
+  }
+
+  /* Màu cột Tổng view = cam */
+  td.col-total {
+    color: #FF8C00 !important;           /* Cam */
+    font-weight: bold;
+  }
+</style>
+
+<h2 style="margin-bottom: 10px;">📊 Xem Views 7 ngày gần nhất</h2>
+<p><strong>Từ {{ start_date.strftime('%d/%m/%Y') }} đến {{ end_date.strftime('%d/%m/%Y') }}</strong></p>
+
+<div style="margin: 20px 0 30px 0;">
+  <a href="{{ url_for('views_analytics') }}" style="padding:8px 16px; background:#4A90E2; color:white; text-decoration:none; border-radius:4px; margin-right:8px;">Tổng views cao nhất</a>
+  <a href="{{ url_for('views_analytics') }}?sort=name" style="padding:8px 16px; background:#555; color:white; text-decoration:none; border-radius:4px; margin-right:8px;">Tên A-Z</a>
+  <a href="{{ url_for('views_analytics') }}?sort=created" style="padding:8px 16px; background:#555; color:white; text-decoration:none; border-radius:4px;">Ngày tạo mới nhất</a>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="col-stt">STT</th>
+      <th class="col-name">Tên truyện</th>
+      <th class="col-total">Tổng view</th>
+      <th class="col-week">Tổng 7 ngày</th>
+      {% for d in dates %}
+      <th class="col-day">{{ d.strftime('%d/%m') }}</th>
+      {% endfor %}
+      <th class="col-change">% thay đổi</th>
+      <th class="col-trend">Xu hướng</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in story_data %}
+    <tr>
+      <td class="col-stt">{{ loop.index }}</td>
+      <td class="col-name">
+        <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
+      </td>
+      <td class="col-total">{{ item.story.views }}</td>
+      <td class="col-week" style="color:#32CD32; font-weight:bold;">{{ item.total_week }}</td>
+      {% for d in dates %}
+      <td class="col-day {% if item.daily[d] > 0 %}positive{% else %}zero{% endif %}">
+        {{ item.daily[d] }}
+      </td>
+      {% endfor %}
+      <td class="col-change">
+        {% if item.change_pct is not none %}
+          {% if item.change_pct > 0 %}<span style="color:#32CD32;">+{{ item.change_pct }}%</span>
+          {% elif item.change_pct < 0 %}<span style="color:#FF0000;">{{ item.change_pct }}%</span>
+          {% else %}0%{% endif %}
+        {% else %}—{% endif %}
+      </td>
+      <td class="col-trend" style="font-size:24px;">
+        {% if item.change_pct is not none %}
+          {% if item.change_pct > 5 %}↑{% elif item.change_pct < -5 %}↓{% else %}→{% endif %}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p style="margin-top:30px; color:#32CD32;">
+  <strong>Top 3 truyện hot tuần này:</strong> 
+  {% for item in story_data[:3] %}{{ item.story.title }} ({{ item.total_week }} views){% if not loop.last %}, {% endif %}{% endfor %}
+</p>
+{% endblock %}

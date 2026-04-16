@@ -24,6 +24,7 @@ import os
 import re
 import uuid
 from datetime import datetime
+from datetime import datetime, date, timedelta
 import json
 import io
 import smtplib
@@ -316,6 +317,16 @@ class PartVideo(db.Model):
         return f"<PartVideo {self.id} for Part {self.part_id}>"
 
 
+# ====================== MODEL MỚI: VIEWS THEO NGÀY ======================
+class DailyView(db.Model):
+    __tablename__ = "daily_view"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    views = db.Column(db.Integer, default=0, nullable=False)
+    __table_args__ = (db.UniqueConstraint('story_id', 'date', name='uq_daily_story_date'),)
+    story = db.relationship('Story', backref=db.backref('daily_views', lazy=True))
+
 # Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
 # đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
@@ -529,6 +540,16 @@ def story_detail(story_id: int):
     # tăng lượt xem
     story.views = (story.views or 0) + 1
     db.session.commit()
+    
+    # Ghi nhận views theo ngày cho chức năng Xem Views
+    today = date.today()
+    daily = DailyView.query.filter_by(story_id=story.id, date=today).first()
+    if daily:
+        daily.views += 1
+    else:
+        db.session.add(DailyView(story_id=story.id, date=today, views=1))
+    db.session.commit()
+
     # Lấy danh sách tất cả các phần của truyện (sắp xếp theo số thứ tự)
     parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
     total_parts = len(parts)
@@ -945,37 +966,25 @@ def upload():
 # Người dùng cần nhập mật khẩu hợp lệ để tiếp tục.
 @app.route("/upload_login", methods=["GET", "POST"])
 def upload_login():
-    """Trang nhập mật khẩu trước khi vào trang quản trị đăng truyện.
-
-    Trang này hiển thị một form đơn giản yêu cầu mật khẩu. Nếu mật khẩu
-    hợp lệ, thiết lập session và chuyển hướng tới trang upload. Nếu sai,
-    hiển thị thông báo lỗi. Danh sách thể loại được truyền vào để hiện
-    trong sidebar, giống như các trang khác.
-    """
     categories_group1, categories_group2, categories_group3 = get_category_groups()
-    # Mật khẩu upload từ biến môi trường hoặc giá trị mặc định
     UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    
+    next_url = request.args.get("next") or url_for("upload")  # mặc định quay về upload nếu không có next
+
     if request.method == "POST":
-        password = request.form.get("password", "")
-        if password == UPLOAD_PASSWORD:
-            # Ghi nhớ rằng người dùng đã đăng nhập để tránh phải nhập lại trong phiên
+        if request.form.get("password") == UPLOAD_PASSWORD:
             session["upload_authenticated"] = True
-            return redirect(url_for("upload"))
-        else:
-            return render_template(
-                "upload_login.html",
-                error="Mật khẩu sai.",
-                categories_group1=categories_group1,
-                categories_group2=categories_group2,
-                categories_group3=categories_group3,
-            )
-    # GET: hiển thị form nhập mật khẩu
-    return render_template(
-        "upload_login.html",
-        categories_group1=categories_group1,
-        categories_group2=categories_group2,
-        categories_group3=categories_group3,
-    )
+            return redirect(next_url)          # ← Quan trọng: redirect theo next
+        return render_template("upload_login.html", 
+                               error="Mật khẩu sai.",
+                               categories_group1=categories_group1,
+                               categories_group2=categories_group2,
+                               categories_group3=categories_group3)
+
+    return render_template("upload_login.html",
+                           categories_group1=categories_group1,
+                           categories_group2=categories_group2,
+                           categories_group3=categories_group3)
 
 
 # --------- Export/Import data utilities ---------
@@ -1885,6 +1894,67 @@ def api_category_stories(category_id: int):
 def page_not_found(e):
     """ Trang lỗi 404 tuỳ chỉnh."""
     return render_template("404.html"), 404
+
+
+@app.route("/admin/views")
+def views_analytics():
+    """Trang Xem Views 7 ngày gần nhất"""
+    if 'upload_authenticated' not in session:
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+
+    end_date = date.today()
+    start_date = end_date - timedelta(days=6)
+    dates = [start_date + timedelta(days=i) for i in range(7)]
+
+    stories = Story.query.all()
+    story_data = []
+
+    for story in stories:
+        # Sửa ở đây: Query trực tiếp từ DailyView thay vì story.daily_views.filter
+        daily_views = DailyView.query.filter(
+            DailyView.story_id == story.id,
+            DailyView.date.between(start_date, end_date)
+        ).all()
+
+        daily_map = {d: 0 for d in dates}
+        for dv in daily_views:
+            daily_map[dv.date] = dv.views
+
+        total_week = sum(daily_map.values())
+
+        # Tính % thay đổi so với tuần trước
+        prev_start = start_date - timedelta(days=7)
+        prev_views = DailyView.query.filter(
+            DailyView.story_id == story.id,
+            DailyView.date.between(prev_start, prev_start + timedelta(days=6))
+        ).all()
+        prev_total = sum(dv.views for dv in prev_views)
+        
+        change_pct = round(((total_week - prev_total) / prev_total * 100), 1) if prev_total > 0 else None
+
+        story_data.append({
+            'story': story,
+            'daily': daily_map,
+            'total_week': total_week,
+            'change_pct': change_pct,
+            'created_at': story.created_at
+        })
+
+    # Sắp xếp
+    sort = request.args.get('sort', 'total')
+    if sort == 'name':
+        story_data.sort(key=lambda x: x['story'].title.lower())
+    elif sort == 'created':
+        story_data.sort(key=lambda x: x['created_at'], reverse=True)
+    else:
+        story_data.sort(key=lambda x: x['total_week'], reverse=True)
+
+    return render_template('views_analytics.html',
+                           story_data=story_data,
+                           dates=dates,
+                           start_date=start_date,
+                           end_date=end_date)
 
 
 if __name__ == "__main__":
