@@ -67,13 +67,12 @@
       </div>
     {% endif %}
 
-    <!-- ==================== PHẦN NỘI DUNG CHƯƠNG ==================== -->
     <div class="story-part">
       {% if chapter_title %}
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- Audio Player - Progress bar cố định, không nhảy dài ngắn -->
+      <!-- Audio Player -->
       <div id="audio-player" class="audio-player" 
            style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; 
                   display: grid; grid-template-columns: 48px 1fr 175px; align-items:center; gap:12px; height:52px;">
@@ -95,7 +94,6 @@
         <audio id="audio-element" style="display:none;"></audio>
       </div>
 
-      <!-- Nội dung truyện -->
       <p>{{ content_processed | safe }}</p>
     </div>
 
@@ -113,7 +111,6 @@
 
     <p class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
 
-    <!-- Đánh giá -->
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
       <p>Đánh giá hiện tại:
@@ -208,6 +205,7 @@
 </style>
 
 <script>
+/* ==================== AUDIO PLAYER ==================== */
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -328,31 +326,24 @@ function resetAudioPlayer() {
   playBtn.innerHTML = "🔊";
   playText.textContent = "Nghe phần này...";
   playBtn.disabled = false;
-  progressBar.disabled = false;
+  progressBar.disabled = true;
   progressBar.value = 1;
   progressBar.style.accentColor = "#00BFFF";
 }
 
 progressBar.addEventListener('input', function() {});
-
 progressBar.addEventListener('change', async function() {
   if (!currentStoryId || !currentPartNumber || progressBar.disabled) return;
-
   const targetChunk = parseInt(this.value);
   if (targetChunk === currentChunkIndex) return;
-
   currentChunkIndex = targetChunk;
-
   if (currentAudio) currentAudio.pause();
-
   playText.textContent = "Đang chuyển sang audio...";
   playBtn.innerHTML = "⏳";
   playBtn.disabled = true;
   progressBar.style.accentColor = "#FF9800";
-
   const res = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
   const data = await res.json();
-
   if (data.status === "success") {
     const audioEl = document.getElementById('audio-element');
     audioEl.src = data.url;
@@ -380,6 +371,60 @@ progressBar.addEventListener('change', async function() {
       if (attempts > 40) clearInterval(poll);
     }, 700);
   }
+});
+
+/* ==================== CATEGORY CHECKBOX FILTER ==================== */
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('selected-categories-container');
+  if (!container) return;
+
+  function renderCategorySection(catId, catName, data) {
+    let html = `<div id="selected-category-${catId}" class="selected-category-section">`;
+    html += `<h3>${catName} <span class="remove-cat" data-cat-id="${catId}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
+    html += '<div class="story-grid">';
+    data.stories.forEach(story => {
+      html += `<div class="story-card"><a href="/story/${story.id}">${story.title}</a></div>`;
+    });
+    html += '</div></div>';
+    return html;
+  }
+
+  async function loadCategory(catId, catName, page = 1) {
+    const res = await fetch(`/api/category/${catId}?page=${page}`);
+    const data = await res.json();
+    const html = renderCategorySection(catId, catName, data);
+    const existing = document.getElementById(`selected-category-${catId}`);
+    if (existing) existing.outerHTML = html;
+    else container.insertAdjacentHTML('beforeend', html);
+  }
+
+  const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', function() {
+      const catId = this.getAttribute('data-cat-id');
+      const catName = this.getAttribute('data-cat-name');
+      if (this.checked) {
+        loadCategory(catId, catName, 1);
+      } else {
+        const sec = document.getElementById(`selected-category-${catId}`);
+        if (sec) sec.remove();
+      }
+    });
+  });
+
+  container.addEventListener('click', function(evt) {
+    const link = evt.target.closest('a');
+    if (link && link.dataset.catId && link.dataset.page) {
+      evt.preventDefault();
+      const catId = link.dataset.catId;
+      const page = parseInt(link.dataset.page);
+      const cb = document.querySelector(`.category-list input[data-cat-id="${catId}"]`);
+      if (cb && cb.checked) {
+        const catName = cb.getAttribute('data-cat-name');
+        loadCategory(catId, catName, page);
+      }
+    }
+  });
 });
 </script>
 {% endblock %}

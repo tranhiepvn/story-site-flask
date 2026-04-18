@@ -6,7 +6,6 @@
     <title>{% block title %}Trang web truyện{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
-
     <style>
         /* Nền đen cho toàn body/site */
         body {
@@ -14,13 +13,11 @@
             color: #6687cb !important;
             font-family: Arial, sans-serif;
         }
-
         /* Content chính */
         .container, article, div, p, h2, .meta, .story-part, .chapter-title {
             background-color: #000000 !important;
             color: #6687cb !important;
         }
-
         /* Link */
         a {
             color: #00BFFF !important;
@@ -28,11 +25,9 @@
         a:hover {
             color: #6687cb !important;
         }
-
         /* Highlight "" và '' */
         .highlight-green { color: #1fa943 !important; }
-        .highlight-red   { color: #00FF00 !important; }
-
+        .highlight-red { color: #00FF00 !important; }
         /* Header */
         header {
             background-color: #4A90E2 !important;
@@ -42,13 +37,11 @@
             color: #FFFFFF !important;
         }
         header nav a:hover { color: #E0E0E0 !important; }
-
         /* Footer & Sidebar */
         footer, .sidebar {
             background-color: #000000 !important;
             color: #6687cb !important;
         }
-
         /* Form */
         input, textarea, button {
             background-color: #1C1C1C !important;
@@ -72,7 +65,6 @@
         header button:hover {
             background-color: #357ABD !important;
         }
-
         /* Phần anh yêu cầu màu trắng */
         .thank-you {
             color: #FFFFFF !important;
@@ -83,7 +75,6 @@
         .part-list p {
             color: #FFFFFF !important;
         }
-
         /* Tình trạng truyện */
         .completed-status {
             color: #32CD32 !important;
@@ -95,14 +86,12 @@
         .updating-status em.updating {
             color: inherit !important;
         }
-
         /* Sidebar thể loại giữ màu riêng */
         .sidebar h3 { color: #FFFFFF !important; }
         .category-list li { color: #6687cb !important; }
         .category-list .special-cat { color: #FFD700 !important; font-weight: bold !important; }
         .category-list .uppercase-cat { color: #00BFFF !important; text-transform: uppercase !important; }
         .category-list a { color: inherit !important; }
-
         /* Button Phần Trước / Phần Sau */
         .part-navigation a {
             background-color: #1C1C1C !important;
@@ -128,21 +117,16 @@
         <nav>
           <a href="{{ url_for('index') }}">Trang chủ</a><span class="separator">|</span>
           <a href="{{ url_for('upload_login') }}">Admin</a>
-          
-          <!-- Button Xem Views - Luôn yêu cầu nhập password -->
-        <a href="{{ url_for('upload_login', next=url_for('views_analytics')) }}" 
-           style="background:#32CD32; color:#000; padding:8px 15px; border-radius:4px; margin-left:15px; text-decoration:none;">
-           📊 Xem Views
-        </a>
-    </nav>
+          <a href="{{ url_for('upload_login', next=url_for('views_analytics')) }}"
+             style="background:#32CD32; color:#000; padding:8px 15px; border-radius:4px; margin-left:15px; text-decoration:none;">
+             📊 Xem Views
+          </a>
+        </nav>
         <form action="{{ url_for('search') }}" method="get" class="search-form">
-          <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}"
-            {% if request.endpoint == 'search' %} autofocus onfocus="this.select()" {% endif %}>
+          <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}">
           <button type="submit">Tìm</button>
         </form>
-
       </header>
-
       <div class="content-wrapper">
         {% if categories %}
           <aside class="sidebar">
@@ -171,7 +155,6 @@
             </ul>
           </aside>
         {% endif %}
-
         <main>
           {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -181,12 +164,10 @@
             {% endif %}
           {% endwith %}
           {% if error %}<p class="error">{{ error }}</p>{% endif %}
-
           <div id="selected-categories-container" class="section selected-categories"></div>
           {% block content %}{% endblock %}
         </main>
       </div>
-
       <footer>
         <p>&copy; {{ datetime.utcnow().year }} Trang web truyện. Cảm ơn bạn đã đến đây, chúc bạn xem truyện được thoải mái và vui vẻ. Chúc một ngày hạnh phúc nha bạn!</p>
       </footer>
@@ -194,11 +175,58 @@
 
     {% block scripts %}
     <script>
-      // Script chọn nhiều thể loại (giữ nguyên)
+      /* ==================== CATEGORY CHECKBOX FILTER ==================== */
       document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('selected-categories-container');
         if (!container) return;
-        // ... (toàn bộ script cũ của anh giữ nguyên, em không thay đổi)
+
+        function renderCategorySection(catId, catName, data) {
+          let html = `<div id="selected-category-${catId}" class="selected-category-section">`;
+          html += `<h3>${catName} <span class="remove-cat" data-cat-id="${catId}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
+          html += '<div class="story-grid">';
+          data.stories.forEach(story => {
+            html += `<div class="story-card"><a href="/story/${story.id}">${story.title}</a></div>`;
+          });
+          html += '</div></div>';
+          return html;
+        }
+
+        async function loadCategory(catId, catName, page = 1) {
+          const res = await fetch(`/api/category/${catId}?page=${page}`);
+          const data = await res.json();
+          const html = renderCategorySection(catId, catName, data);
+          const existing = document.getElementById(`selected-category-${catId}`);
+          if (existing) existing.outerHTML = html;
+          else container.insertAdjacentHTML('beforeend', html);
+        }
+
+        const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+          cb.addEventListener('change', function() {
+            const catId = this.getAttribute('data-cat-id');
+            const catName = this.getAttribute('data-cat-name');
+            if (this.checked) {
+              loadCategory(catId, catName, 1);
+            } else {
+              const sec = document.getElementById(`selected-category-${catId}`);
+              if (sec) sec.remove();
+            }
+          });
+        });
+
+        container.addEventListener('click', function(evt) {
+          const link = evt.target.closest('a');
+          if (link && link.dataset.catId && link.dataset.page) {
+            evt.preventDefault();
+            const catId = link.dataset.catId;
+            const page = parseInt(link.dataset.page);
+            const cb = document.querySelector(`.category-list input[data-cat-id="${catId}"]`);
+            if (cb && cb.checked) {
+              const catName = cb.getAttribute('data-cat-name');
+              loadCategory(catId, catName, page);
+            }
+          }
+        });
       });
     </script>
     {% endblock %}

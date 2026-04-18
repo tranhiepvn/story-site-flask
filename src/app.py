@@ -2165,6 +2165,24 @@ def cleanup_old_audio():
 Thread(target=cleanup_old_audio, daemon=True).start()
 print("[CLEANUP] ✅ Background cleaner đã khởi động (xóa file mp3 cũ hơn 1 ngày)")
 
+@app.route("/api/category/<int:category_id>")
+def api_category(category_id: int):
+    """API cho checkbox filter thể loại - trả về JSON danh sách truyện"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 12
+
+    category = Category.query.get_or_404(category_id)
+
+    stories = Story.query.filter(Story.categories.any(id=category_id))\
+        .order_by(Story.created_at.desc())\
+        .paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        "stories": [{"id": s.id, "title": s.title} for s in stories.items],
+        "has_next": stories.has_next,
+        "current_page": page
+    })
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
