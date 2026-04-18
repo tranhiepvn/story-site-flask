@@ -2167,20 +2167,16 @@ print("[CLEANUP] ✅ Background cleaner đã khởi động (xóa file mp3 cũ h
 
 @app.route("/api/category/<int:category_id>")
 def api_category(category_id: int):
-    """API cho checkbox filter thể loại - trả về JSON danh sách truyện"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 12
-
+    """API cho checkbox filter thể loại - Trả về HẾT tất cả truyện"""
     category = Category.query.get_or_404(category_id)
 
+    # Lấy tất cả truyện thuộc thể loại này (không phân trang)
     stories = Story.query.filter(Story.categories.any(id=category_id))\
         .order_by(Story.created_at.desc())\
-        .paginate(page=page, per_page=per_page, error_out=False)
+        .all()
 
     return jsonify({
-        "stories": [{"id": s.id, "title": s.title} for s in stories.items],
-        "has_next": stories.has_next,
-        "current_page": page
+        "stories": [{"id": s.id, "title": s.title} for s in stories]
     })
 
 if __name__ == "__main__":
