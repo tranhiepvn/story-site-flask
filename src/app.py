@@ -2133,12 +2133,12 @@ def delete_chunk(story_id: int, part_number: int, chunk_index: int):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def cleanup_old_audio():
-    """Xóa các file chunk mp3 cũ hơn 60 phút"""
+    """Xóa các file chunk mp3 cũ hơn 1 ngày (24 giờ)"""
     while True:
         try:
             audio_root = Path("static/audio")
             if not audio_root.exists():
-                time.sleep(60)
+                time.sleep(300)
                 continue
 
             now = time.time()
@@ -2147,15 +2147,16 @@ def cleanup_old_audio():
                 if not story_dir.is_dir():
                     continue
                 for mp3_file in story_dir.glob("*.mp3"):
-                    if mp3_file.stat().st_mtime < now - 3600:   # 3600 giây = 60 phút
+                    # 86400 giây = 1 ngày
+                    if mp3_file.stat().st_mtime < now - 86400:
                         try:
                             mp3_file.unlink()
                             deleted += 1
-                            print(f"[CLEANUP] 🗑️ Đã xóa file cũ: {mp3_file.name}")
+                            print(f"[CLEANUP] 🗑️ Đã xóa file cũ hơn 1 ngày: {mp3_file.name}")
                         except Exception as e:
                             print(f"[CLEANUP] Lỗi xóa {mp3_file.name}: {e}")
             if deleted > 0:
-                print(f"[CLEANUP] Đã xóa {deleted} file mp3 cũ")
+                print(f"[CLEANUP] Đã xóa {deleted} file mp3 cũ hơn 1 ngày")
         except Exception as e:
             print(f"[CLEANUP] Lỗi: {e}")
         time.sleep(300)   # quét mỗi 5 phút
