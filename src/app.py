@@ -19,8 +19,13 @@ Chức năng chính:
   2. Khởi động máy chủ với lệnh `flask --app app run --debug`.
   3. Mở trình duyệt tới http://127.0.0.1:5000 để xem trang.
 """
-
+from pathlib import Path
+import time
+from threading import Thread
+import asyncio
+import edge_tts
 import os
+import threading
 import re
 import uuid
 from datetime import datetime
@@ -34,6 +39,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
+
 
 # Tạo ứng dụng Flask
 app = Flask(__name__)
@@ -531,17 +537,11 @@ def index():
 
 @app.route("/story/<int:story_id>")
 def story_detail(story_id: int):
-    """ Trang chi tiết hiển thị nội dung truyện.
-    - Tăng lượt xem mỗi lần truy cập.
-    - Hỗ trợ hiển thị theo từng phần (chương). Nếu truyện có nhiều hơn một phần,
-      người đọc có thể chuyển tới phần trước/tiếp theo hoặc chọn phần cụ thể.
-    """
+    """Trang chi tiết truyện - ĐÃ FIX TIÊU ĐỀ LẶP + giữ nguyên xuống dòng"""
     story = Story.query.get_or_404(story_id)
-    # tăng lượt xem
-    story.views = (story.views or 0) + 1
-    db.session.commit()
     
-    # Ghi nhận views theo ngày cho chức năng Xem Views
+    # Tăng lượt xem
+    story.views = (story.views or 0) + 1
     today = date.today()
     daily = DailyView.query.filter_by(story_id=story.id, date=today).first()
     if daily:
@@ -550,38 +550,44 @@ def story_detail(story_id: int):
         db.session.add(DailyView(story_id=story.id, date=today, views=1))
     db.session.commit()
 
-    # Lấy danh sách tất cả các phần của truyện (sắp xếp theo số thứ tự)
     parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
     total_parts = len(parts)
-    # Xác định phần đang chọn từ query string (part=)
+
     part_param = request.args.get("part", default=None, type=int)
-    # Nếu có tham số part và hợp lệ thì dùng, ngược lại mặc định phần 1
-    if part_param is not None and 1 <= part_param <= total_parts:
-        current_index = part_param
-    else:
-        current_index = 1
-    # Phần hiện tại cần hiển thị
+    current_index = part_param if part_param and 1 <= part_param <= total_parts else 1
+
     current_part = None
-    chapter_title = ""
-    content_processed = ""
-    if parts:
-        for p in parts:
-            if p.part_number == current_index:
-                current_part = p
-                # Tách tiêu đề và body
-                lines = current_part.content.split('\n', 1)
-                chapter_title = lines[0]
-                chapter_body = lines[1] if len(lines) > 1 else ''
-                # Highlight: giữa "..." thành xanh lá đậm, giữa '...' thành đỏ đậm, giữ nguyên dấu nháy
-                chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
-                chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
-                # Thay \n thành <br> cho body để giữ định dạng dòng
-                content_processed = chapter_body.replace('\n', '<br>')
-                break
-    # Lấy danh sách bình luận cho truyện (mới nhất lên đầu)
+    for p in parts:
+        if p.part_number == current_index:
+            current_part = p
+            break
+
+    if current_part is None:
+        return render_template("story.html", story=story, current_part=None,
+                               chapter_title="Chưa có nội dung phần này",
+                               content_processed="<p><em>Truyện này chưa có phần nào.</em></p>",
+                               current_index=current_index, total_parts=total_parts,
+                               parts=parts, comments=[], current_url=request.url)
+
+    # Tách tiêu đề và nội dung
+    raw = current_part.content
+    if '\n' in raw:
+        chapter_title, chapter_body = raw.split('\n', 1)
+    else:
+        chapter_title = raw
+        chapter_body = ""
+
+    chapter_title = chapter_title.strip()
+
+    # Highlight chỉ áp dụng cho nội dung
+    chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
+    chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
+
+    # Giữ nguyên tất cả xuống dòng
+    content_processed = chapter_body.replace('\n', '<br>')
+
     comments = Comment.query.filter_by(story_id=story.id).order_by(Comment.created_at.desc()).all()
-    # url hiện tại (bao gồm query string) để gắn vào form comment
-    current_url = request.url
+
     return render_template(
         "story.html",
         story=story,
@@ -592,8 +598,160 @@ def story_detail(story_id: int):
         total_parts=total_parts,
         parts=parts,
         comments=comments,
-        current_url=current_url,
+        current_url=request.url,
     )
+
+def split_to_chunks(text: str, max_chars: int = 1000) -> list:
+    """Split text thành chunk <= 1000 ký tự, không cắt giữa câu."""
+    if not text.strip():
+        return [" "]
+
+    import re
+    sentence_split = re.compile(r'(?<=[\.!?…])\s+')
+    sentences = [s.strip() for s in sentence_split.split(text.strip()) if s.strip()]
+
+    chunks = []
+    current = ""
+    for sentence in sentences:
+        if not current:
+            current = sentence
+        elif len(current) + 1 + len(sentence) <= max_chars:
+            current += " " + sentence
+        else:
+            chunks.append(current)
+            current = sentence
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+# Thêm dòng này ở đầu file app.py (gần phần import)
+background_tasks = {}   # key: (story_id, part_number) → thread đang chạy
+
+@app.route("/api/start_audio/<int:part_id>")
+def start_audio(part_id: int):
+    """Tạo chunk 1 ngay + background tạo chunk còn lại (đã fix race condition)"""
+    part = Part.query.get_or_404(part_id)
+    story_id = part.story_id
+    part_number = part.part_number
+    task_key = (story_id, part_number)
+
+    print(f"[AUDIO] 🚀 Yêu cầu nghe phần {part_number} - truyện {story_id}")
+
+    audio_dir = Path("static/audio") / str(story_id)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    text = part.content.strip()
+    if not text:
+        return jsonify({"status": "error", "message": "Nội dung trống"}), 400
+
+    chunks = split_to_chunks(text, max_chars=1000)
+    total_chunks = len(chunks)
+
+    # === CHUNK 1 ===
+    chunk1_path = audio_dir / f"{part_number}_chunk_0001.mp3"
+    tmp1 = chunk1_path.with_name(chunk1_path.stem + "__tmp" + chunk1_path.suffix)
+
+    if not chunk1_path.exists():
+        print(f"[AUDIO] 🔨 Đang tạo CHUNK 1/{total_chunks}...")
+        try:
+            communicate = edge_tts.Communicate(text=chunks[0], voice="vi-VN-HoaiMyNeural")
+            asyncio.run(communicate.save(str(tmp1)))
+            if tmp1.exists():
+                os.replace(tmp1, chunk1_path)
+                print(f"[AUDIO] ✅ CHUNK 1 HOÀN TẤT")
+        except Exception as e:
+            print(f"[AUDIO] ❌ Lỗi chunk 1: {e}")
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+    url_chunk1 = f"/static/audio/{story_id}/{part_number}_chunk_0001.mp3"
+
+    # === BACKGROUND: Chỉ khởi động nếu chưa có thread nào đang chạy ===
+    if task_key not in background_tasks or not background_tasks[task_key].is_alive():
+        def background_create():
+            print(f"[BACKGROUND] 🔄 Bắt đầu tạo {total_chunks-1} chunk còn lại cho phần {part_number}...")
+            for i in range(1, total_chunks):
+                chunk_path = audio_dir / f"{part_number}_chunk_{i+1:04d}.mp3"
+                tmp_path = chunk_path.with_name(chunk_path.stem + "__tmp" + chunk_path.suffix)
+
+                if chunk_path.exists():
+                    continue
+
+                print(f"[BACKGROUND] 🔨 Đang tạo chunk {i+1}/{total_chunks}...")
+                try:
+                    communicate = edge_tts.Communicate(text=chunks[i], voice="vi-VN-HoaiMyNeural")
+                    asyncio.run(communicate.save(str(tmp_path)))
+                    if tmp_path.exists():
+                        os.replace(tmp_path, chunk_path)
+                        print(f"[BACKGROUND] ✅ Chunk {i+1}/{total_chunks} HOÀN TẤT")
+                except Exception as e:
+                    print(f"[BACKGROUND] ❌ Lỗi chunk {i+1}: {e}")
+
+            print(f"[BACKGROUND] 🎉 Hoàn thành tất cả chunk của phần {part_number}")
+            # Xóa thread khỏi dict khi xong
+            if task_key in background_tasks:
+                del background_tasks[task_key]
+
+        thread = threading.Thread(target=background_create, daemon=True)
+        background_tasks[task_key] = thread
+        thread.start()
+    else:
+        print(f"[BACKGROUND] ♻️ Đã có background thread đang chạy cho phần này, bỏ qua khởi động mới")
+
+    return jsonify({
+        "status": "success",
+        "url": url_chunk1,
+        "current_chunk": 1,
+        "total_chunks": total_chunks,
+        "part_id": part_id,
+        "story_id": story_id,
+        "part_number": part_number
+    })
+
+@app.route("/api/get_chunk/<int:story_id>/<int:part_number>/<int:chunk_index>")
+def get_chunk(story_id: int, part_number: int, chunk_index: int):
+    """Trả về chunk - Nếu chunk bị xóa thì tạo lại ngay"""
+    print(f"[GET_CHUNK] 📥 Yêu cầu chunk {chunk_index} của phần {part_number} (truyện {story_id})")
+
+    audio_dir = Path("static/audio") / str(story_id)
+    chunk_path = audio_dir / f"{part_number}_chunk_{chunk_index:04d}.mp3"
+
+    # Nếu chunk còn tồn tại → trả về ngay
+    if chunk_path.exists() and chunk_path.stat().st_size > 500:
+        url = f"/static/audio/{story_id}/{chunk_path.name}"
+        print(f"[GET_CHUNK] ✅ Chunk {chunk_index} SẴN SÀNG")
+        return jsonify({"status": "success", "url": url})
+
+    # Chunk bị xóa hoặc chưa có → tạo lại ngay
+    print(f"[GET_CHUNK] 🔄 Chunk {chunk_index} bị xóa → tạo lại ngay")
+
+    # Lấy Part theo story_id + part_number
+    part = Part.query.filter_by(story_id=story_id, part_number=part_number).first_or_404()
+
+    text = part.content.strip()
+    chunks = split_to_chunks(text, max_chars=1000)
+
+    if chunk_index < 1 or chunk_index > len(chunks):
+        return jsonify({"status": "error", "message": "Chunk index không hợp lệ"}), 400
+
+    tmp_path = chunk_path.with_name(chunk_path.stem + "__tmp" + chunk_path.suffix)
+
+    try:
+        communicate = edge_tts.Communicate(text=chunks[chunk_index-1], voice="vi-VN-HoaiMyNeural")
+        asyncio.run(communicate.save(str(tmp_path)))
+
+        if tmp_path.exists():
+            os.replace(tmp_path, chunk_path)
+            print(f"[GET_CHUNK] ✅ ĐÃ TẠO LẠI chunk {chunk_index}")
+
+            url = f"/static/audio/{story_id}/{chunk_path.name}"
+            return jsonify({"status": "success", "url": url})
+        else:
+            return jsonify({"status": "error", "message": "Tạo chunk thất bại"}), 500
+
+    except Exception as e:
+        print(f"[GET_CHUNK] ❌ Lỗi tạo lại chunk {chunk_index}: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
@@ -1956,6 +2114,55 @@ def views_analytics():
                            start_date=start_date,
                            end_date=end_date)
 
+
+@app.route("/api/delete_chunk/<int:story_id>/<int:part_number>/<int:chunk_index>")
+def delete_chunk(story_id: int, part_number: int, chunk_index: int):
+    """Xóa file chunk mp3 sau khi browser play xong"""
+    try:
+        audio_dir = Path("static/audio") / str(story_id)
+        chunk_path = audio_dir / f"{part_number}_chunk_{chunk_index:04d}.mp3"
+        
+        if chunk_path.exists():
+            os.remove(chunk_path)
+            print(f"[DELETE] 🗑️ Đã xóa chunk {chunk_index} của phần {part_number} (truyện {story_id})")
+            return jsonify({"status": "deleted"})
+        else:
+            return jsonify({"status": "not_found"})
+    except Exception as e:
+        print(f"[DELETE] ❌ Lỗi khi xóa chunk: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+def cleanup_old_audio():
+    """Xóa các file chunk mp3 cũ hơn 60 phút"""
+    while True:
+        try:
+            audio_root = Path("static/audio")
+            if not audio_root.exists():
+                time.sleep(60)
+                continue
+
+            now = time.time()
+            deleted = 0
+            for story_dir in audio_root.iterdir():
+                if not story_dir.is_dir():
+                    continue
+                for mp3_file in story_dir.glob("*.mp3"):
+                    if mp3_file.stat().st_mtime < now - 3600:   # 3600 giây = 60 phút
+                        try:
+                            mp3_file.unlink()
+                            deleted += 1
+                            print(f"[CLEANUP] 🗑️ Đã xóa file cũ: {mp3_file.name}")
+                        except Exception as e:
+                            print(f"[CLEANUP] Lỗi xóa {mp3_file.name}: {e}")
+            if deleted > 0:
+                print(f"[CLEANUP] Đã xóa {deleted} file mp3 cũ")
+        except Exception as e:
+            print(f"[CLEANUP] Lỗi: {e}")
+        time.sleep(300)   # quét mỗi 5 phút
+
+# Khởi động background cleaner
+Thread(target=cleanup_old_audio, daemon=True).start()
+print("[CLEANUP] ✅ Background cleaner đã khởi động (xóa file mp3 cũ hơn 60 phút)")
 
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại

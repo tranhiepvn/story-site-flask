@@ -4,7 +4,6 @@
 <article>
   <h2>{{ story.title }}</h2>
   <p class="meta">
-    {# Tác giả: nếu có tên tác giả thì liên kết tới trang tác giả #}
     Tác giả:
     {% if story.author %}
       <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
@@ -19,7 +18,7 @@
       {{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}
     </a>
   </p>
-  {# Thể loại: hiển thị danh sách các thể loại với liên kết trên dòng riêng #}
+
   {% if story.categories %}
   <p class="meta">
     Thể loại:
@@ -28,8 +27,8 @@
     {% endfor %}
   </p>
   {% endif %}
-  {# Hiển thị trạng thái hoàn thành của truyện #}
-    {% if story.is_completed %}
+
+  {% if story.is_completed %}
     <p class="status-message completed-status">
       Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)
     </p>
@@ -38,7 +37,7 @@
       Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
     </p>
   {% endif %}
-  {# Hiển thị nội dung từng phần của truyện. #}
+
   {% if total_parts > 0 %}
     {% if total_parts > 1 %}
       <div class="part-navigation">
@@ -46,23 +45,17 @@
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
         {% endif %}
         {% if current_index < total_parts %}
-          {# nếu truyện đã hoàn thành và đang ở phần cuối thì hiển thị "Chương cuối" thay cho "Chương sau" #}
-          {% if story.is_completed and (current_index + 1 == total_parts) %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần cuối &rarr;</a>
-          {% else %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
-          {% endif %}
+          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
         {% elif story.is_completed %}
-          {# nếu đang ở chương cuối của truyện hoàn thành, chỉ hiển thị nhãn #}
           <span class="no-link">Phần cuối</span>
         {% endif %}
       </div>
+
       <div class="part-list">
         <p>Danh sách phần:</p>
         <ul>
           {% for p in parts %}
             <li style="margin-bottom: 0.5em;">
-              {# Lấy dòng đầu tiên làm tiêu đề #}
               {% set _first = p.content.split('\n', 1)[0] %}
               {% if p.part_number == current_index %}
                 <strong>{{ _first }}</strong>
@@ -74,43 +67,62 @@
         </ul>
       </div>
     {% endif %}
+
+    <!-- ==================== PHẦN NỘI DUNG CHƯƠNG ==================== -->
     <div class="story-part">
-      {# Hiển thị tiêu đề chương #}
+      <!-- Tiêu đề chỉ hiển thị 1 lần -->
       {% if chapter_title %}
-        <p class="chapter-title">{{ chapter_title }}</p>
+        <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
-      {# Hiển thị nội dung đã highlight và test #}
-      {% if content_processed %}
-        <p>{{ content_processed | safe }}</p>
-      {% endif %}
-    </div>
-    {# Hiển thị các video liên kết (nếu có) ngay dưới nội dung chương #}
+
+      <!-- Audio Player - Layout cứng, progress bar KHÔNG NHẢY DÀI NGẮN -->
+<div id="audio-player" class="audio-player" 
+     style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; 
+            display: grid; grid-template-columns: 48px 1fr 175px; align-items:center; gap:12px; height:52px;">
+
+  <!-- Button -->
+  <button id="play-btn" onclick="toggleAudio({{ current_part.id }})"
+          style="background:none; border:none; font-size:28px; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
+    🔊
+  </button>
+
+  <!-- Progress Bar - CỐ ĐỊNH -->
+  <div>
+    <input type="range" id="progress-bar" min="1" max="100" value="1" 
+           style="width:100%; height:8px; accent-color:#00BFFF; cursor:pointer;">
+  </div>
+
+  <!-- Text - Cố định chiều rộng -->
+  <span id="play-text" style="font-weight:500; color:#00BFFF; white-space:nowrap;">
+    Nghe phần này...
+  </span>
+
+  <audio id="audio-element" style="display:none;"></audio>
+</div>
+    <!-- Video nếu có -->
     {% if current_part and current_part.videos %}
       <div class="video-section">
         {% for vid in current_part.videos %}
-          {# Sử dụng hàm drive_embed để chuyển đổi URL thành liên kết xem trước của Google Drive #}
           <iframe src="{{ drive_embed(vid.url) }}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
         {% endfor %}
       </div>
     {% endif %}
-    {# Khi đang xem phần cuối cùng và truyện chưa hoàn thành, hiển thị thông báo tiếp tục #}
+
     {% if not story.is_completed and current_index == total_parts %}
       <p class="continuation">Còn tiếp…</p>
     {% endif %}
+
     <p class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
-    {# hiển thị đánh giá hiện tại và form đánh giá #}
+
+    <!-- Đánh giá -->
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
-      <p>Đánh giá hiện tại:
+      <p>Đánh giá hiện tại: 
         <span class="rating">
           {% for i in range(1, 6) %}
             {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
           {% endfor %}
-          {% if story.rating_count > 0 %}
-            ({{ '%.1f'|format(avg) }})
-          {% else %}
-            (chưa có)
-          {% endif %}
+          {% if story.rating_count > 0 %}({{ '%.1f'|format(avg) }}){% else %}(chưa có){% endif %}
         </span>
       </p>
       <form method="post" action="{{ url_for('rate_story', story_id=story.id) }}">
@@ -122,18 +134,15 @@
         </div>
       </form>
     </div>
-    {# lặp lại điều hướng và danh sách chương bên dưới nội dung để tiện cho người đọc #}
+
+    <!-- Lặp lại điều hướng và danh sách phần -->
     {% if total_parts > 1 %}
       <div class="part-navigation">
         {% if current_index > 1 %}
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
         {% endif %}
         {% if current_index < total_parts %}
-          {% if story.is_completed and (current_index + 1 == total_parts) %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần cuối &rarr;</a>
-          {% else %}
-            <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
-          {% endif %}
+          <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
         {% elif story.is_completed %}
           <span class="no-link">Phần cuối</span>
         {% endif %}
@@ -154,7 +163,8 @@
         </ul>
       </div>
     {% endif %}
-    {# Hiển thị khu vực bình luận sau nội dung chương và danh sách chương #}
+
+    <!-- Bình luận -->
     <div class="comments-section">
       <h3>Bình luận</h3>
       <div class="comment-form">
@@ -164,7 +174,6 @@
             <label for="comment_name">Tên:</label><br>
             <input type="text" id="comment_name" name="name" placeholder="Tên của bạn (tuỳ chọn)">
           </div>
-          {# Bỏ trường email; chỉ thu thập tên và nội dung bình luận #}
           <div class="form-group">
             <label for="comment_content">Nội dung bình luận:</label><br>
             <textarea id="comment_content" name="content" rows="4" required></textarea>
@@ -192,14 +201,211 @@
   {% else %}
     <p><em>Chưa có nội dung cho truyện này.</em></p>
   {% endif %}
+
   <p><a href="{{ url_for('index') }}">&larr; Quay lại danh sách</a></p>
 </article>
+
 <style>
-  .highlight-green {
-    color: #006400; /* Màu xanh lá đậm */
-  }
-  .highlight-red {
-    color: #8B0000; /* Màu đỏ đậm */
-  }
+  .highlight-green { color: #006400; }
+  .highlight-red { color: #8B0000; }
 </style>
+
+<!-- Audio Player với Progress Bar ổn định -->
+<div id="audio-player" class="audio-player" style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; display:flex; align-items:center; gap:12px;">
+  <button id="play-btn" onclick="toggleAudio({{ current_part.id }})"
+          style="background:none; border:none; font-size:28px; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
+    🔊
+  </button>
+
+  <!-- Progress Bar cố định chiều rộng -->
+  <input type="range" id="progress-bar" min="1" max="100" value="1" 
+         style="flex: 1; min-width: 220px; height: 8px; accent-color: #00BFFF; cursor: pointer;">
+
+  <!-- Text có chiều rộng ổn định -->
+  <span id="play-text" style="font-weight:500; color:#00BFFF; min-width: 170px; white-space: nowrap;">
+    Nghe phần này...
+  </span>
+
+  <audio id="audio-element" style="display:none;"></audio>
+</div>
+
+<script>
+let currentAudio = null;
+let currentPartId = null;
+let currentStoryId = null;
+let currentPartNumber = null;
+let currentChunkIndex = 1;
+let totalChunks = 1;
+
+const progressBar = document.getElementById('progress-bar');
+const playText = document.getElementById('play-text');
+const playBtn = document.getElementById('play-btn');
+
+async function toggleAudio(partId) {
+  const audioEl = document.getElementById('audio-element');
+
+  if (currentAudio && currentAudio.partId === partId) {
+    if (currentAudio.paused) {
+      currentAudio.play();
+      playText.textContent = "Đang nghe...";
+      playBtn.innerHTML = "⏸️";
+    } else {
+      currentAudio.pause();
+      playText.textContent = "Tạm dừng...";
+      playBtn.innerHTML = "▶️";
+    }
+    return;
+  }
+
+  // Lần đầu click → disable progress bar
+  playBtn.innerHTML = "⏳";
+  playText.textContent = "Đang chuyển sang audio...";
+  playBtn.disabled = true;
+  progressBar.disabled = true;           // ← DISABLE lần đầu
+  progressBar.style.accentColor = "#FF9800";
+
+  try {
+    const res = await fetch(`/api/start_audio/${partId}`);
+    const data = await res.json();
+
+    if (data.status === "success") {
+      currentPartId = data.part_id;
+      currentStoryId = data.story_id;
+      currentPartNumber = data.part_number;
+      currentChunkIndex = data.current_chunk;
+      totalChunks = data.total_chunks;
+
+      audioEl.src = data.url;
+      await audioEl.play();
+
+      currentAudio = audioEl;
+      currentAudio.partId = partId;
+
+      playBtn.innerHTML = "⏸️";
+      playText.textContent = "Đang nghe...";
+      playBtn.disabled = false;
+      progressBar.disabled = false;      // ← ENABLE sau khi chunk 1 play xong
+      progressBar.style.accentColor = "#00BFFF";
+      progressBar.max = totalChunks;
+      progressBar.value = currentChunkIndex;
+    }
+  } catch (e) {
+    console.error(e);
+    playText.textContent = "Lỗi kết nối";
+    playBtn.innerHTML = "🔊";
+    playBtn.disabled = false;
+    progressBar.disabled = false;
+  }
+}
+
+// Khi chunk play xong
+document.getElementById('audio-element').addEventListener('ended', async function() {
+  if (currentChunkIndex >= totalChunks) {
+    resetAudioPlayer();
+    return;
+  }
+
+  currentChunkIndex++;
+  progressBar.value = currentChunkIndex;
+
+  this.pause();
+  playText.textContent = "Đang chuyển sang audio...";
+  playBtn.innerHTML = "⏳";
+  playBtn.disabled = true;
+  progressBar.disabled = true;
+  progressBar.style.accentColor = "#FF9800";
+
+  const res = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
+  const data = await res.json();
+
+  if (data.status === "success") {
+    this.src = data.url;
+    this.play();
+    playText.textContent = "Đang nghe...";
+    playBtn.innerHTML = "⏸️";
+    playBtn.disabled = false;
+    progressBar.disabled = false;
+    progressBar.style.accentColor = "#00BFFF";
+  } else {
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const res2 = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
+      const data2 = await res2.json();
+      if (data2.status === "success") {
+        clearInterval(poll);
+        this.src = data2.url;
+        this.play();
+        playText.textContent = "Đang nghe...";
+        playBtn.innerHTML = "⏸️";
+        playBtn.disabled = false;
+        progressBar.disabled = false;
+        progressBar.style.accentColor = "#00BFFF";
+      }
+      if (attempts > 40) clearInterval(poll);
+    }, 700);
+  }
+});
+
+function resetAudioPlayer() {
+  if (currentAudio) currentAudio.pause();
+  currentAudio = null;
+  playBtn.innerHTML = "🔊";
+  playText.textContent = "Nghe phần này...";
+  playBtn.disabled = false;
+  progressBar.disabled = false;
+  progressBar.value = 1;
+  progressBar.style.accentColor = "#00BFFF";
+}
+
+// Kéo progress bar (chỉ gửi request khi buông chuột)
+progressBar.addEventListener('input', function() { /* chỉ di chuyển */ });
+
+progressBar.addEventListener('change', async function() {
+  if (!currentStoryId || !currentPartNumber || progressBar.disabled) return;
+
+  const targetChunk = parseInt(this.value);
+  if (targetChunk === currentChunkIndex) return;
+
+  currentChunkIndex = targetChunk;
+
+  if (currentAudio) currentAudio.pause();
+
+  playText.textContent = "Đang chuyển sang audio...";
+  playBtn.innerHTML = "⏳";
+  playBtn.disabled = true;
+  progressBar.style.accentColor = "#FF9800";
+
+  const res = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
+  const data = await res.json();
+
+  if (data.status === "success") {
+    const audioEl = document.getElementById('audio-element');
+    audioEl.src = data.url;
+    audioEl.play();
+    playText.textContent = "Đang nghe...";
+    playBtn.innerHTML = "⏸️";
+    playBtn.disabled = false;
+    progressBar.style.accentColor = "#00BFFF";
+  } else {
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const res2 = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
+      const data2 = await res2.json();
+      if (data2.status === "success") {
+        clearInterval(poll);
+        const audioEl = document.getElementById('audio-element');
+        audioEl.src = data2.url;
+        audioEl.play();
+        playText.textContent = "Đang nghe...";
+        playBtn.innerHTML = "⏸️";
+        playBtn.disabled = false;
+        progressBar.style.accentColor = "#00BFFF";
+      }
+      if (attempts > 40) clearInterval(poll);
+    }, 700);
+  }
+});
+</script>
 {% endblock %}
