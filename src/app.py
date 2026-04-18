@@ -2163,7 +2163,7 @@ def cleanup_old_audio():
 
 # Khởi động background cleaner
 Thread(target=cleanup_old_audio, daemon=True).start()
-print("[CLEANUP] ✅ Background cleaner đã khởi động (xóa file mp3 cũ hơn 60 phút)")
+print("[CLEANUP] ✅ Background cleaner đã khởi động (xóa file mp3 cũ hơn 1 ngày)")
 
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
