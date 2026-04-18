@@ -50,7 +50,6 @@
           <span class="no-link">Phần cuối</span>
         {% endif %}
       </div>
-
       <div class="part-list">
         <p>Danh sách phần:</p>
         <ul>
@@ -70,36 +69,36 @@
 
     <!-- ==================== PHẦN NỘI DUNG CHƯƠNG ==================== -->
     <div class="story-part">
-      <!-- Tiêu đề chỉ hiển thị 1 lần -->
       {% if chapter_title %}
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- Audio Player - Layout cứng, progress bar KHÔNG NHẢY DÀI NGẮN -->
-<div id="audio-player" class="audio-player" 
-     style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; 
-            display: grid; grid-template-columns: 48px 1fr 175px; align-items:center; gap:12px; height:52px;">
+      <!-- Audio Player - Progress bar cố định, không nhảy dài ngắn -->
+      <div id="audio-player" class="audio-player" 
+           style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; 
+                  display: grid; grid-template-columns: 48px 1fr 175px; align-items:center; gap:12px; height:52px;">
 
-  <!-- Button -->
-  <button id="play-btn" onclick="toggleAudio({{ current_part.id }})"
-          style="background:none; border:none; font-size:28px; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
-    🔊
-  </button>
+        <button id="play-btn" onclick="toggleAudio({{ current_part.id }})"
+                style="background:none; border:none; font-size:28px; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
+          🔊
+        </button>
 
-  <!-- Progress Bar - CỐ ĐỊNH -->
-  <div>
-    <input type="range" id="progress-bar" min="1" max="100" value="1" 
-           style="width:100%; height:8px; accent-color:#00BFFF; cursor:pointer;">
-  </div>
+        <div style="flex:1; min-width:280px;">
+          <input type="range" id="progress-bar" min="1" max="100" value="1" 
+                 style="width:100%; height:8px; accent-color:#00BFFF; cursor:pointer;">
+        </div>
 
-  <!-- Text - Cố định chiều rộng -->
-  <span id="play-text" style="font-weight:500; color:#00BFFF; white-space:nowrap;">
-    Nghe phần này...
-  </span>
+        <span id="play-text" style="font-weight:500; color:#00BFFF; white-space:nowrap;">
+          Nghe phần này...
+        </span>
 
-  <audio id="audio-element" style="display:none;"></audio>
-</div>
-    <!-- Video nếu có -->
+        <audio id="audio-element" style="display:none;"></audio>
+      </div>
+
+      <!-- Nội dung truyện -->
+      <p>{{ content_processed | safe }}</p>
+    </div>
+
     {% if current_part and current_part.videos %}
       <div class="video-section">
         {% for vid in current_part.videos %}
@@ -117,7 +116,7 @@
     <!-- Đánh giá -->
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
-      <p>Đánh giá hiện tại: 
+      <p>Đánh giá hiện tại:
         <span class="rating">
           {% for i in range(1, 6) %}
             {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
@@ -135,7 +134,6 @@
       </form>
     </div>
 
-    <!-- Lặp lại điều hướng và danh sách phần -->
     {% if total_parts > 1 %}
       <div class="part-navigation">
         {% if current_index > 1 %}
@@ -164,7 +162,6 @@
       </div>
     {% endif %}
 
-    <!-- Bình luận -->
     <div class="comments-section">
       <h3>Bình luận</h3>
       <div class="comment-form">
@@ -210,25 +207,6 @@
   .highlight-red { color: #8B0000; }
 </style>
 
-<!-- Audio Player với Progress Bar ổn định -->
-<div id="audio-player" class="audio-player" style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; display:flex; align-items:center; gap:12px;">
-  <button id="play-btn" onclick="toggleAudio({{ current_part.id }})"
-          style="background:none; border:none; font-size:28px; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
-    🔊
-  </button>
-
-  <!-- Progress Bar cố định chiều rộng -->
-  <input type="range" id="progress-bar" min="1" max="100" value="1" 
-         style="flex: 1; min-width: 220px; height: 8px; accent-color: #00BFFF; cursor: pointer;">
-
-  <!-- Text có chiều rộng ổn định -->
-  <span id="play-text" style="font-weight:500; color:#00BFFF; min-width: 170px; white-space: nowrap;">
-    Nghe phần này...
-  </span>
-
-  <audio id="audio-element" style="display:none;"></audio>
-</div>
-
 <script>
 let currentAudio = null;
 let currentPartId = null;
@@ -257,11 +235,10 @@ async function toggleAudio(partId) {
     return;
   }
 
-  // Lần đầu click → disable progress bar
   playBtn.innerHTML = "⏳";
   playText.textContent = "Đang chuyển sang audio...";
   playBtn.disabled = true;
-  progressBar.disabled = true;           // ← DISABLE lần đầu
+  progressBar.disabled = true;
   progressBar.style.accentColor = "#FF9800";
 
   try {
@@ -284,7 +261,7 @@ async function toggleAudio(partId) {
       playBtn.innerHTML = "⏸️";
       playText.textContent = "Đang nghe...";
       playBtn.disabled = false;
-      progressBar.disabled = false;      // ← ENABLE sau khi chunk 1 play xong
+      progressBar.disabled = false;
       progressBar.style.accentColor = "#00BFFF";
       progressBar.max = totalChunks;
       progressBar.value = currentChunkIndex;
@@ -294,11 +271,9 @@ async function toggleAudio(partId) {
     playText.textContent = "Lỗi kết nối";
     playBtn.innerHTML = "🔊";
     playBtn.disabled = false;
-    progressBar.disabled = false;
   }
 }
 
-// Khi chunk play xong
 document.getElementById('audio-element').addEventListener('ended', async function() {
   if (currentChunkIndex >= totalChunks) {
     resetAudioPlayer();
@@ -358,8 +333,7 @@ function resetAudioPlayer() {
   progressBar.style.accentColor = "#00BFFF";
 }
 
-// Kéo progress bar (chỉ gửi request khi buông chuột)
-progressBar.addEventListener('input', function() { /* chỉ di chuyển */ });
+progressBar.addEventListener('input', function() {});
 
 progressBar.addEventListener('change', async function() {
   if (!currentStoryId || !currentPartNumber || progressBar.disabled) return;
