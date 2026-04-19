@@ -1,13 +1,13 @@
 {% extends "layout.html" %}
 {% block title %}Đăng truyện mới{% endblock %}
 {% block content %}
-<h2>Đăng truyện mới</h2>
-
 <!-- Thanh điều hướng admin -->
 <div style="background: #2C2C2C; padding: 12px; margin-bottom: 20px; border-radius: 8px; text-align: center;">
   <a href="{{ url_for('views_analytics') }}" style="color: #00BFFF; margin-right: 20px; text-decoration: none; font-weight: bold;">📊 Xem Views (7 ngày)</a>
   <a href="{{ url_for('hears_analytics') }}" style="color: #FF8C00; text-decoration: none; font-weight: bold;">🎧 Xem Nghe (7 ngày)</a>
 </div>
+
+<h2>Đăng truyện mới</h2>
 
 {% set show_comments, commented_stories = get_comment_notifications() %}
 {% if show_comments and commented_stories %}
