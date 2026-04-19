@@ -165,10 +165,22 @@
           <a href="{{ url_for('index') }}">Trang chủ</a><span class="separator">|</span>
           <a href="{{ url_for('upload_login') }}">Admin</a>
         </nav>
-        <form action="{{ url_for('search') }}" method="get" class="search-form">
-          <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}">
-          <button type="submit">Tìm</button>
-        </form>
+
+
+
+<form action="{{ url_for('search') }}" method="get" class="search-form" style="display: flex; align-items: center;">
+  <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #333; color: #fff; box-sizing: border-box; margin: 0;">
+  <select name="limit" style="padding: 8px 12px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box; margin-left: 10px;">
+    {% set cur_limit = request.args.get('limit', '3') %}
+    <option value="1" {% if cur_limit == '1' %}selected{% endif %}>1 đoạn</option>
+    <option value="3" {% if cur_limit == '3' %}selected{% endif %}>3 đoạn</option>
+    <option value="5" {% if cur_limit == '5' %}selected{% endif %}>5 đoạn</option>
+    <option value="10" {% if cur_limit == '10' %}selected{% endif %}>10 đoạn</option>
+    <option value="all" {% if cur_limit == 'all' %}selected{% endif %}>Tất cả</option>
+  </select>
+  <button type="submit" style="padding: 8px 16px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box; margin-left: 10px;">Tìm</button>
+</form>
+
       </header>
       <div class="content-wrapper">
         {% if categories %}

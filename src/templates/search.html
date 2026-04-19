@@ -48,14 +48,18 @@
                 Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
               </p>
             {% endif %}
-            
-            {# HIỂN THỊ ĐOẠN TRÍCH CHỨA TỪ KHÓA #}
-            {% set snippet_info = snippets.get(story.id) %}
-            {% if snippet_info %}
-              {% set snippet_html, part_num = snippet_info %}
-              <p class="snippet" style="font-style: italic; color: #ccc;">
-                <strong>Phần {{ part_num }}:</strong> {{ snippet_html|safe }}
-              </p>
+
+            {# HIỂN THỊ TẤT CẢ CÁC ĐOẠN TRÍCH (tối đa 3) #}
+            {% set snippets = all_snippets.get(story.id) %}
+            {% if snippets %}
+              <div class="search-snippets">
+                {% for part_num, snippet_html in snippets %}
+                  <p class="snippet" style="margin-bottom: 8px; font-style: italic; color: #ccc;">
+                    <strong><a href="{{ url_for('story_detail', story_id=story.id, part=part_num) }}">Phần {{ part_num }}</a>:</strong>
+                    {{ snippet_html|safe }}
+                  </p>
+                {% endfor %}
+              </div>
             {% else %}
               {% set first_part = story.parts|first %}
               {% if first_part %}
@@ -84,6 +88,13 @@
     font-weight: bold;
     padding: 0 2px;
     border-radius: 3px;
+  }
+  .search-snippets {
+    margin-top: 6px;
+  }
+  .search-snippets .snippet {
+    border-left: 3px solid #4A90E2;
+    padding-left: 10px;
   }
 </style>
 {% endblock %}

@@ -1760,13 +1760,24 @@ def type_view(story_type: str):
 
 @app.route("/search")
 def search():
-    """Tìm kiếm truyện theo tiêu đề hoặc nội dung, hiển thị đoạn trích chứa từ khóa."""
     query = request.args.get("q", "").strip()
+    limit_param = request.args.get("limit", "3")
+    
+    # Xử lý limit
+    if limit_param == 'all':
+        max_snippets = None
+    else:
+        try:
+            max_snippets = int(limit_param)
+            if max_snippets <= 0:
+                max_snippets = 3
+        except ValueError:
+            max_snippets = 3
+
     stories = []
-    snippets = {}  # dict story_id -> (snippet_html, part_number)
+    all_snippets = {}
     if query:
         like_pattern = f"%{query}%"
-        # Tìm các story thỏa mãn (title, author hoặc nội dung part)
         stories = (
             Story.query.outerjoin(Part)
             .filter(
@@ -1779,12 +1790,10 @@ def search():
             .order_by(Story.created_at.desc())
             .all()
         )
-        # Với mỗi story, tìm phần đầu tiên có chứa keyword và tạo snippet highlight
         keywords = [kw.lower() for kw in query.split() if kw.strip()]
         for story in stories:
             parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
-            snippet = None
-            part_number = None
+            snippets = []
             for part in parts:
                 content_lower = part.content.lower()
                 idx = content_lower.find(query.lower())
@@ -1797,15 +1806,15 @@ def search():
                     start = max(0, idx - 100)
                     end = min(len(part.content), idx + len(query) + 150)
                     raw_snippet = part.content[start:end]
-                    # Highlight các keyword
+                    # Highlight keywords
                     highlighted = raw_snippet
                     for kw in keywords:
                         highlighted = re.sub(rf'({re.escape(kw)})', r'<span class="highlight">\1</span>', highlighted, flags=re.IGNORECASE)
-                    snippet = highlighted
-                    part_number = part.part_number
-                    break
-            if snippet:
-                snippets[story.id] = (snippet, part_number)
+                    snippets.append((part.part_number, highlighted))
+                    if max_snippets is not None and len(snippets) >= max_snippets:
+                        break
+            if snippets:
+                all_snippets[story.id] = snippets
             else:
                 # fallback: lấy 200 ký tự đầu của phần đầu tiên
                 first_part = parts[0] if parts else None
@@ -1813,18 +1822,19 @@ def search():
                     raw = first_part.content[:200]
                     if len(first_part.content) > 200:
                         raw = raw.rsplit(' ', 1)[0] + "..."
-                    snippets[story.id] = (raw.replace('\n', ' '), 1)
+                    all_snippets[story.id] = [(1, raw.replace('\n', ' '))]
+    
     categories_group1, categories_group2, categories_group3 = get_category_groups()
     return render_template(
         "search.html",
         query=query,
         stories=stories,
-        snippets=snippets,
+        all_snippets=all_snippets,
+        limit=limit_param,
         categories_group1=categories_group1,
         categories_group2=categories_group2,
         categories_group3=categories_group3,
     )
-
 
 # Đánh giá truyện: nhận giá trị rating 1-5 qua POST và cập nhật tổng/số lượng
 @app.route("/rate/<int:story_id>", methods=["POST"])
@@ -2145,7 +2155,7 @@ def hears_analytics():
                            dates=dates,
                            start_date=start_date,
                            end_date=end_date)
-    
+
 @app.route("/api/delete_chunk/<int:story_id>/<int:part_number>/<int:chunk_index>")
 def delete_chunk(story_id: int, part_number: int, chunk_index: int):
     """Xóa file chunk mp3 sau khi browser play xong"""
