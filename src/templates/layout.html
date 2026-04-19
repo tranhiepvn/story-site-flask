@@ -168,9 +168,10 @@
 
 
 
-<form action="{{ url_for('search') }}" method="get" class="search-form" style="display: flex; align-items: center;">
-  <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #333; color: #fff; box-sizing: border-box; margin: 0;">
-  <select name="limit" style="padding: 8px 12px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box; margin-left: 10px;">
+<form action="{{ url_for('search') }}" method="get" class="search-form" style="display: flex; align-items: center; gap: 10px; position: relative;">
+  <input type="text" name="q" id="search-input" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #333; color: #fff; box-sizing: border-box;" autocomplete="off">
+  <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: #222; border: 1px solid #444; border-radius: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; display: none;"></div>
+  <select name="limit" style="padding: 8px 12px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box;">
     {% set cur_limit = request.args.get('limit', '3') %}
     <option value="1" {% if cur_limit == '1' %}selected{% endif %}>1 đoạn</option>
     <option value="3" {% if cur_limit == '3' %}selected{% endif %}>3 đoạn</option>
@@ -178,8 +179,10 @@
     <option value="10" {% if cur_limit == '10' %}selected{% endif %}>10 đoạn</option>
     <option value="all" {% if cur_limit == 'all' %}selected{% endif %}>Tất cả</option>
   </select>
-  <button type="submit" style="padding: 8px 16px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box; margin-left: 10px;">Tìm</button>
+  <button type="submit" style="padding: 8px 16px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box;">Tìm</button>
 </form>
+
+
 
       </header>
       <div class="content-wrapper">
@@ -339,6 +342,47 @@
           }
         });
       });
+
+      // Autocomplete tìm kiếm
+const searchInput = document.getElementById('search-input');
+const suggestionsDiv = document.getElementById('suggestions');
+
+let debounceTimer;
+searchInput.addEventListener('input', function() {
+  clearTimeout(debounceTimer);
+  const query = this.value.trim();
+  if (query.length < 2) {
+    suggestionsDiv.style.display = 'none';
+    return;
+  }
+  debounceTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/suggest?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.length === 0) {
+        suggestionsDiv.style.display = 'none';
+        return;
+      }
+      suggestionsDiv.innerHTML = data.map(item => 
+        `<div style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #444; color: #00BFFF;" data-id="${item.id}" data-title="${item.title.replace(/"/g, '&quot;')}">${item.title}</div>`
+      ).join('');
+      suggestionsDiv.style.display = 'block';
+      document.querySelectorAll('#suggestions div').forEach(div => {
+        div.addEventListener('click', function() {
+          searchInput.value = this.getAttribute('data-title');
+          suggestionsDiv.style.display = 'none';
+          searchInput.closest('form').submit();
+        });
+      });
+    } catch(e) { console.error(e); }
+  }, 300);
+});
+
+document.addEventListener('click', function(e) {
+  if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+    suggestionsDiv.style.display = 'none';
+  }
+});
     </script>
     {% endblock %}
   </body>

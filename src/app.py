@@ -2265,6 +2265,19 @@ def delete_all_audio():
     flash(f"Đã xóa {deleted_count} file MP3.")
     return redirect(url_for("upload"))
 
+@app.route("/api/suggest")
+def suggest():
+    """Trả về danh sách tiêu đề truyện gợi ý dựa trên query."""
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify([])
+    stories = Story.query.filter(
+        Story.is_hidden == False,
+        Story.title.ilike(f"%{query}%")
+    ).limit(10).all()
+    suggestions = [{"id": s.id, "title": s.title} for s in stories]
+    return jsonify(suggestions)
+    
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
