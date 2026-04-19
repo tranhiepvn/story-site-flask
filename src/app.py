@@ -391,6 +391,15 @@ class DailyView(db.Model):
     __table_args__ = (db.UniqueConstraint('story_id', 'date', name='uq_daily_story_date'),)
     story = db.relationship('Story', backref=db.backref('daily_views', lazy=True))
 
+class DailyListen(db.Model):
+    __tablename__ = "daily_listen"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    listens = db.Column(db.Integer, default=0, nullable=False)
+    __table_args__ = (db.UniqueConstraint('story_id', 'date', name='uq_listen_story_date'),)
+    story = db.relationship('Story', backref=db.backref('daily_listens', lazy=True))
+
 # Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
 # đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
@@ -702,6 +711,16 @@ def start_audio(part_id: int):
     text = part.content.strip()
     if not text:
         return jsonify({"status": "error", "message": "Nội dung trống"}), 400
+
+    # === GHI NHẬN LƯỢT NGHE MỚI ===
+    today = date.today()
+    listen_record = DailyListen.query.filter_by(story_id=story_id, date=today).first()
+    if listen_record:
+        listen_record.listens += 1
+    else:
+        db.session.add(DailyListen(story_id=story_id, date=today, listens=1))
+    db.session.commit()
+    # ================================
 
     chunks = split_to_chunks(text, max_chars=1000)
     total_chunks = len(chunks)
@@ -2036,6 +2055,63 @@ def views_analytics():
                            end_date=end_date)
 
 
+@app.route("/admin/hears")
+def hears_analytics():
+    """Trang Xem Lượt nghe 7 ngày gần nhất"""
+    if 'upload_authenticated' not in session:
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+
+    end_date = date.today()
+    start_date = end_date - timedelta(days=6)
+    dates = [start_date + timedelta(days=i) for i in range(7)]
+
+    stories = Story.query.all()
+    story_data = []
+
+    for story in stories:
+        daily_listens = DailyListen.query.filter(
+            DailyListen.story_id == story.id,
+            DailyListen.date.between(start_date, end_date)
+        ).all()
+
+        daily_map = {d: 0 for d in dates}
+        for dl in daily_listens:
+            daily_map[dl.date] = dl.listens
+
+        total_week = sum(daily_map.values())
+
+        # So sánh với tuần trước
+        prev_start = start_date - timedelta(days=7)
+        prev_listens = DailyListen.query.filter(
+            DailyListen.story_id == story.id,
+            DailyListen.date.between(prev_start, prev_start + timedelta(days=6))
+        ).all()
+        prev_total = sum(dl.listens for dl in prev_listens)
+        change_pct = round(((total_week - prev_total) / prev_total * 100), 1) if prev_total > 0 else None
+
+        story_data.append({
+            'story': story,
+            'daily': daily_map,
+            'total_week': total_week,
+            'change_pct': change_pct,
+            'created_at': story.created_at
+        })
+
+    sort = request.args.get('sort', 'total')
+    if sort == 'name':
+        story_data.sort(key=lambda x: x['story'].title.lower())
+    elif sort == 'created':
+        story_data.sort(key=lambda x: x['created_at'], reverse=True)
+    else:
+        story_data.sort(key=lambda x: x['total_week'], reverse=True)
+
+    return render_template('hears_analytics.html',
+                           story_data=story_data,
+                           dates=dates,
+                           start_date=start_date,
+                           end_date=end_date)
+    
 @app.route("/api/delete_chunk/<int:story_id>/<int:part_number>/<int:chunk_index>")
 def delete_chunk(story_id: int, part_number: int, chunk_index: int):
     """Xóa file chunk mp3 sau khi browser play xong"""
