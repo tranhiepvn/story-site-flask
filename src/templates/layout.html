@@ -283,14 +283,20 @@
         }
 
         async function loadItem(id, name, isType) {
-          const url = isType ? `/api/type/${id}` : `/api/category/${id}`;
-          const res = await fetch(url);
-          const data = await res.json();
-          const html = renderSection(id, name, data, isType);
-          const existing = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
-          if (existing) existing.outerHTML = html;
-          else container.insertAdjacentHTML('beforeend', html);
-        }
+  const url = isType ? `/api/type/${id}` : `/api/category/${id}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const html = renderSection(id, name, data, isType);
+  const existing = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
+  if (existing) existing.outerHTML = html;
+  else container.insertAdjacentHTML('beforeend', html);
+  
+  // Tự động cuộn lên vùng danh sách truyện vừa được thêm
+  const newSection = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
+  if (newSection) {
+    newSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
 
         const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
         checkboxes.forEach(cb => {
