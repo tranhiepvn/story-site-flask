@@ -10,52 +10,62 @@
       <ul class="story-list">
         {% for story in stories %}
           <li>
-          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
-          <p class="meta">
-            {% if story.author %}
-              Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
-            {% else %}
-              Tác giả: Ẩn danh
-            {% endif %}
-            | Ngày: {{ story.created_at.strftime('%d/%m/%Y') }}
-            | Loại: <a href="{{ url_for('type_view', story_type=story.story_type) }}">{{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}</a>
-          </p>
-          {% if story.categories %}
-          <p class="meta">
-            Thể loại:
-            {% for cat in story.categories %}
-              <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
-            {% endfor %}
-          </p>
-          {% endif %}
-          <p class="meta">
-            {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
-            Đánh giá:
-            <span class="rating">
-              {% for i in range(1,6) %}
-                {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+            <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+            <p class="meta">
+              {% if story.author %}
+                Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>
+              {% else %}
+                Tác giả: Ẩn danh
+              {% endif %}
+              | Ngày: {{ story.created_at.strftime('%d/%m/%Y') }}
+              | Loại: <a href="{{ url_for('type_view', story_type=story.story_type) }}">{{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}</a>
+            </p>
+            {% if story.categories %}
+            <p class="meta">
+              Thể loại:
+              {% for cat in story.categories %}
+                <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
               {% endfor %}
-              {% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}
-            </span>
-          </p>
-          {% set total_parts = story.parts|length %}
-          {% if story.is_completed %}
-            <p class="status-message completed-status">
-              Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)
             </p>
-          {% else %}
-            <p class="status-message updating-status">
-              Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
-            </p>
-          {% endif %}
-          {% set first_part = story.parts|first %}
-          {% if first_part %}
-            {% set snippet = first_part.content[:200] %}
-            {% if first_part.content|length > 200 %}
-              {% set snippet = snippet.rsplit(' ', 1)[0] %}
             {% endif %}
-            <p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>
-          {% endif %}
+            <p class="meta">
+              {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
+              Đánh giá:
+              <span class="rating">
+                {% for i in range(1,6) %}
+                  {% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}
+                {% endfor %}
+                {% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}
+              </span>
+            </p>
+            {% set total_parts = story.parts|length %}
+            {% if story.is_completed %}
+              <p class="status-message completed-status">
+                Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)
+              </p>
+            {% else %}
+              <p class="status-message updating-status">
+                Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)
+              </p>
+            {% endif %}
+            
+            {# HIỂN THỊ ĐOẠN TRÍCH CHỨA TỪ KHÓA #}
+            {% set snippet_info = snippets.get(story.id) %}
+            {% if snippet_info %}
+              {% set snippet_html, part_num = snippet_info %}
+              <p class="snippet" style="font-style: italic; color: #ccc;">
+                <strong>Phần {{ part_num }}:</strong> {{ snippet_html|safe }}
+              </p>
+            {% else %}
+              {% set first_part = story.parts|first %}
+              {% if first_part %}
+                {% set snippet = first_part.content[:200] %}
+                {% if first_part.content|length > 200 %}
+                  {% set snippet = snippet.rsplit(' ', 1)[0] %}
+                {% endif %}
+                <p class="snippet">{{ snippet.replace('\n', ' ') }}...</p>
+              {% endif %}
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
@@ -66,4 +76,14 @@
     <p>Vui lòng nhập từ khoá.</p>
   {% endif %}
 </div>
+
+<style>
+  .highlight {
+    background-color: #ffff00;
+    color: #000000;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 3px;
+  }
+</style>
 {% endblock %}

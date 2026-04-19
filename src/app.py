@@ -1760,15 +1760,13 @@ def type_view(story_type: str):
 
 @app.route("/search")
 def search():
-    """Tìm kiếm truyện theo tiêu đề hoặc nội dung.
-
-    Nhận tham số q trên URL, trả về danh sách truyện phù hợp.
-    """
+    """Tìm kiếm truyện theo tiêu đề hoặc nội dung, hiển thị đoạn trích chứa từ khóa."""
     query = request.args.get("q", "").strip()
     stories = []
+    snippets = {}  # dict story_id -> (snippet_html, part_number)
     if query:
-        # tìm theo tiêu đề, tác giả hoặc nội dung phần truyện và loại bỏ truyện ẩn.
         like_pattern = f"%{query}%"
+        # Tìm các story thỏa mãn (title, author hoặc nội dung part)
         stories = (
             Story.query.outerjoin(Part)
             .filter(
@@ -1781,11 +1779,47 @@ def search():
             .order_by(Story.created_at.desc())
             .all()
         )
+        # Với mỗi story, tìm phần đầu tiên có chứa keyword và tạo snippet highlight
+        keywords = [kw.lower() for kw in query.split() if kw.strip()]
+        for story in stories:
+            parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+            snippet = None
+            part_number = None
+            for part in parts:
+                content_lower = part.content.lower()
+                idx = content_lower.find(query.lower())
+                if idx == -1 and keywords:
+                    for kw in keywords:
+                        idx = content_lower.find(kw)
+                        if idx != -1:
+                            break
+                if idx != -1:
+                    start = max(0, idx - 100)
+                    end = min(len(part.content), idx + len(query) + 150)
+                    raw_snippet = part.content[start:end]
+                    # Highlight các keyword
+                    highlighted = raw_snippet
+                    for kw in keywords:
+                        highlighted = re.sub(rf'({re.escape(kw)})', r'<span class="highlight">\1</span>', highlighted, flags=re.IGNORECASE)
+                    snippet = highlighted
+                    part_number = part.part_number
+                    break
+            if snippet:
+                snippets[story.id] = (snippet, part_number)
+            else:
+                # fallback: lấy 200 ký tự đầu của phần đầu tiên
+                first_part = parts[0] if parts else None
+                if first_part:
+                    raw = first_part.content[:200]
+                    if len(first_part.content) > 200:
+                        raw = raw.rsplit(' ', 1)[0] + "..."
+                    snippets[story.id] = (raw.replace('\n', ' '), 1)
     categories_group1, categories_group2, categories_group3 = get_category_groups()
     return render_template(
         "search.html",
         query=query,
         stories=stories,
+        snippets=snippets,
         categories_group1=categories_group1,
         categories_group2=categories_group2,
         categories_group3=categories_group3,

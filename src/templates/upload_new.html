@@ -160,17 +160,6 @@
   </div>
 </form>
 
-<!-- Hoặc chỉnh sửa truyện đã có -->
-<h3>Hoặc chỉnh sửa truyện đã có</h3>
-<form method="get" class="search-existing-form">
-  <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ q|default('') }}">
-  <select name="stype">
-    <option value="title" {% if stype == 'title' %}selected{% endif %}>Tên truyện</option>
-    <option value="content" {% if stype == 'content' %}selected{% endif %}>Nội dung</option>
-  </select>
-  <button type="submit">Tìm</button>
-</form>
-
 <!-- Xoá toàn bộ audio MP3 ngay lập tức -->
 <h3>Xoá toàn bộ audio MP3 (ngay lập tức)</h3>
 <form method="post" action="{{ url_for('delete_all_audio') }}" class="delete-audio-form" onsubmit="return confirm('Bạn có chắc muốn xoá toàn bộ file MP3? Hành động này không thể hoàn tác.');">
@@ -181,6 +170,17 @@
   <div class="form-group">
     <button type="submit">Xoá toàn bộ audio</button>
   </div>
+</form>
+
+<!-- Hoặc chỉnh sửa truyện đã có -->
+<h3>Hoặc chỉnh sửa truyện đã có</h3>
+<form method="get" class="search-existing-form">
+  <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ q|default('') }}">
+  <select name="stype">
+    <option value="title" {% if stype == 'title' %}selected{% endif %}>Tên truyện</option>
+    <option value="content" {% if stype == 'content' %}selected{% endif %}>Nội dung</option>
+  </select>
+  <button type="submit">Tìm</button>
 </form>
 
 {% if stories %}
