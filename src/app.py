@@ -668,7 +668,7 @@ def story_detail(story_id: int):
         current_url=request.url,
     )
 
-def split_to_chunks(text: str, max_chars: int = 1000) -> list:
+def split_to_chunks(text: str, max_chars: int = 800) -> list:
     """Split text thành chunk <= 1000 ký tự, không cắt giữa câu."""
     if not text.strip():
         return [" "]
@@ -722,7 +722,7 @@ def start_audio(part_id: int):
     db.session.commit()
     # ================================
 
-    chunks = split_to_chunks(text, max_chars=1000)
+    chunks = split_to_chunks(text, max_chars=800)
     total_chunks = len(chunks)
 
     # === CHUNK 1 ===
@@ -806,7 +806,7 @@ def get_chunk(story_id: int, part_number: int, chunk_index: int):
     part = Part.query.filter_by(story_id=story_id, part_number=part_number).first_or_404()
 
     text = part.content.strip()
-    chunks = split_to_chunks(text, max_chars=1000)
+    chunks = split_to_chunks(text, max_chars=800)
 
     if chunk_index < 1 or chunk_index > len(chunks):
         return jsonify({"status": "error", "message": "Chunk index không hợp lệ"}), 400

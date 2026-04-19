@@ -40,7 +40,6 @@
 
   {% if total_parts > 0 %}
     {% if total_parts > 1 %}
-      <!-- DANH SÁCH PHẦN (phía trên cùng) - CÁCH XA DÒNG TRẠNG THÁI -->
       <div class="part-list" style="margin-top: 2em;">
         <p>Danh sách phần:</p>
         <ul>
@@ -57,7 +56,6 @@
         </ul>
       </div>
 
-      <!-- ĐIỀU HƯỚNG PHẦN (nằm giữa danh sách phần và nội dung) -->
       <div class="part-navigation">
         {% if current_index > 1 %}
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
@@ -70,7 +68,6 @@
       </div>
     {% endif %}
 
-    <!-- NỘI DUNG PHẦN -->
     <div class="story-part">
       {% if chapter_title %}
         <h3 class="chapter-title">{{ chapter_title }}</h3>
@@ -78,11 +75,11 @@
 
       <!-- AUDIO PLAYER -->
       <div style="display: flex; align-items: center; gap: 12px; width: 100%; margin: 15px 0;">
-        <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">🔊</button>
+        <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
         <div style="flex: 1; min-width: 0;">
           <input type="range" id="progress-bar" min="1" max="100" value="1" style="width: 100%; pointer-events: none; opacity: 0.4; margin: 0; display: block;">
         </div>
-        <span id="play-text" style="font-size: 1.2rem; color: #00BFFF; width: 280px; flex-shrink: 0; line-height: 1.3; white-space: normal; word-break: keep-all; text-align: left;">Nghe phần này...</span>
+        <span id="play-text" style="font-size: 1.2rem; color: #00BFFF; width: 280px; flex-shrink: 0; line-height: 1.3; white-space: normal; word-break: keep-all; text-align: left;">Nhấn play để nghe...</span>
       </div>
       <audio id="audio-element" style="display:none;"></audio>
 
@@ -123,7 +120,6 @@
       </form>
     </div>
 
-    <!-- ĐIỀU HƯỚNG PHẦN PHÍA DƯỚI (giữ nguyên) -->
     {% if total_parts > 1 %}
       <div class="part-navigation">
         {% if current_index > 1 %}
@@ -198,15 +194,18 @@
 </style>
 
 <script>
+// === AUDIO PLAYER: PRELOAD + KHÔNG DISABLE KHI DRAG + KHÔNG HIỂN THỊ LỖI KHI DRAG LIÊN TỤC ===
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
 let currentPartNumber = null;
 let currentChunkIndex = 1;
 let totalChunks = 1;
+let nextChunkUrl = null;
+let isPreloading = false;
+let isAudioStarted = false;
 
 let activeFetchController = null;
-let pendingSeek = false;  // đánh dấu đang chờ chunk từ drag
 
 const progressBar = document.getElementById('progress-bar');
 const playText = document.getElementById('play-text');
@@ -216,13 +215,16 @@ function setProgressBarEnabled(enabled) {
   if (enabled) {
     progressBar.style.pointerEvents = 'auto';
     progressBar.style.opacity = '1';
+    progressBar.disabled = false;
   } else {
     progressBar.style.pointerEvents = 'none';
     progressBar.style.opacity = '0.4';
+    progressBar.disabled = true;
   }
 }
 
-async function fetchChunkWithRetry(storyId, partNumber, chunkIndex, maxRetries = 10, delay = 800) {
+// Hàm fetch chunk với retry, trả về null nếu bị abort (không coi là lỗi)
+async function fetchChunkWithRetry(storyId, partNumber, chunkIndex, maxRetries = 5, delay = 500) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (activeFetchController) {
@@ -239,37 +241,50 @@ async function fetchChunkWithRetry(storyId, partNumber, chunkIndex, maxRetries =
           return data.url;
         }
       }
-      if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, delay));
-      }
+      if (attempt < maxRetries) await new Promise(r => setTimeout(r, delay));
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Fetch aborted for chunk', chunkIndex);
-        return null;
+        return null; // không phải lỗi, chỉ bị hủy
       }
-      if (attempt < maxRetries) {
-        await new Promise(r => setTimeout(r, delay));
-      } else {
-        throw err;
-      }
+      if (attempt < maxRetries) await new Promise(r => setTimeout(r, delay));
+      else return null;
     }
   }
-  throw new Error('Failed to fetch chunk after retries');
+  return null;
+}
+
+async function preloadNextChunk() {
+  if (isPreloading) return;
+  if (currentChunkIndex >= totalChunks) return;
+  isPreloading = true;
+  const nextIndex = currentChunkIndex + 1;
+  try {
+    const url = await fetchChunkWithRetry(currentStoryId, currentPartNumber, nextIndex, 3, 500);
+    if (url) {
+      nextChunkUrl = url;
+      console.log(`Preloaded chunk ${nextIndex}`);
+    }
+  } catch (err) {
+    console.warn(`Failed to preload chunk ${nextIndex}:`, err);
+  } finally {
+    isPreloading = false;
+  }
 }
 
 async function loadChunk(storyId, partNumber, chunkIndex, audioElement, shouldPlay = true) {
-  try {
-    const url = await fetchChunkWithRetry(storyId, partNumber, chunkIndex);
-    if (!url) return false;
-    audioElement.src = url;
-    if (shouldPlay) {
+  const url = await fetchChunkWithRetry(storyId, partNumber, chunkIndex);
+  if (!url) return false;
+  audioElement.src = url;
+  if (shouldPlay) {
+    try {
       await audioElement.play();
+    } catch (e) {
+      console.warn('Play failed', e);
+      return false;
     }
-    return true;
-  } catch (err) {
-    console.error('Load chunk error:', err);
-    return false;
   }
+  return true;
 }
 
 async function toggleAudio(partId) {
@@ -280,7 +295,9 @@ async function toggleAudio(partId) {
       await currentAudio.play();
       playText.textContent = "Đang nghe...";
       playBtn.innerHTML = "⏸️";
+      if (!isAudioStarted) isAudioStarted = true;
       setProgressBarEnabled(true);
+      if (currentChunkIndex < totalChunks && !nextChunkUrl && !isPreloading) preloadNextChunk();
     } else {
       currentAudio.pause();
       playText.textContent = "Tạm dừng...";
@@ -290,14 +307,15 @@ async function toggleAudio(partId) {
   }
 
   playBtn.innerHTML = "⏳";
-  playText.textContent = "Đang chuyển sang audio...";
+  playText.textContent = "Đang khởi tạo...";
   playBtn.disabled = true;
-  setProgressBarEnabled(false);
+  if (!isAudioStarted) setProgressBarEnabled(false);
+  nextChunkUrl = null;
+  isPreloading = false;
 
   try {
     const res = await fetch(`/api/start_audio/${partId}`);
     const data = await res.json();
-
     if (data.status === "success") {
       currentPartId = data.part_id;
       currentStoryId = data.story_id;
@@ -314,18 +332,21 @@ async function toggleAudio(partId) {
       playBtn.innerHTML = "⏸️";
       playText.textContent = "Đang nghe...";
       playBtn.disabled = false;
+      isAudioStarted = true;
       setProgressBarEnabled(true);
       progressBar.max = totalChunks;
       progressBar.value = currentChunkIndex;
+
+      if (totalChunks >= 2) preloadNextChunk();
     } else {
       throw new Error("API error");
     }
   } catch (e) {
     console.error(e);
     playText.textContent = "Lỗi kết nối";
-    playBtn.innerHTML = "🔊";
+    playBtn.innerHTML = "▶️";
     playBtn.disabled = false;
-    setProgressBarEnabled(false);
+    if (!isAudioStarted) setProgressBarEnabled(false);
   }
 }
 
@@ -338,45 +359,62 @@ document.getElementById('audio-element').addEventListener('ended', async functio
   currentChunkIndex++;
   progressBar.value = currentChunkIndex;
 
-  this.pause();
-  playText.textContent = "Đang chuyển sang audio...";
-  playBtn.innerHTML = "⏳";
-  playBtn.disabled = true;
-
-  const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, this, true);
-  if (success) {
-    playText.textContent = "Đang nghe...";
-    playBtn.innerHTML = "⏸️";
-    playBtn.disabled = false;
+  if (nextChunkUrl) {
+    this.src = nextChunkUrl;
+    nextChunkUrl = null;
+    await this.play();
+    if (currentChunkIndex < totalChunks) preloadNextChunk();
   } else {
-    playText.textContent = "Lỗi tải audio";
-    playBtn.innerHTML = "🔊";
-    playBtn.disabled = false;
+    this.pause();
+    playText.textContent = "Đang tải...";
+    playBtn.innerHTML = "⏳";
+    playBtn.disabled = true;
+    const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, this, true);
+    if (success) {
+      if (currentChunkIndex < totalChunks) preloadNextChunk();
+    } else {
+      playText.textContent = "Lỗi tải audio";
+      playBtn.innerHTML = "▶️";
+      playBtn.disabled = false;
+      return;
+    }
   }
+  playText.textContent = "Đang nghe...";
+  playBtn.innerHTML = "⏸️";
+  playBtn.disabled = false;
 });
 
 function resetAudioPlayer() {
   if (currentAudio) currentAudio.pause();
   currentAudio = null;
-  playBtn.innerHTML = "🔊";
-  playText.textContent = "Nghe phần này...";
+  playBtn.innerHTML = "▶️";
+  playText.textContent = "Nhấn play để nghe...";
   playBtn.disabled = false;
+  isAudioStarted = false;
   setProgressBarEnabled(false);
   progressBar.value = 1;
+  nextChunkUrl = null;
+  isPreloading = false;
+  if (activeFetchController) activeFetchController.abort();
+  activeFetchController = null;
 }
 
+let isDragging = false;
+progressBar.addEventListener('mousedown', () => { isDragging = true; });
+progressBar.addEventListener('mouseup', () => { isDragging = false; });
 progressBar.addEventListener('change', async function() {
   if (!currentStoryId || !currentPartNumber) return;
-  if (progressBar.style.pointerEvents === 'none') return;
+  if (!isAudioStarted) return;
 
   const targetChunk = parseInt(this.value);
   if (targetChunk === currentChunkIndex) return;
 
-  // Hủy request đang chạy
   if (activeFetchController) {
     activeFetchController.abort();
     activeFetchController = null;
   }
+  nextChunkUrl = null;
+  isPreloading = false;
 
   currentChunkIndex = targetChunk;
   if (currentAudio) {
@@ -384,38 +422,29 @@ progressBar.addEventListener('change', async function() {
     currentAudio.currentTime = 0;
   }
 
-  playText.textContent = "Đang chuyển sang audio...";
-  playBtn.innerHTML = "⏳";
-  playBtn.disabled = true;
-  // KHÔNG disable progress bar
-
-  // Hàm retry liên tục, không báo lỗi sớm
-  let success = false;
-  let attempts = 0;
-  const maxAttempts = 15; // ~15*0.8s = 12 giây
-  while (!success && attempts < maxAttempts) {
-    attempts++;
-    const result = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, document.getElementById('audio-element'), true);
-    if (result) {
-      success = true;
-      break;
-    }
-    if (attempts < maxAttempts) {
-      await new Promise(r => setTimeout(r, 800));
-    }
+  if (!isDragging) {
+    playText.textContent = "Đang chuyển...";
+    playBtn.innerHTML = "⏳";
+    playBtn.disabled = true;
   }
 
+  const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, document.getElementById('audio-element'), true);
   if (success) {
     playText.textContent = "Đang nghe...";
     playBtn.innerHTML = "⏸️";
     playBtn.disabled = false;
+    if (currentChunkIndex < totalChunks) preloadNextChunk();
   } else {
-    playText.textContent = "Lỗi tải audio";
-    playBtn.innerHTML = "🔊";
-    playBtn.disabled = false;
+    // Chỉ hiển thị lỗi nếu không phải do abort (tức là thực sự thất bại)
+    if (!activeFetchController) {
+      playText.textContent = "Lỗi tải";
+      playBtn.innerHTML = "▶️";
+      playBtn.disabled = false;
+    }
   }
 });
 
 setProgressBarEnabled(false);
+isAudioStarted = false;
 </script>
 {% endblock %}
