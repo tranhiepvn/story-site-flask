@@ -2114,6 +2114,37 @@ def api_type(story_type: str):
         "stories": [{"id": s.id, "title": s.title} for s in stories]
     })
 
+@app.route("/delete_all_audio", methods=["POST"])
+def delete_all_audio():
+    """Xóa tất cả file .mp3 trong thư mục static/audio ngay lập tức."""
+    # Kiểm tra đăng nhập admin
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+
+    # Xác thực mật khẩu
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload"))
+
+    audio_root = Path("static/audio")
+    if not audio_root.exists():
+        flash("Thư mục audio không tồn tại.")
+        return redirect(url_for("upload"))
+
+    deleted_count = 0
+    # Duyệt đệ quy tìm tất cả file .mp3
+    for mp3_file in audio_root.rglob("*.mp3"):
+        try:
+            mp3_file.unlink()
+            deleted_count += 1
+        except Exception as e:
+            print(f"Lỗi xóa {mp3_file}: {e}")
+
+    flash(f"Đã xóa {deleted_count} file MP3.")
+    return redirect(url_for("upload"))
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
