@@ -1,9 +1,8 @@
 {% extends "layout.html" %}
-
 {% block title %}Đăng truyện mới{% endblock %}
-
 {% block content %}
 <h2>Đăng truyện mới</h2>
+
 {% set show_comments, commented_stories = get_comment_notifications() %}
 {% if show_comments and commented_stories %}
 <div class="comment-notification">
@@ -27,20 +26,25 @@
 {% if error %}
   <p class="error">{{ error }}</p>
 {% endif %}
+
 <form method="post">
   <input type="hidden" name="existing_story_id" value="">
+
   <div class="form-group">
     <label for="password">Password:</label><br>
     <input type="password" id="password" name="password" required>
   </div>
+
   <div class="form-group">
     <label for="title">Tên truyện:</label><br>
     <input type="text" id="title" name="title" required>
   </div>
+
   <div class="form-group">
     <label for="author">Tác giả (tuỳ chọn):</label><br>
     <input type="text" id="author" name="author">
   </div>
+
   <div class="form-group">
     <label for="story_type">Loại truyện:</label><br>
     <select id="story_type" name="story_type" required>
@@ -48,31 +52,39 @@
       <option value="long">Truyện Dài</option>
     </select>
   </div>
+
   <div class="form-group">
     <label>
       <input type="checkbox" id="is_completed" name="is_completed">
       Đánh dấu truyện đã hoàn thành
     </label>
   </div>
+
+  <!-- === THỂ LOẠI CÓ MÀU XÁM XEN KẼ === -->
   <div class="form-group">
     <label>Thể loại (có thể chọn nhiều):</label><br>
-    {% if categories %}
+    <div class="category-list-admin">
+      {% set ns = namespace(prev_first='', color_toggle=0) %}
       {% for cat in categories %}
-        <label>
+        {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+        {% if first_word != ns.prev_first %}
+          {% set ns.prev_first = first_word %}
+          {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+        {% endif %}
+        <label class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
           <input type="checkbox" name="category_ids" value="{{ cat.id }}">
           {{ cat.name }}
         </label><br>
       {% endfor %}
       <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
-    {% else %}
-      <em>Chưa có thể loại nào.</em> <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
-    {% endif %}
+    </div>
   </div>
+
   <div class="form-group">
     <label for="content">Nội dung phần đầu tiên:</label><br>
     <textarea id="content" name="content" rows="45" cols="80" required></textarea>
   </div>
-  {# Thêm trường nhập video cho phần đầu tiên #}
+
   <div class="form-group">
     <label>Video phần đầu (tối đa 9):</label><br>
     <div class="video-grid">
@@ -84,32 +96,13 @@
       {% endfor %}
     </div>
   </div>
+
   <div class="form-group">
     <button type="submit" name="action" value="create">Tạo truyện</button>
   </div>
 </form>
 
 <!-- Xuất/Nhập dữ liệu -->
-<!-- Thay thế cụm từ đầu dòng trong tất cả phần của tất cả truyện -->
-<h3>Tìm và thay cụm từ đầu phần</h3>
-<form method="post" action="{{ url_for('replace_prefix_all') }}" class="replace-form">
-  <div class="form-group">
-    <label for="find_prefix">Cụm từ cần tìm (đầu dòng):</label><br>
-    <input type="text" id="find_prefix" name="find_prefix" required>
-  </div>
-  <div class="form-group">
-    <label for="replace_prefix">Cụm từ thay thế:</label><br>
-    <input type="text" id="replace_prefix" name="replace_prefix" required>
-  </div>
-  <div class="form-group">
-    <label for="replace_password">Password:</label><br>
-    <input type="password" id="replace_password" name="password" required>
-  </div>
-  <div class="form-group">
-    <button type="submit">Thực hiện thay thế</button>
-  </div>
-</form>
-
 <h3>Xuất / Nhập dữ liệu</h3>
 <form method="post" action="{{ url_for('export_data') }}" class="export-form">
   <label for="export_password">Password:</label><br>
@@ -141,26 +134,28 @@
   </div>
 </form>
 
-<script>
-// Hàm xác nhận xoá toàn bộ dữ liệu. Kiểm tra hai mật khẩu khớp nhau rồi yêu cầu hai lần xác nhận người dùng.
-function confirmDeleteAll() {
-  var pw1 = document.getElementById('password1').value;
-  var pw2 = document.getElementById('password2').value;
-  if (pw1 !== pw2) {
-    alert('Hai mật khẩu phải giống nhau.');
-    return false;
-  }
-  // Xác nhận đầu tiên
-  if (!confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện?')) {
-    return false;
-  }
-  // Xác nhận thứ hai
-  return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
-}
-</script>
+<!-- Tìm và thay cụm từ đầu dòng -->
+<h3>Tìm và thay cụm từ đầu phần</h3>
+<form method="post" action="{{ url_for('replace_prefix_all') }}" class="replace-form">
+  <div class="form-group">
+    <label for="find_prefix">Cụm từ cần tìm (đầu dòng):</label><br>
+    <input type="text" id="find_prefix" name="find_prefix" required>
+  </div>
+  <div class="form-group">
+    <label for="replace_prefix">Cụm từ thay thế:</label><br>
+    <input type="text" id="replace_prefix" name="replace_prefix" required>
+  </div>
+  <div class="form-group">
+    <label for="replace_password">Password:</label><br>
+    <input type="password" id="replace_password" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit">Thực hiện thay thế</button>
+  </div>
+</form>
 
+<!-- Hoặc chỉnh sửa truyện đã có -->
 <h3>Hoặc chỉnh sửa truyện đã có</h3>
-<!-- Form tìm kiếm truyện để dễ tìm trong danh sách lớn -->
 <form method="get" class="search-existing-form">
   <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ q|default('') }}">
   <select name="stype">
@@ -169,6 +164,7 @@ function confirmDeleteAll() {
   </select>
   <button type="submit">Tìm</button>
 </form>
+
 {% if stories %}
   <ul class="existing-stories">
     {% for st in stories %}
@@ -178,7 +174,6 @@ function confirmDeleteAll() {
           {% if stype == 'content' and highlight_snippets and highlight_snippets.get(st.id) %}
             {{ highlight_snippets.get(st.id)|safe }}
           {% else %}
-            {# Hiển thị đoạn trích chương đầu tiên, tránh cắt chữ #}
             {% set first_part = st.parts[0] %}
             {% set snippet = first_part.content[:200] %}
             {{ snippet.rsplit(' ', 1)[0] }}{% if first_part.content|length > 200 %}...{% endif %}
@@ -203,31 +198,18 @@ function confirmDeleteAll() {
 {% else %}
   <p>Chưa có truyện nào.</p>
 {% endif %}
-{# Script cập nhật xem trước video ở trang tạo truyện #}
+
 <script>
-function getDrivePreview(url) {
-  var match = url.match(/\/file\/d\/([\w-]+)/);
-  if (!match) {
-    match = url.match(/id=([\w-]+)/);
+function confirmDeleteAll() {
+  var pw1 = document.getElementById('password1').value;
+  var pw2 = document.getElementById('password2').value;
+  if (pw1 !== pw2) {
+    alert('Hai mật khẩu phải giống nhau.');
+    return false;
   }
-  if (match) {
-    return 'https://drive.google.com/file/d/' + match[1] + '/preview';
-  }
-  return '';
+  if (!confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện?')) return false;
+  return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
 }
-document.addEventListener('DOMContentLoaded', function() {
-  var inputs = document.querySelectorAll('.video-input');
-  inputs.forEach(function(input) {
-    input.addEventListener('input', function() {
-      var previewId = input.getAttribute('data-preview');
-      var embedUrl = getDrivePreview(input.value);
-      var iframe = document.getElementById(previewId);
-      if (iframe) {
-        iframe.src = embedUrl;
-      }
-    });
-  });
-});
 </script>
 
 {% endblock %}

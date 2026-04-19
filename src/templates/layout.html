@@ -7,107 +7,126 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <style>
-        /* Nền đen cho toàn body/site */
-        body {
-            background-color: #000000 !important;
-            color: #6687cb !important;
-            font-family: Arial, sans-serif;
-        }
-        /* Content chính */
-        .container, article, div, p, h2, .meta, .story-part, .chapter-title {
-            background-color: #000000 !important;
-            color: #6687cb !important;
-        }
-        /* Link */
-        a {
-            color: #00BFFF !important;
-        }
-        a:hover {
-            color: #6687cb !important;
-        }
-        /* Highlight "" và '' */
-        .highlight-green { color: #1fa943 !important; }
-        .highlight-red { color: #00FF00 !important; }
-        /* Header */
-        header {
-            background-color: #4A90E2 !important;
-            color: #FFFFFF !important;
-        }
-        header h1 a, header nav a, .separator {
-            color: #FFFFFF !important;
-        }
-        header nav a:hover { color: #E0E0E0 !important; }
-        /* Footer & Sidebar */
-        footer, .sidebar {
-            background-color: #000000 !important;
-            color: #6687cb !important;
-        }
-        /* Form */
-        input, textarea, button {
-            background-color: #1C1C1C !important;
-            color: #6687cb !important;
-            border: 1px solid #6687cb !important;
-            border-radius: 4px;
-        }
-        header input {
-            background-color: #FFFFFF !important;
-            color: #000000 !important;
-            border: 1px solid #FFFFFF !important;
-        }
-        header button {
-            background-color: #4A90E2 !important;
-            color: #FFFFFF !important;
-            border: 1px solid #FFFFFF !important;
-            border-radius: 4px;
-            padding: 5px 10px;
-            cursor: pointer;
-        }
-        header button:hover {
-            background-color: #357ABD !important;
-        }
-        /* Phần anh yêu cầu màu trắng */
-        .thank-you {
-            color: #FFFFFF !important;
-        }
-        .rating-section p,
-        .rating-form label,
-        .rating-form button,
-        .part-list p {
-            color: #FFFFFF !important;
-        }
-        /* Tình trạng truyện */
-        .completed-status {
-            color: #32CD32 !important;
-        }
-        .updating-status {
-            color: #FF0000 !important;
-        }
-        .completed-status em.completed,
-        .updating-status em.updating {
-            color: inherit !important;
-        }
-        /* Sidebar thể loại giữ màu riêng */
-        .sidebar h3 { color: #FFFFFF !important; }
-        .category-list li { color: #6687cb !important; }
-        .category-list .special-cat { color: #FFD700 !important; font-weight: bold !important; }
-        .category-list .uppercase-cat { color: #00BFFF !important; text-transform: uppercase !important; }
-        .category-list a { color: inherit !important; }
-        /* Button Phần Trước / Phần Sau */
-        .part-navigation a {
-            background-color: #1C1C1C !important;
-            color: #FFFFFF !important;
-            border: 1px solid #6687cb !important;
-            border-radius: 4px !important;
-            padding: 5px 10px !important;
-            text-decoration: none !important;
-        }
-        .part-navigation a:hover {
-            background-color: #357ABD !important;
-            border-color: #00BFFF !important;
-        }
-        .part-navigation .no-link {
-            color: #6687cb !important;
-        }
+    /* === TOÀN BỘ SITE ĐEN HOÀN TOÀN === */
+    body, .container, .content-wrapper, main, article, .story-part, .meta,
+    .status-message, .thank-you, .rating-section, .section, .selected-category-section,
+    .story-grid, .selected-categories {
+        background-color: #000000 !important;
+        color: #6687cb !important;
+    }
+
+    /* Sidebar đen */
+    .sidebar, aside, .category-list, .category-list li {
+        background-color: #000000 !important;
+    }
+
+    /* Header giữ nguyên */
+    header {
+        background-color: #4A90E2 !important;
+        color: #FFFFFF !important;
+    }
+    header h1 a, header nav a, .separator { color: #FFFFFF !important; }
+
+    /* Màu cam và xám xen kẽ cho cột thể loại */
+    .category-list .special-type,
+    .category-list .special-type a { color: #FF9800 !important; font-weight: bold !important; }
+    .category-list li.category-group-even,
+    .category-list li.category-group-even a { color: #aaaaaa !important; }
+    .category-list li.category-group-odd,
+    .category-list li.category-group-odd a { color: #777777 !important; }
+
+    /* Button Phần trước / Phần sau thoáng */
+    .part-navigation {
+        margin-top: 60px !important;
+        margin-bottom: 70px !important;
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+    }
+    .part-navigation a,
+    .part-navigation button {
+        color: #FFFFFF !important;
+        border: 2px solid #FFFFFF !important;
+        background-color: transparent !important;
+        padding: 12px 32px;
+        border-radius: 8px;
+        font-weight: bold;
+        text-decoration: none;
+        font-size: 1.05em;
+    }
+    .part-navigation a:hover,
+    .part-navigation button:hover {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+
+    /* Text trắng cho các phần quan trọng */
+    .thank-you, .thank-you-text,
+    .rating-section, .rating-label,
+    h2, h3, h4, .meta, .status-message {
+        color: #FFFFFF !important;
+    }
+    a { color: #00BFFF !important; }
+    a:hover { color: #6687cb !important; }
+
+    /* Highlight "" và '' */
+    .highlight-green { color: #1fa943 !important; }
+    .highlight-red { color: #00FF00 !important; }
+
+    /* Footer */
+    footer { background-color: #000000 !important; color: #6687cb !important; }
+
+    /* === RATING + THANK YOU + STATUS === */
+    .rating-section {
+        margin: 55px auto 20px auto !important;
+        text-align: center !important;
+        width: 100% !important;
+    }
+    .rating-section p,
+    .rating-section .rating-label {
+        margin-bottom: 20px !important;
+        display: block !important;
+        text-align: center !important;
+    }
+    .rating-buttons {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 15px !important;
+    }
+    .rating-buttons button {
+        margin-top: 0 !important;
+        height: 34px !important;
+        padding: 0 20px !important;
+    }
+
+    /* Trạng thái hoàn thành / chưa hoàn thành */
+    .status-message.completed-status,
+    .completed { color: #39FF14 !important; font-weight: bold !important; }
+    .status-message.updating-status,
+    .updating { color: #FF3366 !important; font-weight: bold !important; }
+
+    /* Cảm ơn dời xuống và canh giữa */
+    .thank-you {
+        margin-top: 40px !important;
+        margin-bottom: 35px !important;
+        text-align: center !important;
+        display: block !important;
+        font-size: 1.1em !important;
+        color: #FFFFFF !important;
+    }
+
+    /* === ADMIN CATEGORY LIST - XÁM XEN KẼ === */
+    .category-list-admin ul { list-style: none; padding: 0; margin: 0; }
+    .category-list-admin li { padding: 4px 0; }
+    .category-list-admin label.category-group-even,
+    .category-list-admin li.category-group-even label { color: #aaaaaa !important; }
+    .category-list-admin label.category-group-odd,
+    .category-list-admin li.category-group-odd label { color: #777777 !important; }
+    .category-list-admin a,
+    .category-list-admin label { color: inherit !important; }
+
+    /* === KHÔNG CÓ BẤT KỲ CSS NÀO CHO AUDIO PLAYER Ở ĐÂY === */
     </style>
   </head>
   <body class="{{ request.endpoint }}">
@@ -117,10 +136,7 @@
         <nav>
           <a href="{{ url_for('index') }}">Trang chủ</a><span class="separator">|</span>
           <a href="{{ url_for('upload_login') }}">Admin</a>
-          <a href="{{ url_for('upload_login', next=url_for('views_analytics')) }}"
-             style="background:#32CD32; color:#000; padding:8px 15px; border-radius:4px; margin-left:15px; text-decoration:none;">
-             📊 Xem Views
-          </a>
+          <a href="{{ url_for('upload_login', next=url_for('views_analytics')) }}" style="background:#32CD32; color:#000; padding:8px 15px; border-radius:4px; margin-left:15px; text-decoration:none;">📊 Xem Views</a>
         </nav>
         <form action="{{ url_for('search') }}" method="get" class="search-form">
           <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}">
@@ -132,22 +148,67 @@
           <aside class="sidebar">
             <h3>Thể loại</h3>
             <ul class="category-list">
+              <!-- Truyện Dài / Truyện Ngắn -->
+              <li class="special-type">
+                <input type="checkbox" id="type_long" data-type="long" data-name="Truyện Dài">
+                <a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a>
+              </li>
+              <li class="special-type">
+                <input type="checkbox" id="type_short" data-type="short" data-name="Truyện Ngắn">
+                <a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a>
+              </li>
+
+              <!-- Logic xen kẽ xám (bỏ qua các thể loại bắt đầu bằng "Truyện ") -->
+              {% set ns = namespace(prev_first='', color_toggle=0) %}
+
               {% for cat in categories_group1 %}
-                <li class="special-cat">
+                {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+                {% if cat.name.startswith('Truyện ') %}
+                  <!-- Giữ màu mặc định cho "Truyện một phần", "Truyện nhiều phần" -->
+                  <li>
+                {% elif first_word != ns.prev_first %}
+                  {% set ns.prev_first = first_word %}
+                  {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+                {% else %}
+                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+                {% endif %}
                   <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
                   <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
                 </li>
               {% endfor %}
+
               {% if categories_group1 and categories_group2 %}<li class="group-separator"></li>{% endif %}
+
               {% for cat in categories_group2 %}
-                <li class="uppercase-cat">
+                {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+                {% if cat.name.startswith('Truyện ') %}
+                  <li>
+                {% elif first_word != ns.prev_first %}
+                  {% set ns.prev_first = first_word %}
+                  {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+                {% else %}
+                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+                {% endif %}
                   <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
                   <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
                 </li>
               {% endfor %}
+
               {% if categories_group2 and categories_group3 %}<li class="group-separator"></li>{% endif %}
+
               {% for cat in categories_group3 %}
-                <li>
+                {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+                {% if cat.name.startswith('Truyện ') %}
+                  <li>
+                {% elif first_word != ns.prev_first %}
+                  {% set ns.prev_first = first_word %}
+                  {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+                {% else %}
+                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+                {% endif %}
                   <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
                   <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
                 </li>
@@ -156,13 +217,7 @@
           </aside>
         {% endif %}
         <main>
-          {% with messages = get_flashed_messages() %}
-            {% if messages %}
-              <ul class="flash-messages">
-                {% for msg in messages %}<li class="flash">{{ msg }}</li>{% endfor %}
-              </ul>
-            {% endif %}
-          {% endwith %}
+          {% with messages = get_flashed_messages() %}{% if messages %}<ul class="flash-messages">{% for msg in messages %}<li class="flash">{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
           {% if error %}<p class="error">{{ error }}</p>{% endif %}
           <div id="selected-categories-container" class="section selected-categories"></div>
           {% block content %}{% endblock %}
@@ -175,14 +230,13 @@
 
     {% block scripts %}
     <script>
-      /* ==================== CATEGORY CHECKBOX FILTER ==================== */
       document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('selected-categories-container');
         if (!container) return;
 
-        function renderCategorySection(catId, catName, data) {
-          let html = `<div id="selected-category-${catId}" class="selected-category-section">`;
-          html += `<h3>${catName} <span class="remove-cat" data-cat-id="${catId}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
+        function renderSection(id, name, data, isType) {
+          let html = `<div id="selected-${isType ? 'type' : 'category'}-${id}" class="selected-category-section">`;
+          html += `<h3>${name} <span class="remove-item" data-id="${id}" data-is-type="${isType}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
           html += '<div class="story-grid">';
           data.stories.forEach(story => {
             html += `<div class="story-card"><a href="/story/${story.id}">${story.title}</a></div>`;
@@ -191,11 +245,12 @@
           return html;
         }
 
-        async function loadCategory(catId, catName, page = 1) {
-          const res = await fetch(`/api/category/${catId}?page=${page}`);
+        async function loadItem(id, name, isType) {
+          const url = isType ? `/api/type/${id}` : `/api/category/${id}`;
+          const res = await fetch(url);
           const data = await res.json();
-          const html = renderCategorySection(catId, catName, data);
-          const existing = document.getElementById(`selected-category-${catId}`);
+          const html = renderSection(id, name, data, isType);
+          const existing = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
           if (existing) existing.outerHTML = html;
           else container.insertAdjacentHTML('beforeend', html);
         }
@@ -203,28 +258,29 @@
         const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
         checkboxes.forEach(cb => {
           cb.addEventListener('change', function() {
-            const catId = this.getAttribute('data-cat-id');
-            const catName = this.getAttribute('data-cat-name');
+            const isType = !!this.getAttribute('data-type');
+            const id = isType ? this.getAttribute('data-type') : this.getAttribute('data-cat-id');
+            const name = isType ? this.getAttribute('data-name') : this.getAttribute('data-cat-name');
             if (this.checked) {
-              loadCategory(catId, catName, 1);
+              loadItem(id, name, isType);
             } else {
-              const sec = document.getElementById(`selected-category-${catId}`);
+              const prefix = isType ? 'type' : 'category';
+              const sec = document.getElementById(`selected-${prefix}-${id}`);
               if (sec) sec.remove();
             }
           });
         });
 
         container.addEventListener('click', function(evt) {
-          const link = evt.target.closest('a');
-          if (link && link.dataset.catId && link.dataset.page) {
-            evt.preventDefault();
-            const catId = link.dataset.catId;
-            const page = parseInt(link.dataset.page);
-            const cb = document.querySelector(`.category-list input[data-cat-id="${catId}"]`);
-            if (cb && cb.checked) {
-              const catName = cb.getAttribute('data-cat-name');
-              loadCategory(catId, catName, page);
-            }
+          const removeBtn = evt.target.closest('.remove-item');
+          if (removeBtn) {
+            const id = removeBtn.getAttribute('data-id');
+            const isType = removeBtn.getAttribute('data-is-type') === 'true';
+            const prefix = isType ? 'type' : 'category';
+            const checkbox = document.querySelector(`input[data-${isType ? 'type' : 'cat-id'}="${id}"]`);
+            if (checkbox) checkbox.checked = false;
+            const sec = document.getElementById(`selected-${prefix}-${id}`);
+            if (sec) sec.remove();
           }
         });
       });

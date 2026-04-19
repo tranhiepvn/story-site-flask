@@ -72,27 +72,15 @@
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- Audio Player -->
-      <div id="audio-player" class="audio-player" 
-           style="margin: 20px 0; padding: 12px; background:#1C1C1C; border-radius:8px; 
-                  display: grid; grid-template-columns: 48px 1fr 175px; align-items:center; gap:12px; height:52px;">
-
-        <button id="play-btn" onclick="toggleAudio({{ current_part.id }})"
-                style="background:none; border:none; font-size:28px; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
-          🔊
-        </button>
-
-        <div style="flex:1; min-width:280px;">
-          <input type="range" id="progress-bar" min="1" max="100" value="1" 
-                 style="width:100%; height:8px; accent-color:#00BFFF; cursor:pointer;">
+      <!-- AUDIO PLAYER - LẦN CUỐI, KHÔNG DISABLE KHI DRAG -->
+      <div style="display: flex; align-items: center; gap: 12px; width: 100%; margin: 15px 0;">
+        <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">🔊</button>
+        <div style="flex: 1; min-width: 0;">
+          <input type="range" id="progress-bar" min="1" max="100" value="1" style="width: 100%; pointer-events: none; opacity: 0.4; margin: 0; display: block;">
         </div>
-
-        <span id="play-text" style="font-weight:500; color:#00BFFF; white-space:nowrap;">
-          Nghe phần này...
-        </span>
-
-        <audio id="audio-element" style="display:none;"></audio>
+        <span id="play-text" style="font-size: 1.2rem; color: #00BFFF; width: 280px; flex-shrink: 0; line-height: 1.3; white-space: normal; word-break: keep-all; text-align: left;">Nghe phần này...</span>
       </div>
+      <audio id="audio-element" style="display:none;"></audio>
 
       <p>{{ content_processed | safe }}</p>
     </div>
@@ -205,7 +193,6 @@
 </style>
 
 <script>
-/* ==================== AUDIO PLAYER ==================== */
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -213,18 +200,81 @@ let currentPartNumber = null;
 let currentChunkIndex = 1;
 let totalChunks = 1;
 
+let activeFetchController = null; // để hủy request cũ khi drag mới
+
 const progressBar = document.getElementById('progress-bar');
 const playText = document.getElementById('play-text');
 const playBtn = document.getElementById('play-btn');
+
+function setProgressBarEnabled(enabled) {
+  if (enabled) {
+    progressBar.style.pointerEvents = 'auto';
+    progressBar.style.opacity = '1';
+  } else {
+    progressBar.style.pointerEvents = 'none';
+    progressBar.style.opacity = '0.4';
+  }
+}
+
+async function fetchChunkWithRetry(storyId, partNumber, chunkIndex, maxRetries = 5, delay = 500) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (activeFetchController) {
+        activeFetchController.abort();
+      }
+      const controller = new AbortController();
+      activeFetchController = controller;
+      const url = `/api/get_chunk/${storyId}/${partNumber}/${chunkIndex}`;
+      const res = await fetch(url, { signal: controller.signal });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success') {
+          activeFetchController = null;
+          return data.url;
+        }
+      }
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delay));
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Fetch aborted for chunk', chunkIndex);
+        return null;
+      }
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error('Failed to fetch chunk after retries');
+}
+
+async function loadChunk(storyId, partNumber, chunkIndex, audioElement, shouldPlay = true) {
+  try {
+    const url = await fetchChunkWithRetry(storyId, partNumber, chunkIndex);
+    if (!url) return false;
+    audioElement.src = url;
+    if (shouldPlay) {
+      await audioElement.play();
+    }
+    return true;
+  } catch (err) {
+    console.error('Load chunk error:', err);
+    return false;
+  }
+}
 
 async function toggleAudio(partId) {
   const audioEl = document.getElementById('audio-element');
 
   if (currentAudio && currentAudio.partId === partId) {
     if (currentAudio.paused) {
-      currentAudio.play();
+      await currentAudio.play();
       playText.textContent = "Đang nghe...";
       playBtn.innerHTML = "⏸️";
+      setProgressBarEnabled(true);
     } else {
       currentAudio.pause();
       playText.textContent = "Tạm dừng...";
@@ -236,8 +286,7 @@ async function toggleAudio(partId) {
   playBtn.innerHTML = "⏳";
   playText.textContent = "Đang chuyển sang audio...";
   playBtn.disabled = true;
-  progressBar.disabled = true;
-  progressBar.style.accentColor = "#FF9800";
+  setProgressBarEnabled(false);
 
   try {
     const res = await fetch(`/api/start_audio/${partId}`);
@@ -259,16 +308,18 @@ async function toggleAudio(partId) {
       playBtn.innerHTML = "⏸️";
       playText.textContent = "Đang nghe...";
       playBtn.disabled = false;
-      progressBar.disabled = false;
-      progressBar.style.accentColor = "#00BFFF";
+      setProgressBarEnabled(true);
       progressBar.max = totalChunks;
       progressBar.value = currentChunkIndex;
+    } else {
+      throw new Error("API error");
     }
   } catch (e) {
     console.error(e);
     playText.textContent = "Lỗi kết nối";
     playBtn.innerHTML = "🔊";
     playBtn.disabled = false;
+    setProgressBarEnabled(false);
   }
 }
 
@@ -285,38 +336,18 @@ document.getElementById('audio-element').addEventListener('ended', async functio
   playText.textContent = "Đang chuyển sang audio...";
   playBtn.innerHTML = "⏳";
   playBtn.disabled = true;
-  progressBar.disabled = true;
-  progressBar.style.accentColor = "#FF9800";
+  // Không disable progress bar khi chuyển chunk tự động
 
-  const res = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
-  const data = await res.json();
-
-  if (data.status === "success") {
-    this.src = data.url;
-    this.play();
+  const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, this, true);
+  if (success) {
     playText.textContent = "Đang nghe...";
     playBtn.innerHTML = "⏸️";
     playBtn.disabled = false;
-    progressBar.disabled = false;
-    progressBar.style.accentColor = "#00BFFF";
+    // progress bar vẫn enabled
   } else {
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
-      const res2 = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
-      const data2 = await res2.json();
-      if (data2.status === "success") {
-        clearInterval(poll);
-        this.src = data2.url;
-        this.play();
-        playText.textContent = "Đang nghe...";
-        playBtn.innerHTML = "⏸️";
-        playBtn.disabled = false;
-        progressBar.disabled = false;
-        progressBar.style.accentColor = "#00BFFF";
-      }
-      if (attempts > 40) clearInterval(poll);
-    }, 700);
+    playText.textContent = "Lỗi tải audio";
+    playBtn.innerHTML = "🔊";
+    playBtn.disabled = false;
   }
 });
 
@@ -326,105 +357,46 @@ function resetAudioPlayer() {
   playBtn.innerHTML = "🔊";
   playText.textContent = "Nghe phần này...";
   playBtn.disabled = false;
-  progressBar.disabled = true;
+  setProgressBarEnabled(false);
   progressBar.value = 1;
-  progressBar.style.accentColor = "#00BFFF";
 }
 
-progressBar.addEventListener('input', function() {});
 progressBar.addEventListener('change', async function() {
-  if (!currentStoryId || !currentPartNumber || progressBar.disabled) return;
+  if (!currentStoryId || !currentPartNumber) return;
+  if (progressBar.style.pointerEvents === 'none') return;
+
   const targetChunk = parseInt(this.value);
   if (targetChunk === currentChunkIndex) return;
+
+  // Hủy request đang chạy
+  if (activeFetchController) {
+    activeFetchController.abort();
+    activeFetchController = null;
+  }
+
   currentChunkIndex = targetChunk;
-  if (currentAudio) currentAudio.pause();
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+  }
+
   playText.textContent = "Đang chuyển sang audio...";
   playBtn.innerHTML = "⏳";
   playBtn.disabled = true;
-  progressBar.style.accentColor = "#FF9800";
-  const res = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
-  const data = await res.json();
-  if (data.status === "success") {
-    const audioEl = document.getElementById('audio-element');
-    audioEl.src = data.url;
-    audioEl.play();
+  // KHÔNG disable progress bar, để user có thể drag tiếp
+
+  const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, document.getElementById('audio-element'), true);
+  if (success) {
     playText.textContent = "Đang nghe...";
     playBtn.innerHTML = "⏸️";
     playBtn.disabled = false;
-    progressBar.style.accentColor = "#00BFFF";
   } else {
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
-      const res2 = await fetch(`/api/get_chunk/${currentStoryId}/${currentPartNumber}/${currentChunkIndex}`);
-      const data2 = await res2.json();
-      if (data2.status === "success") {
-        clearInterval(poll);
-        const audioEl = document.getElementById('audio-element');
-        audioEl.src = data2.url;
-        audioEl.play();
-        playText.textContent = "Đang nghe...";
-        playBtn.innerHTML = "⏸️";
-        playBtn.disabled = false;
-        progressBar.style.accentColor = "#00BFFF";
-      }
-      if (attempts > 40) clearInterval(poll);
-    }, 700);
+    playText.textContent = "Lỗi tải audio";
+    playBtn.innerHTML = "🔊";
+    playBtn.disabled = false;
   }
 });
 
-/* ==================== CATEGORY CHECKBOX FILTER ==================== */
-document.addEventListener('DOMContentLoaded', function() {
-  const container = document.getElementById('selected-categories-container');
-  if (!container) return;
-
-  function renderCategorySection(catId, catName, data) {
-    let html = `<div id="selected-category-${catId}" class="selected-category-section">`;
-    html += `<h3>${catName} <span class="remove-cat" data-cat-id="${catId}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
-    html += '<div class="story-grid">';
-    data.stories.forEach(story => {
-      html += `<div class="story-card"><a href="/story/${story.id}">${story.title}</a></div>`;
-    });
-    html += '</div></div>';
-    return html;
-  }
-
-  async function loadCategory(catId, catName, page = 1) {
-    const res = await fetch(`/api/category/${catId}?page=${page}`);
-    const data = await res.json();
-    const html = renderCategorySection(catId, catName, data);
-    const existing = document.getElementById(`selected-category-${catId}`);
-    if (existing) existing.outerHTML = html;
-    else container.insertAdjacentHTML('beforeend', html);
-  }
-
-  const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
-  checkboxes.forEach(cb => {
-    cb.addEventListener('change', function() {
-      const catId = this.getAttribute('data-cat-id');
-      const catName = this.getAttribute('data-cat-name');
-      if (this.checked) {
-        loadCategory(catId, catName, 1);
-      } else {
-        const sec = document.getElementById(`selected-category-${catId}`);
-        if (sec) sec.remove();
-      }
-    });
-  });
-
-  container.addEventListener('click', function(evt) {
-    const link = evt.target.closest('a');
-    if (link && link.dataset.catId && link.dataset.page) {
-      evt.preventDefault();
-      const catId = link.dataset.catId;
-      const page = parseInt(link.dataset.page);
-      const cb = document.querySelector(`.category-list input[data-cat-id="${catId}"]`);
-      if (cb && cb.checked) {
-        const catName = cb.getAttribute('data-cat-name');
-        loadCategory(catId, catName, page);
-      }
-    }
-  });
-});
+setProgressBarEnabled(false);
 </script>
 {% endblock %}

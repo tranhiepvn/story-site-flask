@@ -40,6 +40,64 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 
+# ====================== HÀM DỌN DẸP + TÁCH PHẦN (theo script anh đưa) ======================
+def clean_line(line: str) -> str:
+    line = line.rstrip('\n')
+    line = re.sub(r'^#+\s*', '', line)
+    
+    if line.startswith('*') and line.endswith('*') and len(line) > 1 and line[1] != '*' and line[-2] != '*':
+        content = line[1:-1].strip()
+        line = f'"{content}"'
+    else:
+        line = line.strip('*')
+    
+    if line.startswith('- '):
+        line = f'"{line[2:].strip()}"'
+    if line.startswith('– '):
+        line = f'"{line[2:].strip()}"'
+    
+    line = line.replace("’", "'").replace("‘", "'")
+    line = line.replace("…", "...")
+    line = line.replace("”", '"').replace("“", '"')
+    line = line.replace("–", "-")
+    
+    line = line.replace("cái cặc", "con cặc").replace("Cái cặc", "Con cặc")
+    line = line.replace("quần lót", "xì-líp").replace("Quần lót", "Xì-líp")
+    line = line.replace("địt", "đụ").replace("Địt", "Đụ")
+    
+    line = line.replace('"*', '"')
+    line = line.replace('""', '"')
+    
+    return line
+
+
+def split_and_clean_content(content: str) -> list[tuple[int, str]]:
+    lines = content.splitlines()
+    sections = []
+    current_content = []
+    part_num = None
+
+    for raw_line in lines:
+        cleaned = clean_line(raw_line)
+        match = re.match(r'^\s*Phần\s+(\d+)\s*:', cleaned, re.IGNORECASE)
+        if match:
+            if current_content and part_num is not None:
+                sections.append((part_num, '\n'.join(current_content)))
+            part_num = int(match.group(1))
+            current_content = [cleaned]
+        else:
+            if part_num is not None:
+                current_content.append(cleaned)
+
+    if current_content and part_num is not None:
+        sections.append((part_num, '\n'.join(current_content)))
+
+    if not sections and content.strip():
+        full_clean = '\n'.join(clean_line(line) for line in content.splitlines())
+        sections = [(1, full_clean)]
+
+    return sections
+# ==========================================================================================
 
 # Tạo ứng dụng Flask
 app = Flask(__name__)
@@ -755,38 +813,23 @@ def get_chunk(story_id: int, part_number: int, chunk_index: int):
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
-    """ Trang quản lý truyện.
-
-    Cho phép:
-    * Tạo truyện mới (với phần/chương đầu tiên).
-    * Chỉnh sửa truyện đã có: cập nhật tiêu đề, tác giả, thể loại, loại truyện;
-      thêm phần mới; xoá phần cuối.
-    Yêu cầu nhập mật khẩu trong mỗi thao tác POST để bảo vệ quyền upload.
-    """
-    # Nếu người dùng chưa xác thực để vào trang upload, chuyển hướng tới trang đăng nhập
-    # Tạo một trang đăng nhập riêng để yêu cầu mật khẩu trước khi truy cập trang upload.
+    """ Trang quản lý truyện - ĐÃ TÍCH HỢP LOGIC DỌN DẸP + TÁCH PHẦN TỰ ĐỘNG + VIDEO_URLS """
     if not session.get("upload_authenticated"):
         return redirect(url_for("upload_login"))
 
-    # Mật khẩu upload; bạn có thể thay đổi hằng số này theo nhu cầu
     UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
-
-    # Danh sách thể loại luôn cần cho các form
     categories = Category.query.order_by(Category.name).all()
-    # Xử lý tham số tìm kiếm và phân trang cho danh sách truyện
-    # (áp dụng khi hiển thị danh sách truyện để chỉnh sửa ở chế độ GET)
+
+    # === PHẦN GET ===
     page = request.args.get("page", 1, type=int)
     search_query = request.args.get("q", "").strip()
     search_type = request.args.get("stype", "title")
-
     stories_query = Story.query.order_by(Story.created_at.desc())
-    # Bộ sưu tập snippet highlight khi tìm theo nội dung
     highlight_snippets: dict[int, str] = {}
 
     if search_query:
         pattern = f"%{search_query}%"
         if search_type == "content":
-            # tìm theo nội dung chương: join tới bảng Part
             stories_query = (
                 Story.query.join(Part)
                 .filter(Part.content.ilike(pattern))
@@ -794,20 +837,16 @@ def upload():
                 .order_by(Story.created_at.desc())
             )
         else:
-            # mặc định: tìm theo tiêu đề hoặc tác giả
             stories_query = stories_query.filter(
                 (Story.title.ilike(pattern)) | (Story.author.ilike(pattern))
             )
-    # Phân trang 25 truyện một trang
+
     stories_pagination = stories_query.paginate(page=page, per_page=25, error_out=False)
     stories = stories_pagination.items
 
-    # Nếu tìm theo nội dung, tạo đoạn trích có highlight cho từng truyện trong trang
     if search_query and search_type == "content":
-        # Tách từ khoá để highlight riêng từng từ (có thể nhiều từ)
         keywords = [kw.lower() for kw in search_query.split() if kw.strip()]
         for st in stories:
-            # tìm chương đầu tiên chứa từ khoá
             part_match = (
                 Part.query.filter(
                     Part.story_id == st.id,
@@ -819,168 +858,111 @@ def upload():
             if part_match:
                 content_lower = part_match.content.lower()
                 idx = content_lower.find(search_query.lower())
-                if idx < 0:
-                    # nếu không tìm thấy nguyên chuỗi, thử tìm theo từ đầu tiên
-                    idx = content_lower.find(keywords[0]) if keywords else 0
+                if idx < 0 and keywords:
+                    idx = content_lower.find(keywords[0])
                 start = max(0, idx - 50)
                 end = min(len(part_match.content), idx + len(search_query) + 50)
                 snippet = part_match.content[start:end]
-                # highlight tất cả từ khoá
-                def repl(m: re.Match) -> str:
-                    return f'<span class="highlight">{m.group(0)}</span>'
                 for kw in keywords:
                     snippet = re.sub(
                         rf"({re.escape(kw)})",
-                        repl,
+                        lambda m: f'<span class="highlight">{m.group(0)}</span>',
                         snippet,
                         flags=re.IGNORECASE,
                     )
                 highlight_snippets[st.id] = snippet
 
-    # Xử lý gửi form (POST)
+    # === PHẦN POST ===
     if request.method == "POST":
-        # kiểm tra mật khẩu
         password = request.form.get("password", "")
         if password != UPLOAD_PASSWORD:
-            # giữ nguyên giao diện, thông báo lỗi
-            story_id = request.form.get("existing_story_id")
-            if story_id:
-                # nếu đang chỉnh sửa, tải lại trang edit
-                story = Story.query.get(int(story_id))
-                parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
-                # nếu đang cập nhật một phần cụ thể, lấy lại thông tin phần đó để hiển thị
-                edit_part_id_form = request.form.get("part_id")
-                edit_part_obj = None
-                if edit_part_id_form:
-                    try:
-                        pid_int = int(edit_part_id_form)
-                        edit_part_obj = Part.query.get(pid_int)
-                    except Exception:
-                        edit_part_obj = None
-                return render_template(
-                    "upload_edit.html",
-                    error="Mật khẩu sai.",
-                    story=story,
-                    parts=parts,
-                    categories=categories,
-                    edit_part=edit_part_obj,
-                    error_update=None,
-                )
-            else:
-                return render_template(
-                    "upload_new.html",
-                    error="Mật khẩu sai.",
-                    categories=categories,
-                    stories=stories,
-                    pagination=stories_pagination,
-                    q=search_query,
-                    stype=search_type,
-                    highlight_snippets=highlight_snippets,
-                )
+            flash("Mật khẩu sai.", "error")
+            return redirect(url_for("upload"))
 
-        # Nếu có existing_story_id thì là thao tác trên truyện đã có
         existing_story_id = request.form.get("existing_story_id")
         action = request.form.get("action")
+        video_urls = request.form.getlist("video_urls")
+
         if existing_story_id:
             story = Story.query.get_or_404(int(existing_story_id))
-            if action == "update_story":
-                # cập nhật thông tin truyện
+
+            if action == "add_part":
+                raw_content = request.form.get("content", "").strip()
+                if not raw_content:
+                    flash("Nội dung phần mới không được trống.", "error")
+                    return redirect(url_for("upload", story_id=story.id))
+
+                parts_data = split_and_clean_content(raw_content)
+
+                for part_num, cleaned_content in parts_data:
+                    last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
+                    next_number = (last_part.part_number + 1) if last_part else 1
+                    new_part = Part(story_id=story.id, part_number=next_number, content=cleaned_content)
+                    db.session.add(new_part)
+                    db.session.flush()
+
+                    for url in video_urls[:9]:
+                        url = (url or "").strip()
+                        if url:
+                            db.session.add(PartVideo(part_id=new_part.id, url=url))
+
+                db.session.commit()
+                flash(f"Đã thêm {len(parts_data)} phần mới (đã dọn dẹp, tách tự động và gán video).", "success")
+                return redirect(url_for("upload", story_id=story.id))
+
+            elif action == "update_part":
+                part_id = request.form.get("part_id")
+                raw_content = request.form.get("content", "").strip()
+                if not part_id or not raw_content:
+                    flash("Nội dung không được trống.", "error")
+                    return redirect(url_for("upload", story_id=story.id))
+
+                part_obj = Part.query.get(int(part_id))
+                if part_obj and part_obj.story_id == story.id:
+                    cleaned_content = '\n'.join(clean_line(line) for line in raw_content.splitlines())
+                    part_obj.content = cleaned_content
+
+                    PartVideo.query.filter_by(part_id=part_obj.id).delete()
+                    for url in video_urls[:9]:
+                        url = (url or "").strip()
+                        if url:
+                            db.session.add(PartVideo(part_id=part_obj.id, url=url))
+
+                    db.session.commit()
+                    flash("Đã cập nhật phần (đã dọn dẹp và cập nhật video).", "success")
+                return redirect(url_for("upload", story_id=story.id))
+
+            elif action == "update_story":
                 story.title = request.form.get("title", "").strip()
                 story.author = request.form.get("author", "").strip()
-                story_type = request.form.get("story_type", "short")
-                story.story_type = story_type
-                # đánh dấu truyện hoàn thành hay chưa
-                story.is_completed = True if request.form.get("is_completed") else False
-                # danh sách thể loại được chọn (có thể nhiều)
-                cat_ids = request.form.getlist("category_ids")
-                # chuyển thành list int
-                cat_ids_int = [int(cid) for cid in cat_ids if cid]
-                # gán quan hệ nhiều‑nhiều
-                selected_categories = (
-                    Category.query.filter(Category.id.in_(cat_ids_int)).all()
-                    if cat_ids_int
-                    else []
-                )
-                story.categories = selected_categories
-                # đặt category_id bằng thể loại đầu tiên (nếu có) để đảm bảo tương thích
-                story.category_id = cat_ids_int[0] if cat_ids_int else None
+                story.story_type = request.form.get("story_type", "short")
+                story.is_completed = bool(request.form.get("is_completed"))
+                cat_ids = [int(x) for x in request.form.getlist("category_ids") if x]
+                story.categories = Category.query.filter(Category.id.in_(cat_ids)).all() if cat_ids else []
+                story.category_id = cat_ids[0] if cat_ids else None
                 db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
-            elif action == "add_part":
-                # thêm phần mới cho truyện
-                content = request.form.get("content", "").rstrip()
-                if not content:
-                    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
-                    return render_template(
-                        "upload_edit.html",
-                        error="Nội dung phần mới không được trống.",
-                        story=story,
-                        parts=parts,
-                        categories=categories,
-                    )
-                # Chuẩn hoá tiêu đề phần/chương đầu tiên: loại bỏ ký hiệu markdown (##, ###) và
-                # luôn sử dụng tiền tố "Phần " ở đầu dòng. Nếu dòng bắt đầu bằng "###" hoặc "##"
-                # và sau đó là "Phần " hoặc "Chương ", ta chuyển sang "Phần ". Đồng thời nếu
-                # dòng đầu tiên bắt đầu bằng "Chương ", chuyển thành "Phần " để đồng bộ.
-                lines = content.split('\n', 1)
-                first_line = lines[0]
-                # Loại bỏ level heading '### ' hoặc '## '
-                for heading_prefix in ["### ", "## "]:
-                    if first_line.startswith(heading_prefix + "Phần "):
-                        first_line = "Phần " + first_line[len(heading_prefix + "Phần "):]
-                        break
-                    if first_line.startswith(heading_prefix + "Chương "):
-                        first_line = "Phần " + first_line[len(heading_prefix + "Chương "):]
-                        break
-                else:
-                    # Nếu không có heading, nhưng bắt đầu bằng "Chương ", đổi thành "Phần "
-                    if first_line.startswith("Chương "):
-                        first_line = "Phần " + first_line[len("Chương "):]
-                    # Nếu đã bắt đầu bằng "Phần ", giữ nguyên
-                # Ghép lại nội dung với dòng đầu đã chuẩn hoá
-                if len(lines) > 1:
-                    content = first_line + "\n" + lines[1]
-                else:
-                    content = first_line
-                # xác định số thứ tự phần mới
-                last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
-                next_number = last_part.part_number + 1 if last_part else 1
-                new_part = Part(story_id=story.id, part_number=next_number, content=content)
-                db.session.add(new_part)
-                db.session.commit()
-                # Lưu các liên kết video cho phần mới
-                video_urls = request.form.getlist("video_urls")
-                # Chỉ lấy tối đa 9 liên kết video để tránh quá nhiều mục
-                for url in video_urls[:9]:
-                    url = (url or "").strip()
-                    if url:
-                        db.session.add(PartVideo(part_id=new_part.id, url=url))
-                db.session.commit()
-                return redirect(url_for("upload", story_id=story.id))
+
             elif action == "delete_last":
-                # xoá phần cuối cùng nếu có
                 last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
                 if last_part:
                     db.session.delete(last_part)
                     db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
+
             elif action == "toggle_hidden":
-                # ẩn hoặc hiện lại truyện
-                story.is_hidden = not (story.is_hidden or False)
+                story.is_hidden = not bool(story.is_hidden)
                 db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
+
             elif action == "delete_story":
-                # xoá hoàn toàn một truyện và các phần liên quan
-                # gỡ mối quan hệ với thể loại
                 story.categories = []
-                # xoá tất cả các chương của truyện
                 Part.query.filter_by(story_id=story.id).delete()
-                # xoá truyện
                 db.session.delete(story)
                 db.session.commit()
                 return redirect(url_for("upload"))
+
             elif action == "replace_text":
-                # Thay thế cụm từ trong tất cả các chương của truyện
                 search_str = request.form.get("search_string", "").strip()
                 replacement = request.form.get("replacement_string", "")
                 if not search_str:
@@ -998,108 +980,47 @@ def upload():
                 else:
                     flash("Không tìm thấy cụm từ trong các phần.")
                 return redirect(url_for("upload", story_id=story.id))
-            elif action == "update_part":
-                # cập nhật nội dung của một chương cụ thể
-                part_id = request.form.get("part_id")
-                content = request.form.get("content", "").strip()
-                # kiểm tra dữ liệu hợp lệ
-                if not part_id or not content:
-                    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
-                    edit_part_obj = None
-                    try:
-                        edit_part_obj = Part.query.get(int(part_id))
-                    except Exception:
-                        pass
-                    return render_template(
-                        "upload_edit.html",
-                        story=story,
-                        parts=parts,
-                        categories=categories,
-                        edit_part=edit_part_obj,
-                        error_update="Nội dung không được để trống.",
-                    )
-                try:
-                    part_obj = Part.query.get(int(part_id))
-                except Exception:
-                    part_obj = None
-                if part_obj and part_obj.story_id == story.id:
-                    part_obj.content = content
-                    # Cập nhật các liên kết video: xoá cũ và thêm mới
-                    # Xoá toàn bộ video cũ của phần
-                    PartVideo.query.filter_by(part_id=part_obj.id).delete()
-                    video_urls = request.form.getlist("video_urls")
-                    for url in video_urls[:9]:
-                        url = (url or "").strip()
-                        if url:
-                            db.session.add(PartVideo(part_id=part_obj.id, url=url))
-                    db.session.commit()
-                return redirect(url_for("upload", story_id=story.id))
-            # không nhận ra action, trở lại trang edit
-            return redirect(url_for("upload", story_id=story.id))
+
         else:
-            # tạo truyện mới
+            # Tạo truyện mới
             title = request.form.get("title", "").strip()
-            author = request.form.get("author", "").strip()
-            story_type = request.form.get("story_type", "short")
-            # trạng thái hoàn thành
-            is_completed = True if request.form.get("is_completed") else False
-            # nhận danh sách thể loại (có thể nhiều) từ form
-            cat_ids = request.form.getlist("category_ids")
-            content = request.form.get("content", "").strip()
-            if not title or not content:
-                return render_template(
-                    "upload_new.html",
-                    error="Vui lòng nhập đầy đủ tiêu đề và nội dung.",
-                    categories=categories,
-                    stories=stories,
-                    pagination=stories_pagination,
-                    q=search_query,
-                    stype=search_type,
-                    highlight_snippets=highlight_snippets,
-                )
-            # tạo truyện mới
+            raw_content = request.form.get("content", "").strip()
+            if not title or not raw_content:
+                flash("Vui lòng nhập tiêu đề và nội dung.", "error")
+                return redirect(url_for("upload"))
+
             story = Story(
                 title=title,
-                author=author,
-                story_type=story_type,
-                is_completed=is_completed,
+                author=request.form.get("author", "").strip(),
+                story_type=request.form.get("story_type", "short"),
+                is_completed=bool(request.form.get("is_completed"))
             )
-            # thiết lập thể loại many‑to‑many và category_id chính
-            cat_ids_int = [int(cid) for cid in cat_ids if cid]
-            if cat_ids_int:
-                selected_categories = Category.query.filter(Category.id.in_(cat_ids_int)).all()
-                story.categories = selected_categories
-                story.category_id = cat_ids_int[0]
-            else:
-                story.category_id = None
             db.session.add(story)
             db.session.commit()
-            # tạo phần đầu tiên
-            first_part = Part(story_id=story.id, part_number=1, content=content)
-            db.session.add(first_part)
+
+            parts_data = split_and_clean_content(raw_content)
+
+            for part_num, cleaned_content in parts_data:
+                part = Part(story_id=story.id, part_number=part_num, content=cleaned_content)
+                db.session.add(part)
+                db.session.flush()
+
+                for url in video_urls[:9]:
+                    url = (url or "").strip()
+                    if url:
+                        db.session.add(PartVideo(part_id=part.id, url=url))
+
             db.session.commit()
-            # Lưu các liên kết video cho chương đầu
-            video_urls = request.form.getlist("video_urls")
-            for url in video_urls[:9]:
-                url = (url or "").strip()
-                if url:
-                    db.session.add(PartVideo(part_id=first_part.id, url=url))
-            db.session.commit()
+            flash(f"Đã tạo truyện '{title}' với {len(parts_data)} phần (đã dọn dẹp, tách tự động và gán video).", "success")
             return redirect(url_for("upload", story_id=story.id))
 
-    # Xử lý GET: hiển thị trang mới hoặc trang chỉnh sửa
+    # === PHẦN GET - hiển thị form ===
     story_id = request.args.get("story_id")
     if story_id:
         story = Story.query.get_or_404(int(story_id))
         parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
-        # Kiểm tra xem có tham số edit_part trên URL để hiển thị form cập nhật chương
         edit_part_id = request.args.get("edit_part", type=int)
-        edit_part_obj = None
-        if edit_part_id:
-            edit_part_obj = Part.query.get(edit_part_id)
-            # chỉ hiển thị nếu chương thuộc truyện đang chỉnh sửa
-            if edit_part_obj and edit_part_obj.story_id != story.id:
-                edit_part_obj = None
+        edit_part_obj = Part.query.get(edit_part_id) if edit_part_id else None
         return render_template(
             "upload_edit.html",
             story=story,
@@ -1108,7 +1029,7 @@ def upload():
             edit_part=edit_part_obj,
             error_update=None,
         )
-    # Mặc định: hiển thị form tạo truyện mới cùng danh sách truyện để chọn
+
     return render_template(
         "upload_new.html",
         categories=categories,
@@ -2172,6 +2093,20 @@ def api_category(category_id: int):
 
     # Lấy hết truyện thuộc thể loại này, sắp xếp theo tên truyện (A → Z)
     stories = Story.query.filter(Story.categories.any(id=category_id))\
+        .order_by(Story.title.asc())\
+        .all()
+
+    return jsonify({
+        "stories": [{"id": s.id, "title": s.title} for s in stories]
+    })
+
+@app.route("/api/type/<string:story_type>")
+def api_type(story_type: str):
+    """API cho Truyện Dài / Truyện Ngắn - trả về hết, sắp xếp theo tên A-Z"""
+    if story_type not in ['long', 'short']:
+        return jsonify({"stories": []})
+
+    stories = Story.query.filter_by(story_type=story_type)\
         .order_by(Story.title.asc())\
         .all()
 
