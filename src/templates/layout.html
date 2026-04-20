@@ -241,11 +241,8 @@
           <li class="special-type"><input type="checkbox" id="type_long" data-type="long" data-name="Truyện Dài"><a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a></li>
           <li class="special-type"><input type="checkbox" id="type_short" data-type="short" data-name="Truyện Ngắn"><a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a></li>
 
-
           {% for cat in categories_group1 %}
           <li>
-            <!-- Debug: in tên -->
-            {{ cat.name }} - 
             <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
             <a href="{{ url_for('category_view', category_id=cat.id) }}" {% if cat.name == 'Truyện một phần' or cat.name == 'Truyện nhiều phần' %}style="color: #00BFFF !important;"{% endif %}>{{ cat.name }}</a>
           </li>

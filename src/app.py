@@ -152,10 +152,10 @@ def get_category_groups() -> tuple[list["Category"], list["Category"], list["Cat
     """
     cats = Category.query.all()
     # define names for special groups. preserve order within these lists.
-    first_candidates_1 = ["Truyện Chỉ Có 1 Chương", "Phim Chỉ Có 1 Tập"]
-    first_candidates_2 = ["Truyện Có Nhiều Chương", "Phim Có Nhiều Tập"]
-    # first_candidates_1 = ["Truyện Chỉ Có 1 Chương", "Phim Chỉ Có 1 Tập", "Truyện một phần"]
-    # first_candidates_2 = ["Truyện Có Nhiều Chương", "Phim Có Nhiều Tập", "Truyện nhiều phần"]
+    # first_candidates_1 = ["Truyện Chỉ Có 1 Chương", "Phim Chỉ Có 1 Tập"]
+    # first_candidates_2 = ["Truyện Có Nhiều Chương", "Phim Có Nhiều Tập"]
+    first_candidates_1 = ["Phim một tập", "Truyện một phần"]
+    first_candidates_2 = ["Truyện nhiều tập", "Truyện nhiều phần"]
     # prepare containers
     group1: list[Category] = []
     group2: list[Category] = []
