@@ -186,6 +186,9 @@
       .part-navigation { gap: 15px; }
       .part-navigation a, .part-navigation .disabled-nav { padding: 8px 16px; font-size: 0.9em; }
     }
+    .special-blue a {
+      color: #00BFFF !important;
+    }
   </style>
 </head>
 <body class="{{ request.endpoint }}">
@@ -237,9 +240,18 @@
         <ul class="category-list">
           <li class="special-type"><input type="checkbox" id="type_long" data-type="long" data-name="Truyện Dài"><a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a></li>
           <li class="special-type"><input type="checkbox" id="type_short" data-type="short" data-name="Truyện Ngắn"><a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a></li>
+
+
           {% for cat in categories_group1 %}
-          <li><input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}"><a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a></li>
+          <li>
+            <!-- Debug: in tên -->
+            {{ cat.name }} - 
+            <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
+            <a href="{{ url_for('category_view', category_id=cat.id) }}" {% if cat.name == 'Truyện một phần' or cat.name == 'Truyện nhiều phần' %}style="color: #00BFFF !important;"{% endif %}>{{ cat.name }}</a>
+          </li>
           {% endfor %}
+
+
           {% set ns = namespace(prev_first='', color_toggle=0) %}
           {% for cat in categories_group2 %}
             {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
@@ -389,6 +401,15 @@
     document.addEventListener('click', function(e) {
       if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
         suggestionsDiv.style.display = 'none';
+      }
+    });
+
+    // Tô màu xanh cho hai thể loại đặc biệt
+    document.querySelectorAll('.category-list li a').forEach(link => {
+      const text = link.innerText.trim();
+      if (text === 'Truyện một phần' || text === 'Truyện nhiều phần') {
+        link.style.color = '#00BFFF';
+        link.style.setProperty('color', '#00BFFF', 'important');
       }
     });
   }); // <--- ĐÃ THÊM DẤU ĐÓNG NÀY
