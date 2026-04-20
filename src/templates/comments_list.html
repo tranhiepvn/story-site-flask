@@ -1,16 +1,27 @@
 {% extends "layout.html" %}
 
-{% block title %}Danh sách truyện có bình luận{% endblock %}
+{% block title %}Tất cả bình luận{% endblock %}
 
 {% block content %}
-<h2>Danh sách truyện có bình luận</h2>
-{% if commented_stories %}
-<ul class="comment-list">
-{% for st in commented_stories %}
-  <li><a href="{{ url_for('story_detail', story_id=st.id) }}">{{ st.title }}{% if st.author %} - {{ st.author }}{% endif %}</a></li>
-{% endfor %}
-</ul>
+<h2>📝 Tất cả bình luận (mới nhất trước)</h2>
+{% if comments %}
+  <ul style="list-style: none; padding: 0;">
+    {% for comment, story in comments %}
+      <li style="margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 12px;">
+        <div>
+          <strong><a href="{{ url_for('story_detail', story_id=story.id) }}" style="color: #00BFFF;">{{ story.title }}</a></strong>
+          {% if story.author %} - {{ story.author }}{% endif %}
+        </div>
+        <div style="margin-top: 5px; color: #ccc;">
+          <span style="color: #FF9800;">{{ comment.name or 'Ẩn danh' }}</span>:
+          <span>{{ comment.content }}</span>
+          <small style="color: #888; display: block; margin-top: 3px;">{{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
 {% else %}
-<p>Chưa có bình luận nào.</p>
+  <p>Chưa có bình luận nào.</p>
 {% endif %}
+<p><a href="{{ url_for('upload') }}">← Quay lại trang admin</a></p>
 {% endblock %}

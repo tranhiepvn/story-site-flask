@@ -1,38 +1,148 @@
 {% extends "layout.html" %}
-{% block title %}Đăng truyện mới{% endblock %}
+{% block title %}Quản trị truyện{% endblock %}
 {% block content %}
-<!-- Thanh điều hướng admin -->
-<div style="background: #2C2C2C; padding: 12px; margin-bottom: 20px; border-radius: 8px; text-align: center;">
-  <a href="{{ url_for('views_analytics') }}" style="color: #00BFFF; margin-right: 20px; text-decoration: none; font-weight: bold;">📊 Xem Views (7 ngày)</a>
-  <a href="{{ url_for('hears_analytics') }}" style="color: #FF8C00; text-decoration: none; font-weight: bold;">🎧 Xem Nghe (7 ngày)</a>
-</div>
-
-<h2>Đăng truyện mới</h2>
+<h2>Quản trị truyện</h2>
 
 {% set show_comments, commented_stories = get_comment_notifications() %}
 {% if show_comments and commented_stories %}
 <div class="comment-notification">
-  <h3>Truyện có bình luận mới</h3>
-  <ul>
-    {% for st in commented_stories %}
-      <li><a href="{{ url_for('story_detail', story_id=st.id) }}">{{ st.title }}{% if st.author %} - {{ st.author }}{% endif %}</a></li>
+  <h3>📝 Truyện có bình luận mới</h3>
+  <ul style="list-style: none; padding: 0;">
+    {% for story, comment in commented_stories %}
+      <li style="margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px;">
+        <div>
+          <strong><a href="{{ url_for('story_detail', story_id=story.id) }}" style="color: #00BFFF;">{{ story.title }}</a></strong>
+          {% if story.author %} - {{ story.author }}{% endif %}
+        </div>
+        <div style="margin-top: 5px; color: #ccc;">
+          <span style="color: #FF9800;">{{ comment.name or 'Ẩn danh' }}</span>:
+          <span>{{ comment.content[:120] }}{% if comment.content|length > 120 %}...{% endif %}</span>
+          <small style="color: #888;">({{ comment.created_at.strftime('%d/%m/%Y %H:%M') }})</small>
+        </div>
+      </li>
     {% endfor %}
   </ul>
-  <div class="button-row">
+  <div class="button-row" style="margin-top: 10px;">
     <form method="post" action="{{ url_for('skip_comments') }}">
-      <button type="submit">Bỏ qua</button>
-    </form>
-    <form method="get" action="{{ url_for('view_all_comments') }}">
-      <button type="submit">Xem tất cả</button>
+      <button type="submit">Đánh dấu đã đọc</button>
     </form>
   </div>
 </div>
 {% endif %}
 
-{% if error %}
-  <p class="error">{{ error }}</p>
-{% endif %}
 
+<div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px;">
+  <a href="{{ url_for('views_analytics') }}" style="background:#4A90E2; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">📊 Xem Views</a>
+  <a href="{{ url_for('hears_analytics') }}" style="background:#FF8C00; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">🎧 Xem Nghe</a>
+  <a href="{{ url_for('admin_dashboard') }}" style="background:#39FF14; color:#000; padding:8px 15px; text-decoration:none; border-radius:4px;">📈 Dashboard Thống kê</a>
+  <a href="{{ url_for('admin_announcements') }}" style="background:#FF9800; color:#000; padding:8px 15px; text-decoration:none; border-radius:4px;">📢 Quản lý thông báo</a>
+  <a href="{{ url_for('view_all_comments') }}" style="background:#9C27B0; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">💬 Xem tất cả bình luận</a>
+</div>
+
+<!-- Form tìm kiếm nâng cao (đã chỉnh lần cuối) -->
+<form method="get" class="advanced-search" style="background:#111; padding:15px; border-radius:8px; margin-bottom:20px;">
+  <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
+    <div style="flex: 2.5;">
+      <label>Tìm kiếm:</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="Tên truyện, tác giả, nội dung" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+    </div>
+    <div style="flex: 1.2;">
+      <label>Loại tìm:</label>
+      <select name="stype" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+        <option value="title" {% if stype == 'title' %}selected{% endif %}>Tên truyện</option>
+        <option value="content" {% if stype == 'content' %}selected{% endif %}>Nội dung</option>
+      </select>
+    </div>
+    <div style="flex: 1.5;">
+      <label>Thể loại:</label>
+      <select name="category" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+        <option value="">Tất cả</option>
+        {% for cat in all_categories %}
+        <option value="{{ cat.id }}" {% if filter_category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="flex: 1.5;">
+      <label>Hoàn thành:</label>
+      <select name="completed" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+        <option value="">Tất cả</option>
+        <option value="completed" {% if filter_completed == 'completed' %}selected{% endif %}>Đã hoàn thành</option>
+        <option value="uncompleted" {% if filter_completed == 'uncompleted' %}selected{% endif %}>Chưa hoàn thành</option>
+      </select>
+    </div>
+    <div style="flex: 1.2;">
+      <label>Hiển thị:</label>
+      <select name="hidden" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+        <option value="">Tất cả</option>
+        <option value="visible" {% if filter_hidden == 'visible' %}selected{% endif %}>Hiện</option>
+        <option value="hidden" {% if filter_hidden == 'hidden' %}selected{% endif %}>Ẩn</option>
+      </select>
+    </div>
+    <div style="width: 120px;">
+      <label>Từ ngày:</label>
+      <input type="date" name="date_from" value="{{ filter_date_from }}" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+    </div>
+    <div style="width: 120px;">
+      <label>Đến ngày:</label>
+      <input type="date" name="date_to" value="{{ filter_date_to }}" style="width:100%; padding:6px; height: 34px; box-sizing: border-box;">
+    </div>
+    <div style="display: flex; gap: 5px; align-items: flex-end;">
+      <button type="submit" style="padding:0 15px; background:#0056b3; color:white; border:none; border-radius:4px; cursor:pointer; height: 34px; line-height: 34px;">Lọc</button>
+      <a href="{{ url_for('upload') }}" style="padding:0 15px; background:#555; color:white; text-decoration:none; border-radius:4px; display: inline-block; height: 34px; line-height: 34px;">Reset</a>
+    </div>
+
+  </div>
+</form>
+
+<!-- Danh sách truyện dạng bảng -->
+<table style="width:100%; border-collapse: collapse; background:#1C1C1C;">
+  <thead>
+    <tr style="background:#4A90E2; color:white;">
+      <th style="padding:8px;">ID</th>
+      <th style="padding:8px;">Tên truyện</th>
+      <th style="padding:8px;">Tác giả</th>
+      <th style="padding:8px;">Số phần</th>
+      <th style="padding:8px;">Hoàn thành</th>
+      <th style="padding:8px;">Ẩn</th>
+      <th style="padding:8px;">Ngày tạo</th>
+      <th style="padding:8px;">Hành động</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for story in stories %}
+    <tr style="border-bottom:1px solid #333;">
+      <td style="padding:8px; text-align:center;">{{ story.id }}</td>
+      <td style="padding:8px;"><a href="{{ url_for('upload', story_id=story.id) }}">{{ story.title }}</a></td>
+      <td style="padding:8px;">{{ story.author or 'Ẩn danh' }}</td>
+      <td style="padding:8px; text-align:center;">{{ story.parts|length }}</td>
+      <td style="padding:8px; text-align:center;">{% if story.is_completed %}✅{% else %}❌{% endif %}</td>
+      <td style="padding:8px; text-align:center;">{% if story.is_hidden %}🔒{% else %}👁️{% endif %}</td>
+      <td style="padding:8px;">{{ story.created_at.strftime('%d/%m/%Y') }}</td>
+      <td style="padding:8px;">
+        <a href="{{ url_for('upload', story_id=story.id) }}" style="color:#00BFFF;">Sửa</a>
+        <form method="post" style="display:inline;" onsubmit="return confirm('Xoá truyện này?');">
+          <input type="hidden" name="existing_story_id" value="{{ story.id }}">
+          <input type="hidden" name="password" value="{{ request.form.get('password', '') }}" />
+          <button type="submit" name="action" value="delete_story" style="background:none; border:none; color:#FF4444; cursor:pointer;">Xoá</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination" style="margin-top:15px;">
+  {% if pagination.has_prev %}
+    <a href="{{ url_for('upload', page=pagination.prev_num, q=q, stype=stype, category=filter_category, completed=filter_completed, hidden=filter_hidden, date_from=filter_date_from, date_to=filter_date_to) }}">&laquo; Trước</a>
+  {% endif %}
+  <span>Trang {{ pagination.page }} / {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+    <a href="{{ url_for('upload', page=pagination.next_num, q=q, stype=stype, category=filter_category, completed=filter_completed, hidden=filter_hidden, date_from=filter_date_from, date_to=filter_date_to) }}">Sau &raquo;</a>
+  {% endif %}
+</div>
+
+<hr style="margin:30px 0;">
+<h2>Đăng truyện mới</h2>
 <form method="post">
   <input type="hidden" name="existing_story_id" value="">
 
@@ -66,29 +176,32 @@
     </label>
   </div>
 
-  <!-- === THỂ LOẠI CÓ MÀU XÁM XEN KẼ === -->
+  <!-- Thể loại (có màu sắc) -->
   <div class="form-group">
     <label>Thể loại (có thể chọn nhiều):</label><br>
-    <div class="category-list-admin">
-      {% set ns = namespace(prev_first='', color_toggle=0) %}
-      {% for cat in categories %}
-        {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
-        {% if first_word != ns.prev_first %}
-          {% set ns.prev_first = first_word %}
-          {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
-        {% endif %}
-        <label class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-          <input type="checkbox" name="category_ids" value="{{ cat.id }}">
-          {{ cat.name }}
-        </label><br>
-      {% endfor %}
-      <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
+    <div class="category-list-admin" style="max-height: 300px; overflow-y: auto; background: #000;">
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        {% set ns = namespace(prev_first='', color_toggle=0) %}
+        {% for cat in categories %}
+          {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+          {% if first_word != ns.prev_first %}
+            {% set ns.prev_first = first_word %}
+            {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+          {% endif %}
+          <li class="{% if cat.name in ['Truyện một phần', 'Truyện nhiều phần'] %}special-blue{% elif ns.color_toggle == 0 %}category-group-even{% else %}category-group-odd{% endif %}" 
+              style="margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" name="category_ids" value="{{ cat.id }}" id="cat_{{ cat.id }}">
+            <label for="cat_{{ cat.id }}" style="cursor: pointer;">{{ cat.name }}</label>
+          </li>
+        {% endfor %}
+      </ul>
     </div>
+    <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
   </div>
 
   <div class="form-group">
     <label for="content">Nội dung phần đầu tiên:</label><br>
-    <textarea id="content" name="content" rows="45" cols="80" required></textarea>
+    <textarea id="content" name="content" rows="30" cols="80" required></textarea>
   </div>
 
   <div class="form-group">
@@ -140,6 +253,18 @@
   </div>
 </form>
 
+<!-- Xoá toàn bộ audio MP3 -->
+<h3>Xoá toàn bộ audio MP3</h3>
+<form method="post" action="{{ url_for('delete_all_audio') }}" onsubmit="return confirm('Xoá toàn bộ file MP3?');">
+  <div class="form-group">
+    <label for="audio_password">Password:</label><br>
+    <input type="password" id="audio_password" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit">Xoá audio</button>
+  </div>
+</form>
+
 <!-- Tìm và thay cụm từ đầu dòng -->
 <h3>Tìm và thay cụm từ đầu phần</h3>
 <form method="post" action="{{ url_for('replace_prefix_all') }}" class="replace-form">
@@ -160,63 +285,6 @@
   </div>
 </form>
 
-<!-- Xoá toàn bộ audio MP3 ngay lập tức -->
-<h3>Xoá toàn bộ audio MP3 (ngay lập tức)</h3>
-<form method="post" action="{{ url_for('delete_all_audio') }}" class="delete-audio-form" onsubmit="return confirm('Bạn có chắc muốn xoá toàn bộ file MP3? Hành động này không thể hoàn tác.');">
-  <div class="form-group">
-    <label for="audio_password">Password:</label><br>
-    <input type="password" id="audio_password" name="password" required>
-  </div>
-  <div class="form-group">
-    <button type="submit">Xoá toàn bộ audio</button>
-  </div>
-</form>
-
-<!-- Hoặc chỉnh sửa truyện đã có -->
-<h3>Hoặc chỉnh sửa truyện đã có</h3>
-<form method="get" class="search-existing-form">
-  <input type="text" name="q" placeholder="Tìm kiếm..." value="{{ q|default('') }}">
-  <select name="stype">
-    <option value="title" {% if stype == 'title' %}selected{% endif %}>Tên truyện</option>
-    <option value="content" {% if stype == 'content' %}selected{% endif %}>Nội dung</option>
-  </select>
-  <button type="submit">Tìm</button>
-</form>
-
-{% if stories %}
-  <ul class="existing-stories">
-    {% for st in stories %}
-      <li>
-        <a href="{{ url_for('upload', story_id=st.id) }}">{{ st.title }}{% if st.author %} - {{ st.author }}{% endif %}</a>
-        <p class="existing-snippet">
-          {% if stype == 'content' and highlight_snippets and highlight_snippets.get(st.id) %}
-            {{ highlight_snippets.get(st.id)|safe }}
-          {% else %}
-            {% set first_part = st.parts[0] %}
-            {% set snippet = first_part.content[:200] %}
-            {{ snippet.rsplit(' ', 1)[0] }}{% if first_part.content|length > 200 %}...{% endif %}
-          {% endif %}
-        </p>
-      </li>
-    {% endfor %}
-  </ul>
-  {% if pagination and pagination.pages > 1 %}
-    <div class="pagination">
-      {% if pagination.page > 1 %}
-        <a href="{{ url_for('upload', page=1, q=q) }}">&laquo; Đầu</a>
-        <a href="{{ url_for('upload', page=pagination.prev_num, q=q) }}">&lsaquo; Trước</a>
-      {% endif %}
-      <span>Trang {{ pagination.page }} / {{ pagination.pages }}</span>
-      {% if pagination.page < pagination.pages %}
-        <a href="{{ url_for('upload', page=pagination.next_num, q=q) }}">Sau &rsaquo;</a>
-        <a href="{{ url_for('upload', page=pagination.pages, q=q) }}">Cuối &raquo;</a>
-      {% endif %}
-    </div>
-  {% endif %}
-{% else %}
-  <p>Chưa có truyện nào.</p>
-{% endif %}
-
 <script>
 function confirmDeleteAll() {
   var pw1 = document.getElementById('password1').value;
@@ -229,19 +297,37 @@ function confirmDeleteAll() {
   return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
 }
 
-// Hiển thị loading overlay khi submit các form quan trọng
-document.querySelectorAll('form').forEach(form => {
-  // Bỏ qua form tìm kiếm, đăng nhập, và các form không cần spinner
-  if (form.classList.contains('no-spinner')) return;
-  form.addEventListener('submit', function(e) {
-    // Kiểm tra nếu form đã có overlay thì không tạo mới
-    if (document.querySelector('.loading-overlay')) return;
-    const overlay = document.createElement('div');
-    overlay.className = 'loading-overlay';
-    overlay.innerHTML = '<div class="spinner"></div><p style="margin-top: 15px;">Đang xử lý, vui lòng chờ...</p>';
-    document.body.appendChild(overlay);
+// Xem trước video
+document.addEventListener('DOMContentLoaded', function() {
+  var inputs = document.querySelectorAll('.video-input');
+  inputs.forEach(function(input) {
+    input.addEventListener('input', function() {
+      var previewId = input.getAttribute('data-preview');
+      var url = input.value;
+      var match = url.match(/\/file\/d\/([\w-]+)/);
+      if (!match) match = url.match(/id=([\w-]+)/);
+      var embedUrl = match ? 'https://drive.google.com/file/d/' + match[1] + '/preview' : '';
+      var iframe = document.getElementById(previewId);
+      if (iframe) iframe.src = embedUrl;
+    });
   });
 });
 </script>
 
+<style>
+.category-list-admin ul {
+  background: #000;
+  padding: 8px;
+  border-radius: 4px;
+}
+.special-blue label {
+  color: #00BFFF !important;
+}
+.category-group-even label {
+  color: #dddddd !important;
+}
+.category-group-odd label {
+  color: #aaaaaa !important;
+}
+</style>
 {% endblock %}

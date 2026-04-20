@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard Thống kê{% endblock %}
+{% block content %}
+<h2>📈 Dashboard Thống kê (7 ngày qua)</h2>
+<div style="background:#1C1C1C; padding:20px; border-radius:8px;">
+  <canvas id="viewsChart" width="400" height="200" style="max-width:100%;"></canvas>
+</div>
+
+<div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:30px;">
+  <div style="flex:1; background:#1C1C1C; padding:15px; border-radius:8px;">
+    <h3>📖 Top 10 truyện nhiều lượt xem nhất</h3>
+    <ol>
+      {% for story, total in top_views %}
+        <li><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a> ({{ total }} lượt)</li>
+      {% endfor %}
+    </ol>
+  </div>
+  <div style="flex:1; background:#1C1C1C; padding:15px; border-radius:8px;">
+    <h3>🎧 Top 10 truyện nhiều lượt nghe nhất</h3>
+    <ol>
+      {% for story, total in top_listens %}
+        <li><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a> ({{ total }} lượt)</li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const ctx = document.getElementById('viewsChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels|tojson }},
+    datasets: [{
+      label: 'Lượt xem 7 ngày',
+      data: {{ chart_views_data|tojson }},
+      backgroundColor: '#4A90E2',
+      borderColor: '#4A90E2',
+      borderWidth: 1
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, title: { display: true, text: 'Lượt xem' } },
+      x: { title: { display: true, text: 'Truyện' } }
+    }
+  }
+});
+</script>
+{% endblock %}

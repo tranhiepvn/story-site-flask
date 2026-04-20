@@ -3,11 +3,6 @@
 {% block content %}
 <h2>Chỉnh sửa truyện</h2>
 
-<div style="background: #2C2C2C; padding: 12px; margin-bottom: 20px; border-radius: 8px; text-align: center;">
-  <a href="{{ url_for('views_analytics') }}" style="color: #00BFFF; margin-right: 20px; text-decoration: none; font-weight: bold;">📊 Xem Views (7 ngày)</a>
-  <a href="{{ url_for('hears_analytics') }}" style="color: #FF8C00; text-decoration: none; font-weight: bold;">🎧 Xem Nghe (7 ngày)</a>
-</div>
-
 {% if error %}
   <p class="error">{{ error }}</p>
 {% endif %}
@@ -46,25 +41,34 @@
     </label>
   </div>
 
-  <!-- === THỂ LOẠI CÓ MÀU XÁM XEN KẼ === -->
+  <!-- === THỂ LOẠI CÓ MÀU XEN KẼ GIỐNG SIDEBAR === -->
   <div class="form-group">
     <label>Thể loại (có thể chọn nhiều):</label><br>
-    <div class="category-list-admin">
-      {% set ns = namespace(prev_first='', color_toggle=0) %}
-      {% for cat in categories %}
-        {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
-        {% if first_word != ns.prev_first %}
-          {% set ns.prev_first = first_word %}
-          {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
-        {% endif %}
-        <label class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-          <input type="checkbox" name="category_ids" value="{{ cat.id }}" 
-                 {% if cat in story.categories %}checked{% endif %}>
-          {{ cat.name }}
-        </label><br>
-      {% endfor %}
-      <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
+    <div class="category-list-admin" style="max-height: 400px; overflow-y: auto; background: #000;">
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <li class="special-type" style="color: #FF9800 !important; font-weight: bold !important; margin-bottom: 6px;">
+          <span style="color: #FF9800;">📘 Truyện Dài (xác định bởi loại truyện)</span>
+        </li>
+        <li class="special-type" style="color: #FF9800 !important; font-weight: bold !important; margin-bottom: 12px;">
+          <span style="color: #FF9800;">📕 Truyện Ngắn (xác định bởi loại truyện)</span>
+        </li>
+        
+        {% set ns = namespace(prev_first='', color_toggle=0) %}
+        {% for cat in categories %}
+          {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+          {% if first_word != ns.prev_first %}
+            {% set ns.prev_first = first_word %}
+            {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+          {% endif %}
+          <li class="{% if cat.name in ['Truyện một phần', 'Truyện nhiều phần'] %}special-blue{% elif ns.color_toggle == 0 %}category-group-even{% else %}category-group-odd{% endif %}" 
+              style="margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" name="category_ids" value="{{ cat.id }}" id="cat_{{ cat.id }}" {% if cat in story.categories %}checked{% endif %}>
+            <label for="cat_{{ cat.id }}" style="cursor: pointer;">{{ cat.name }}</label>
+          </li>
+        {% endfor %}
+      </ul>
     </div>
+    <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
   </div>
 
   <div class="form-group">
@@ -208,7 +212,6 @@
 
 <p><a href="{{ url_for('upload') }}">← Quay về danh sách truyện / tạo mới</a></p>
 
-{# Script xem trước video #}
 <script>
 function getDrivePreview(url) {
   var match = url.match(/\/file\/d\/([\w-]+)/);
@@ -227,20 +230,27 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-
-// Hiển thị loading overlay khi submit các form quan trọng
-document.querySelectorAll('form').forEach(form => {
-  // Bỏ qua form tìm kiếm, đăng nhập, và các form không cần spinner
-  if (form.classList.contains('no-spinner')) return;
-  form.addEventListener('submit', function(e) {
-    // Kiểm tra nếu form đã có overlay thì không tạo mới
-    if (document.querySelector('.loading-overlay')) return;
-    const overlay = document.createElement('div');
-    overlay.className = 'loading-overlay';
-    overlay.innerHTML = '<div class="spinner"></div><p style="margin-top: 15px;">Đang xử lý, vui lòng chờ...</p>';
-    document.body.appendChild(overlay);
-  });
-});
 </script>
 
+<style>
+/* Màu sắc cho danh sách thể loại trong admin */
+.category-list-admin ul {
+  background: #000;
+  padding: 8px;
+  border-radius: 4px;
+}
+.special-blue label {
+  color: #00BFFF !important;
+}
+.category-group-even label {
+  color: #dddddd !important;
+}
+.category-group-odd label {
+  color: #aaaaaa !important;
+}
+.special-type span {
+  color: #FF9800 !important;
+  font-weight: bold;
+}
+</style>
 {% endblock %}

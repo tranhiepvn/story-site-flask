@@ -400,6 +400,17 @@ class DailyListen(db.Model):
     __table_args__ = (db.UniqueConstraint('story_id', 'date', name='uq_listen_story_date'),)
     story = db.relationship('Story', backref=db.backref('daily_listens', lazy=True))
 
+class Announcement(db.Model):
+    __tablename__ = "announcements"
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Announcement {self.id}>"
+
 # Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
 # đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
@@ -843,9 +854,16 @@ def upload():
     page = request.args.get("page", 1, type=int)
     search_query = request.args.get("q", "").strip()
     search_type = request.args.get("stype", "title")
+    filter_category = request.args.get("category", type=int)
+    filter_completed = request.args.get("completed", "").strip()
+    filter_hidden = request.args.get("hidden", "").strip()
+    filter_date_from = request.args.get("date_from", "").strip()
+    filter_date_to = request.args.get("date_to", "").strip()
+
     stories_query = Story.query.order_by(Story.created_at.desc())
     highlight_snippets: dict[int, str] = {}
 
+    # Tìm kiếm cơ bản
     if search_query:
         pattern = f"%{search_query}%"
         if search_type == "content":
@@ -859,11 +877,42 @@ def upload():
             stories_query = stories_query.filter(
                 (Story.title.ilike(pattern)) | (Story.author.ilike(pattern))
             )
+    
+    # Lọc theo thể loại (nhiều thể loại)
+    if filter_category:
+        stories_query = stories_query.join(story_categories).filter(story_categories.c.category_id == filter_category)
+    
+    # Lọc theo trạng thái hoàn thành
+    if filter_completed == "completed":
+        stories_query = stories_query.filter(Story.is_completed == True)
+    elif filter_completed == "uncompleted":
+        stories_query = stories_query.filter(Story.is_completed == False)
+    
+    # Lọc theo trạng thái ẩn
+    if filter_hidden == "hidden":
+        stories_query = stories_query.filter(Story.is_hidden == True)
+    elif filter_hidden == "visible":
+        stories_query = stories_query.filter(Story.is_hidden == False)
+    
+    # Lọc theo khoảng ngày
+    if filter_date_from:
+        try:
+            date_from = datetime.strptime(filter_date_from, "%Y-%m-%d")
+            stories_query = stories_query.filter(Story.created_at >= date_from)
+        except:
+            pass
+    if filter_date_to:
+        try:
+            date_to = datetime.strptime(filter_date_to, "%Y-%m-%d")
+            stories_query = stories_query.filter(Story.created_at <= date_to)
+        except:
+            pass
 
     stories_pagination = stories_query.paginate(page=page, per_page=25, error_out=False)
     stories = stories_pagination.items
 
     if search_query and search_type == "content":
+        pattern = f"%{search_query}%"
         keywords = [kw.lower() for kw in search_query.split() if kw.strip()]
         for st in stories:
             part_match = (
@@ -891,7 +940,10 @@ def upload():
                     )
                 highlight_snippets[st.id] = snippet
 
-    # === PHẦN POST ===
+    # Lấy danh sách thể loại cho dropdown lọc
+    all_categories = Category.query.order_by(Category.name).all()
+
+    # === PHẦN POST (giữ nguyên logic cũ) ===
     if request.method == "POST":
         password = request.form.get("password", "")
         if password != UPLOAD_PASSWORD:
@@ -1057,7 +1109,62 @@ def upload():
         q=search_query,
         stype=search_type,
         highlight_snippets=highlight_snippets,
+        filter_category=filter_category,
+        filter_completed=filter_completed,
+        filter_hidden=filter_hidden,
+        filter_date_from=filter_date_from,
+        filter_date_to=filter_date_to,
+        all_categories=all_categories,
     )
+
+@app.route("/admin/dashboard")
+def admin_dashboard():
+    if 'upload_authenticated' not in session:
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+
+    end_date = date.today()
+    start_date = end_date - timedelta(days=6)
+    dates = [start_date + timedelta(days=i) for i in range(7)]
+    date_strs = [d.strftime('%d/%m') for d in dates]
+
+    # Lấy top 10 truyện có tổng views cao nhất trong 7 ngày, kèm theo story object
+    top_views_data = db.session.query(
+        DailyView.story_id,
+        func.sum(DailyView.views).label('total_views')
+    ).filter(DailyView.date.between(start_date, end_date)).group_by(DailyView.story_id).order_by(func.sum(DailyView.views).desc()).limit(10).all()
+    
+    top_listens_data = db.session.query(
+        DailyListen.story_id,
+        func.sum(DailyListen.listens).label('total_listens')
+    ).filter(DailyListen.date.between(start_date, end_date)).group_by(DailyListen.story_id).order_by(func.sum(DailyListen.listens).desc()).limit(10).all()
+
+    # Tạo list các tuple (story, total_views) và (story, total_listens)
+    top_views = []
+    for item in top_views_data:
+        story = Story.query.get(item.story_id)
+        if story:
+            top_views.append((story, item.total_views))
+    
+    top_listens = []
+    for item in top_listens_data:
+        story = Story.query.get(item.story_id)
+        if story:
+            top_listens.append((story, item.total_listens))
+
+    # Lấy dữ liệu cho biểu đồ (top 5 truyện theo views)
+    chart_labels = []
+    chart_views_data = []
+    for story, total in top_views[:5]:
+        chart_labels.append(story.title[:20])
+        chart_views_data.append(total)
+
+    return render_template('admin_dashboard.html',
+                           dates=date_strs,
+                           top_views=top_views,
+                           top_listens=top_listens,
+                           chart_labels=chart_labels,
+                           chart_views_data=chart_views_data)
 
 
 # Hiển thị trang đăng nhập trước khi vào trang upload.
@@ -2267,17 +2374,78 @@ def delete_all_audio():
 
 @app.route("/api/suggest")
 def suggest():
-    """Trả về danh sách tiêu đề truyện gợi ý dựa trên query."""
+    """Trả về danh sách gợi ý: truyện và tác giả."""
     query = request.args.get("q", "").strip()
     if not query:
         return jsonify([])
+    pattern = f"%{query}%"
+    # Tìm truyện theo tên
     stories = Story.query.filter(
         Story.is_hidden == False,
-        Story.title.ilike(f"%{query}%")
-    ).limit(10).all()
-    suggestions = [{"id": s.id, "title": s.title} for s in stories]
+        Story.title.ilike(pattern)
+    ).limit(5).all()
+    # Tìm tác giả (duy nhất)
+    authors = db.session.query(Story.author).filter(
+        Story.is_hidden == False,
+        Story.author.isnot(None),
+        Story.author.ilike(pattern)
+    ).distinct().limit(5).all()
+    suggestions = []
+    for s in stories:
+        suggestions.append({
+            "type": "story",
+            "id": s.id,
+            "title": s.title,
+            "author": s.author
+        })
+    for a in authors:
+        if a[0]:
+            suggestions.append({
+                "type": "author",
+                "name": a[0]
+            })
     return jsonify(suggestions)
+
+@app.route("/admin/announcements", methods=["GET", "POST"])
+def admin_announcements():
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
     
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password != UPLOAD_PASSWORD:
+            flash("Mật khẩu không hợp lệ.")
+            return redirect(url_for("admin_announcements"))
+        action = request.form.get("action")
+        if action == "create":
+            content = request.form.get("content", "").strip()
+            if content:
+                ann = Announcement(content=content, is_active=True)
+                db.session.add(ann)
+                db.session.commit()
+                flash("Đã tạo thông báo mới.")
+            else:
+                flash("Nội dung không được để trống.")
+        elif action == "toggle":
+            ann_id = request.form.get("ann_id")
+            ann = Announcement.query.get(ann_id)
+            if ann:
+                ann.is_active = not ann.is_active
+                db.session.commit()
+                flash(f"Đã {'bật' if ann.is_active else 'tắt'} thông báo.")
+        elif action == "delete":
+            ann_id = request.form.get("ann_id")
+            ann = Announcement.query.get(ann_id)
+            if ann:
+                db.session.delete(ann)
+                db.session.commit()
+                flash("Đã xóa thông báo.")
+        return redirect(url_for("admin_announcements"))
+    
+    announcements = Announcement.query.order_by(Announcement.created_at.desc()).all()
+    return render_template("admin_announcements.html", announcements=announcements)
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
@@ -2295,56 +2463,50 @@ def skip_comments():
 @app.context_processor
 def inject_comment_notifications():
     def get_comment_notifications():
-        """
-        Return a tuple (show, commented) where `show` indicates whether to display
-        the comment notification and `commented` contains a list of stories with
-        new comments since the last time the user clicked "Bỏ qua". If no previous
-        skip exists, all commented stories are returned.
-        """
         latest_comment_time = db.session.query(func.max(Comment.created_at)).scalar()
         show = False
         commented = []
         if latest_comment_time:
-            # retrieve the last time the admin dismissed comments
             last_seen_str = session.get('last_comment_seen_at_stories')
             try:
                 last_seen = datetime.fromisoformat(last_seen_str) if last_seen_str else None
             except Exception:
                 last_seen = None
             if last_seen:
-                # only show stories with comments newer than last skip
-                commented = (
-                    db.session.query(Story)
-                    .join(Comment, Story.id == Comment.story_id)
-                    .filter(Comment.created_at > last_seen)
-                    .filter(Story.is_hidden == False)
-                    .distinct()
-                    .all()
-                )
+                # Lấy story có bình luận mới hơn last_seen, kèm theo bình luận mới nhất
+                subq = db.session.query(
+                    Comment.story_id,
+                    func.max(Comment.created_at).label('last_comment_time')
+                ).filter(Comment.created_at > last_seen).group_by(Comment.story_id).subquery()
+                stories = db.session.query(Story).join(subq, Story.id == subq.c.story_id).filter(Story.is_hidden == False).all()
+                # Với mỗi story, lấy bình luận mới nhất
+                for story in stories:
+                    latest_comment = Comment.query.filter_by(story_id=story.id).order_by(Comment.created_at.desc()).first()
+                    if latest_comment:
+                        commented.append((story, latest_comment))
             else:
-                # no last_seen means it's the first load, show all commented stories
-                commented = (
-                    db.session.query(Story)
-                    .join(Comment, Story.id == Comment.story_id)
-                    .filter(Story.is_hidden == False)
-                    .distinct()
-                    .all()
-                )
+                # Lần đầu, lấy tất cả story có bình luận, kèm bình luận mới nhất
+                stories = db.session.query(Story).join(Comment).filter(Story.is_hidden == False).distinct().all()
+                for story in stories:
+                    latest_comment = Comment.query.filter_by(story_id=story.id).order_by(Comment.created_at.desc()).first()
+                    if latest_comment:
+                        commented.append((story, latest_comment))
             if commented:
                 show = True
         return show, commented
-    # Expose the helper to Jinja templates
     return {"get_comment_notifications": get_comment_notifications}
 
+@app.context_processor
+def inject_announcement():
+    announcement = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).first()
+    return dict(active_announcement=announcement)
 
 @app.route("/view_all_comments")
 def view_all_comments():
-    """Render a page listing all stories with comments."""
-    commented = (
-        db.session.query(Story)
-        .join(Comment, Story.id == Comment.story_id)
-        .filter(Story.is_hidden == False)
-        .distinct()
-        .all()
-    )
-    return render_template("comments_list.html", commented_stories=commented)
+    """Hiển thị tất cả bình luận (mới nhất trước) kèm nội dung và tác giả."""
+    if 'upload_authenticated' not in session:
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+    # Lấy tất cả bình luận, sắp xếp mới nhất trước, kèm theo story
+    comments = db.session.query(Comment, Story).join(Story, Comment.story_id == Story.id).filter(Story.is_hidden == False).order_by(Comment.created_at.desc()).all()
+    return render_template("comments_list.html", comments=comments)

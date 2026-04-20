@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block title %}Quản lý thông báo{% endblock %}
+{% block content %}
+<h2>Quản lý thông báo</h2>
+<p>Thông báo sẽ hiển thị trên đầu trang chủ và trang đọc truyện (phía trên nội dung).</p>
+
+<h3>Thêm thông báo mới</h3>
+<form method="post">
+  <div class="form-group">
+    <label for="content">Nội dung:</label><br>
+    <textarea id="content" name="content" rows="3" cols="60" required></textarea>
+  </div>
+  <div class="form-group">
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit" name="action" value="create">Tạo thông báo (và tự động bật)</button>
+  </div>
+</form>
+
+<hr>
+<h3>Danh sách thông báo</h3>
+{% if announcements %}
+<table style="width:100%; border-collapse: collapse; background:#1C1C1C;">
+  <thead>
+    <tr style="background:#4A90E2; color:white;">
+      <th style="padding:8px;">ID</th>
+      <th style="padding:8px;">Nội dung</th>
+      <th style="padding:8px;">Trạng thái</th>
+      <th style="padding:8px;">Ngày tạo</th>
+      <th style="padding:8px;">Hành động</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ann in announcements %}
+    <tr style="border-bottom:1px solid #333;">
+      <td style="padding:8px; text-align:center;">{{ ann.id }}</td>
+      <td style="padding:8px;">{{ ann.content }}</td>
+      <td style="padding:8px; text-align:center;">{% if ann.is_active %}✅ Đang hiện{% else %}❌ Đã ẩn{% endif %}</td>
+      <td style="padding:8px;">{{ ann.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td style="padding:8px;">
+        <form method="post" style="display:inline;">
+          <input type="hidden" name="ann_id" value="{{ ann.id }}">
+          <input type="hidden" name="password" value="{{ request.form.get('password', '') }}">
+          <button type="submit" name="action" value="toggle" style="background:none; border:none; color:#FF9800; cursor:pointer;">{% if ann.is_active %}Ẩn{% else %}Bật{% endif %}</button>
+        </form>
+        <form method="post" style="display:inline;" onsubmit="return confirm('Xóa thông báo?');">
+          <input type="hidden" name="ann_id" value="{{ ann.id }}">
+          <input type="hidden" name="password" value="{{ request.form.get('password', '') }}">
+          <button type="submit" name="action" value="delete" style="background:none; border:none; color:#FF4444; cursor:pointer;">Xóa</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Chưa có thông báo nào.</p>
+{% endif %}
+{% endblock %}
