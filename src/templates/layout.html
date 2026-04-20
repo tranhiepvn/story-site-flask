@@ -404,14 +404,24 @@
       }
     });
 
-    // Tô màu xanh cho hai thể loại đặc biệt
+    // Tô màu xanh cho hai thể loại "Truyện một phần" và "Truyện nhiều phần" trên toàn bộ trang (cả sidebar và admin)
+    const specialCategories = ['Truyện một phần', 'Truyện nhiều phần'];
+    // Xử lý cho sidebar (thẻ a)
     document.querySelectorAll('.category-list li a').forEach(link => {
       const text = link.innerText.trim();
-      if (text === 'Truyện một phần' || text === 'Truyện nhiều phần') {
+      if (specialCategories.includes(text)) {
         link.style.color = '#00BFFF';
         link.style.setProperty('color', '#00BFFF', 'important');
       }
     });
+    // Xử lý cho trang upload (thẻ label trong .category-list-admin)
+    document.querySelectorAll('.category-list-admin ul li label').forEach(label => {
+      const text = label.innerText.trim();
+      if (specialCategories.includes(text)) {
+        label.style.color = '#00BFFF';
+        label.style.setProperty('color', '#00BFFF', 'important');
+      }
+});
   }); // <--- ĐÃ THÊM DẤU ĐÓNG NÀY
 </script>
 </body>
