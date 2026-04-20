@@ -2421,17 +2421,25 @@ def admin_announcements():
         if action == "create":
             content = request.form.get("content", "").strip()
             if content:
+                # Tắt tất cả thông báo cũ
+                Announcement.query.update({Announcement.is_active: False})
                 ann = Announcement(content=content, is_active=True)
                 db.session.add(ann)
                 db.session.commit()
-                flash("Đã tạo thông báo mới.")
+                flash("Đã tạo thông báo mới và kích hoạt.")
             else:
                 flash("Nội dung không được để trống.")
         elif action == "toggle":
             ann_id = request.form.get("ann_id")
             ann = Announcement.query.get(ann_id)
             if ann:
-                ann.is_active = not ann.is_active
+                if not ann.is_active:
+                    # Nếu đang ẩn, bật nó lên và tắt tất cả các thông báo khác
+                    Announcement.query.update({Announcement.is_active: False})
+                    ann.is_active = True
+                else:
+                    # Nếu đang hiện, chỉ tắt nó
+                    ann.is_active = False
                 db.session.commit()
                 flash(f"Đã {'bật' if ann.is_active else 'tắt'} thông báo.")
         elif action == "delete":

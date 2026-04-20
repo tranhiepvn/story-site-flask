@@ -2,7 +2,7 @@
 {% block title %}Quản lý thông báo{% endblock %}
 {% block content %}
 <h2>Quản lý thông báo</h2>
-<p>Thông báo sẽ hiển thị trên đầu trang chủ và trang đọc truyện (phía trên nội dung).</p>
+<p>Thông báo sẽ hiển thị trên đầu trang chủ và trang đọc truyện. <strong>Chỉ có một thông báo được hiển thị tại một thời điểm.</strong></p>
 
 <h3>Thêm thông báo mới</h3>
 <form method="post">
@@ -15,7 +15,7 @@
     <input type="password" id="password" name="password" required>
   </div>
   <div class="form-group">
-    <button type="submit" name="action" value="create">Tạo thông báo (và tự động bật)</button>
+    <button type="submit" name="action" value="create">Tạo thông báo (tự động kích hoạt và tắt cũ)</button>
   </div>
 </form>
 
@@ -42,12 +42,14 @@
       <td style="padding:8px;">
         <form method="post" style="display:inline;">
           <input type="hidden" name="ann_id" value="{{ ann.id }}">
-          <input type="hidden" name="password" value="{{ request.form.get('password', '') }}">
-          <button type="submit" name="action" value="toggle" style="background:none; border:none; color:#FF9800; cursor:pointer;">{% if ann.is_active %}Ẩn{% else %}Bật{% endif %}</button>
+          <input type="password" name="password" placeholder="Mật khẩu" style="width:80px; margin-right:4px;" required>
+          <button type="submit" name="action" value="toggle" style="background:none; border:none; color:#FF9800; cursor:pointer;">
+            {% if ann.is_active %}Ẩn{% else %}Hiện{% endif %}
+          </button>
         </form>
         <form method="post" style="display:inline;" onsubmit="return confirm('Xóa thông báo?');">
           <input type="hidden" name="ann_id" value="{{ ann.id }}">
-          <input type="hidden" name="password" value="{{ request.form.get('password', '') }}">
+          <input type="password" name="password" placeholder="Mật khẩu" style="width:80px; margin-right:4px;" required>
           <button type="submit" name="action" value="delete" style="background:none; border:none; color:#FF4444; cursor:pointer;">Xóa</button>
         </form>
       </td>
