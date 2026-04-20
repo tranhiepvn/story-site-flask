@@ -41,8 +41,7 @@
     </label>
   </div>
 
-  <!-- === THỂ LOẠI CÓ MÀU XEN KẼ GIỐNG SIDEBAR === -->
-  <div class="form-group">
+    <div class="form-group">
     <label>Thể loại (có thể chọn nhiều):</label><br>
     <div class="category-list-admin" style="max-height: 400px; overflow-y: auto; background: #000;">
       <ul style="list-style: none; padding: 0; margin: 0;">
@@ -53,20 +52,36 @@
           <span style="color: #FF9800;">📕 Truyện Ngắn (xác định bởi loại truyện)</span>
         </li>
         
-        {% set ns = namespace(prev_first='', color_toggle=0) %}
+        {# Đưa hai thể loại đặc biệt lên đầu #}
+        {% set special_names = ['Truyện một phần', 'Truyện nhiều phần'] %}
+        {% set normal_cats = [] %}
+        {% set special_cats = [] %}
         {% for cat in categories %}
+          {% if cat.name in special_names %}
+            {% set _ = special_cats.append(cat) %}
+          {% else %}
+            {% set _ = normal_cats.append(cat) %}
+          {% endif %}
+        {% endfor %}
+        {% set sorted_cats = special_cats + normal_cats %}
+        
+        {% set ns = namespace(prev_first='', color_toggle=0) %}
+        {% for cat in sorted_cats %}
           {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
           {% if first_word != ns.prev_first %}
             {% set ns.prev_first = first_word %}
             {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
           {% endif %}
-          <li class="{% if cat.name in ['Truyện một phần', 'Truyện nhiều phần'] %}special-blue{% elif ns.color_toggle == 0 %}category-group-even{% else %}category-group-odd{% endif %}" 
+          <li class="{% if cat.name in special_names %}special-blue{% elif ns.color_toggle == 0 %}category-group-even{% else %}category-group-odd{% endif %}" 
               style="margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
             <input type="checkbox" name="category_ids" value="{{ cat.id }}" id="cat_{{ cat.id }}" {% if cat in story.categories %}checked{% endif %}>
             <label for="cat_{{ cat.id }}" style="cursor: pointer;">{{ cat.name }}</label>
           </li>
         {% endfor %}
       </ul>
+    </div>
+    <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
+  </div>
     </div>
     <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
   </div>
