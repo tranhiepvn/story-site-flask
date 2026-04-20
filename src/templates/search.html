@@ -49,16 +49,19 @@
               </p>
             {% endif %}
 
-            {# HIỂN THỊ TẤT CẢ CÁC ĐOẠN TRÍCH (tối đa 3) #}
+            {# HIỂN THỊ TỐI ĐA 5 SNIPPET + NÚT XEM THÊM #}
             {% set snippets = all_snippets.get(story.id) %}
             {% if snippets %}
-              <div class="search-snippets">
-                {% for part_num, snippet_html in snippets %}
+              <div class="search-snippets" data-story-id="{{ story.id }}" data-full-snippets='{{ snippets|tojson }}'>
+                {% for part_num, snippet_html in snippets[:5] %}
                   <p class="snippet" style="margin-bottom: 8px; font-style: italic; color: #ccc;">
                     <strong><a href="{{ url_for('story_detail', story_id=story.id, part=part_num) }}">Phần {{ part_num }}</a>:</strong>
                     {{ snippet_html|safe }}
                   </p>
                 {% endfor %}
+                {% if snippets|length > 5 %}
+                  <button class="show-more-snippets" data-story-id="{{ story.id }}" style="background: #333; color: #00BFFF; border: 1px solid #00BFFF; border-radius: 4px; padding: 4px 12px; cursor: pointer; margin-top: 4px;">Xem thêm ({{ snippets|length - 5 }} snippet còn lại)</button>
+                {% endif %}
               </div>
             {% else %}
               {% set first_part = story.parts|first %}
@@ -99,4 +102,26 @@
     padding-left: 10px;
   }
 </style>
+
+<script>
+// Xử lý nút "Xem thêm" để hiển thị tất cả snippet (không dùng url_for trong JS)
+document.querySelectorAll('.show-more-snippets').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const storyId = this.getAttribute('data-story-id');
+    const container = document.querySelector(`.search-snippets[data-story-id="${storyId}"]`);
+    if (!container) return;
+    const fullSnippets = JSON.parse(container.getAttribute('data-full-snippets'));
+    container.innerHTML = '';
+    fullSnippets.forEach(([part_num, snippet_html]) => {
+      const p = document.createElement('p');
+      p.className = 'snippet';
+      p.style.cssText = 'margin-bottom: 8px; font-style: italic; color: #ccc; border-left: 3px solid #4A90E2; padding-left: 10px;';
+      // Tạo link thủ công, không qua url_for để tránh lỗi Jinja
+      const link = `/story/${storyId}?part=${part_num}`;
+      p.innerHTML = `<strong><a href="${link}">Phần ${part_num}</a>:</strong> ${snippet_html}`;
+      container.appendChild(p);
+    });
+  });
+});
+</script>
 {% endblock %}

@@ -228,6 +228,20 @@ function confirmDeleteAll() {
   if (!confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện?')) return false;
   return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
 }
+
+// Hiển thị loading overlay khi submit các form quan trọng
+document.querySelectorAll('form').forEach(form => {
+  // Bỏ qua form tìm kiếm, đăng nhập, và các form không cần spinner
+  if (form.classList.contains('no-spinner')) return;
+  form.addEventListener('submit', function(e) {
+    // Kiểm tra nếu form đã có overlay thì không tạo mới
+    if (document.querySelector('.loading-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = '<div class="spinner"></div><p style="margin-top: 15px;">Đang xử lý, vui lòng chờ...</p>';
+    document.body.appendChild(overlay);
+  });
+});
 </script>
 
 {% endblock %}

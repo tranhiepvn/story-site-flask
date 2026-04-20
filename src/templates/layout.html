@@ -1,41 +1,27 @@
 <!doctype html>
 <html lang="vi">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Trang web truyện{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
-    <style>
-    /* === TOÀN BỘ SITE ĐEN HOÀN TOÀN === */
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes">
+  <title>{% block title %}Trang web truyện{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <style>
+    /* === TOÀN BỘ SITE ĐEN === */
     body, .container, .content-wrapper, main, article, .story-part, .meta,
     .status-message, .thank-you, .rating-section, .section, .selected-category-section,
     .story-grid, .selected-categories {
         background-color: #000000 !important;
         color: #6687cb !important;
     }
-
-    /* Sidebar đen */
     .sidebar, aside, .category-list, .category-list li {
         background-color: #000000 !important;
     }
-
-    /* Header giữ nguyên */
     header {
         background-color: #4A90E2 !important;
         color: #FFFFFF !important;
     }
     header h1 a, header nav a, .separator { color: #FFFFFF !important; }
-
-    /* Màu cam và xám xen kẽ cho cột thể loại */
-    .category-list .special-type,
-    .category-list .special-type a { color: #FF9800 !important; font-weight: bold !important; }
-    .category-list li.category-group-even,
-    .category-list li.category-group-even a { color: #aaaaaa !important; }
-    .category-list li.category-group-odd,
-    .category-list li.category-group-odd a { color: #777777 !important; }
-
-    /* Button Phần trước / Phần sau thoáng */
     .part-navigation {
         margin-top: 60px !important;
         margin-bottom: 70px !important;
@@ -43,8 +29,7 @@
         justify-content: center;
         gap: 40px;
     }
-    .part-navigation a,
-    .part-navigation button {
+    .part-navigation a, .part-navigation .disabled-nav {
         color: #FFFFFF !important;
         border: 2px solid #FFFFFF !important;
         background-color: transparent !important;
@@ -54,336 +39,437 @@
         text-decoration: none;
         font-size: 1.05em;
     }
-    .part-navigation a:hover,
-    .part-navigation button:hover {
+    .part-navigation a:hover {
         background-color: #FFFFFF !important;
         color: #000000 !important;
     }
-
-    /* Text trắng cho các phần quan trọng */
-    .thank-you, .thank-you-text,
-    .rating-section, .rating-label,
-    h2, h3, h4, .meta, .status-message {
+    .part-navigation .disabled-nav {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .thank-you, .rating-section, h2, h3, h4, .meta, .status-message {
         color: #FFFFFF !important;
     }
     a { color: #00BFFF !important; }
     a:hover { color: #6687cb !important; }
-
-    /* Highlight "" và '' */
     .highlight-green { color: #1fa943 !important; }
     .highlight-red { color: #00FF00 !important; }
-
-    /* Footer */
     footer { background-color: #000000 !important; color: #6687cb !important; }
-
-    /* === RATING + THANK YOU + STATUS === */
-    .rating-section {
-        margin: 55px auto 20px auto !important;
-        text-align: center !important;
-        width: 100% !important;
+    .rating-section { margin: 55px auto 20px auto !important; text-align: center !important; width: 100% !important; }
+    .status-message.completed-status, .completed { color: #39FF14 !important; font-weight: bold !important; }
+    .status-message.updating-status, .updating { color: #FF3366 !important; font-weight: bold !important; }
+    .thank-you { margin-top: 40px !important; margin-bottom: 35px !important; text-align: center !important; font-size: 1.1em !important; color: #FFFFFF !important; }
+    
+    /* CUSTOM CHECKBOX */
+    .category-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
     }
-    .rating-section p,
-    .rating-section .rating-label {
-        margin-bottom: 20px !important;
+    .category-list input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #4A90E2;
+      transform: scale(1.1);
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .category-list a {
+      text-decoration: none;
+      line-height: 1.4;
+    }
+    .category-list a:hover {
+      text-decoration: underline;
+    }
+    .special-type a {
+      color: #FF9800 !important;
+      font-weight: bold !important;
+    }
+    .category-list li.category-group-even a {
+      color: #dddddd !important;
+    }
+    .category-list li.category-group-odd a {
+      color: #aaaaaa !important;
+    }
+
+    /* FORM TÌM KIẾM */
+    .search-form input, .search-form select, .search-form button {
+      padding: 4px 8px !important;
+      font-size: 0.85rem !important;
+      height: auto !important;
+      box-sizing: border-box;
+    }
+    .search-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+    }
+    .search-form input { flex: 1; }
+    .search-form select {
+      background-color: #0056b3 !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 4px !important;
+      cursor: pointer;
+      appearance: none;
+    }
+    .search-form button {
+      background-color: #0056b3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* DESKTOP - SIDEBAR GỌN LẠI */
+    .container {
+      max-width: 1400px;
+      margin: 10px auto;
+      padding: 0.5rem 1rem;
+    }
+    .content-wrapper {
+      display: flex;
+    }
+    /* Ghi đè mọi CSS sidebar trên tất cả các trang */
+    aside.sidebar,
+    .sidebar,
+    body.story_detail aside.sidebar {
+      width: 280px !important;
+      flex: 0 0 280px !important;
+    }
+    main {
+      flex: 1;
+      min-width: 0;
+    }
+    /* Ẩn các nút mobile trên desktop */
+    .sidebar-toggle, .close-sidebar, .close-sidebar-bottom, #openSidebarFooter {
+      display: none;
+    }
+
+    /* MOBILE - MỞ RỘNG HOÀN TOÀN */
+    @media (max-width: 768px) {
+      .container {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px;
+      }
+      header h1 {
+        font-size: 1.2rem;
+        margin: 0;
+        flex: 1;
+      }
+      header nav {
+        margin-left: auto;
+      }
+      .search-form {
+        width: 100%;
+        margin-top: 8px;
+        order: 3;
+      }
+      .search-form input {
+        width: calc(100% - 140px);
+      }
+      .sidebar-toggle {
+        display: inline-block !important;
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: white;
+        margin-right: 10px;
+        cursor: pointer;
+      }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 85%;
+        max-width: 320px;
+        height: 100%;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+        padding: 15px;
+        background: #000 !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .close-sidebar {
         display: block !important;
-        text-align: center !important;
-    }
-    .rating-buttons {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 15px !important;
-    }
-    .rating-buttons button {
-        margin-top: 0 !important;
-        height: 34px !important;
-        padding: 0 20px !important;
-    }
-
-    /* Trạng thái hoàn thành / chưa hoàn thành */
-    .status-message.completed-status,
-    .completed { color: #39FF14 !important; font-weight: bold !important; }
-    .status-message.updating-status,
-    .updating { color: #FF3366 !important; font-weight: bold !important; }
-
-    /* Cảm ơn dời xuống và canh giữa */
-    .thank-you {
-        margin-top: 40px !important;
-        margin-bottom: 35px !important;
-        text-align: center !important;
+        background: none;
+        border: none;
+        color: #FF9800;
+        font-size: 24px;
+        float: right;
+        cursor: pointer;
+      }
+      .close-sidebar-bottom {
         display: block !important;
-        font-size: 1.1em !important;
-        color: #FFFFFF !important;
+        background: #333;
+        color: #FF9800;
+        border: 1px solid #FF9800;
+        padding: 8px 16px;
+        border-radius: 4px;
+        width: 100%;
+        text-align: center;
+        margin-top: 20px;
+        cursor: pointer;
+      }
+      #openSidebarFooter {
+        display: block !important;
+        background: #333;
+        color: #00BFFF;
+        border: 1px solid #00BFFF;
+        padding: 8px 16px;
+        border-radius: 4px;
+        margin: 20px auto;
+        text-align: center;
+        cursor: pointer;
+      }
+      .content-wrapper {
+        display: block;
+      }
+      main {
+        width: 100%;
+        padding: 0 4px;
+      }
+      .story-part p {
+        font-size: 1.2rem;
+        line-height: 1.5;
+        padding: 0;
+        margin: 0 0 0.8em 0;
+      }
+      .part-navigation {
+        gap: 15px;
+      }
+      .part-navigation a,
+      .part-navigation .disabled-nav {
+        padding: 8px 16px;
+        font-size: 0.9em;
+      }
     }
+  </style>
+</head>
+<body class="{{ request.endpoint }}">
+<div class="container">
+  <header>
+    <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+    <h1><a href="{{ url_for('index') }}" class="home-link">Trang web truyện</a></h1>
+    <nav>
+      <a href="{{ url_for('upload_login') }}">Admin</a>
+    </nav>
+    <form action="{{ url_for('search') }}" method="get" class="search-form no-spinner">
+      <input type="text" name="q" id="search-input" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}" autocomplete="off">
+      <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: #222; border: 1px solid #444; border-radius: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; display: none;"></div>
+      <select name="limit">
+        {% set cur_limit = request.args.get('limit', '3') %}
+        <option value="1" {% if cur_limit == '1' %}selected{% endif %}>1 đoạn</option>
+        <option value="3" {% if cur_limit == '3' %}selected{% endif %}>3 đoạn</option>
+        <option value="5" {% if cur_limit == '5' %}selected{% endif %}>5 đoạn</option>
+        <option value="10" {% if cur_limit == '10' %}selected{% endif %}>10 đoạn</option>
+        <option value="all" {% if cur_limit == 'all' %}selected{% endif %}>Tất cả</option>
+      </select>
+      <button type="submit">Tìm</button>
+    </form>
+  </header>
+  <div class="content-wrapper">
+    {% if categories %}
+      <aside class="sidebar" id="sidebar">
+        <button class="close-sidebar" id="closeSidebar">✕</button>
+        <h3>Thể loại</h3>
+        <p style="font-size:0.85em; color:#aaa; margin-bottom:10px; line-height:1.4;">
+          <span style="display: flex; align-items: flex-start; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" style="background-color: #4A90E2; border-radius: 3px; flex-shrink: 0;">
+              <polyline points="20 6 9 17 4 12" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Chọn ô vuông bên cạnh để xem danh sách truyện nhanh.</span>
+          </span><br>
+          <span style="display: inline-block; margin-top: -12px; margin-left: 28px;">Nhấp vào tên thể loại để xem chi tiết.</span>
+        </p>
+        <ul class="category-list">
+          <li class="special-type">
+            <input type="checkbox" id="type_long" data-type="long" data-name="Truyện Dài">
+            <a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a>
+          </li>
+          <li class="special-type">
+            <input type="checkbox" id="type_short" data-type="short" data-name="Truyện Ngắn">
+            <a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a>
+          </li>
 
-    /* === ADMIN CATEGORY LIST - XÁM XEN KẼ === */
-    .category-list-admin ul { list-style: none; padding: 0; margin: 0; }
-    .category-list-admin li { padding: 4px 0; }
-    .category-list-admin label.category-group-even,
-    .category-list-admin li.category-group-even label { color: #aaaaaa !important; }
-    .category-list-admin label.category-group-odd,
-    .category-list-admin li.category-group-odd label { color: #777777 !important; }
-    .category-list-admin a,
-    .category-list-admin label { color: inherit !important; }
+          {% for cat in categories_group1 %}
+          <li>
+            <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
+            <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
+          </li>
+          {% endfor %}
 
-    /* === KHÔNG CÓ BẤT KỲ CSS NÀO CHO AUDIO PLAYER Ở ĐÂY === */
+          {% set ns = namespace(prev_first='', color_toggle=0) %}
+          {% for cat in categories_group2 %}
+            {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+            {% if first_word != ns.prev_first %}
+              {% set ns.prev_first = first_word %}
+              {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+            {% endif %}
+            <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+              <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
+              <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
+            </li>
+          {% endfor %}
+          {% for cat in categories_group3 %}
+            {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
+            {% if first_word != ns.prev_first %}
+              {% set ns.prev_first = first_word %}
+              {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
+            {% endif %}
+            <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
+              <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
+              <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+        <button class="close-sidebar-bottom">Đóng sidebar</button>
+      </aside>
+    {% endif %}
+    <main>
+      {% with messages = get_flashed_messages() %}{% if messages %}<ul class="flash-messages">{% for msg in messages %}<li class="flash">{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <div id="selected-categories-container" class="section selected-categories"></div>
+      {% block content %}{% endblock %}
+      {% if categories %}
+        <button id="openSidebarFooter" style="display: none;">📂 Mở thể loại</button>
+      {% endif %}
+    </main>
+  </div>
+  <footer>
+    <p>&copy; {{ datetime.utcnow().year }} Trang web truyện. Cảm ơn bạn đã đến đây, chúc bạn xem truyện được thoải mái và vui vẻ. Chúc một ngày hạnh phúc nha bạn!</p>
+  </footer>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // === SIDEBAR TOGGLE ===
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const closeBtn = document.getElementById('closeSidebar');
+    const openFooterBtn = document.getElementById('openSidebarFooter');
+    const closeBottomBtn = document.querySelector('.close-sidebar-bottom');
+    function openSidebar() { if (sidebar) sidebar.classList.add('open'); }
+    function closeSidebar() { if (sidebar) sidebar.classList.remove('open'); }
+    if (toggleBtn) toggleBtn.addEventListener('click', openSidebar);
+    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if (closeBottomBtn) closeBottomBtn.addEventListener('click', closeSidebar);
+    if (openFooterBtn) openFooterBtn.addEventListener('click', openSidebar);
+    function checkMobile() {
+      const isMobile = window.innerWidth <= 768;
+      if (openFooterBtn) openFooterBtn.style.display = isMobile ? 'block' : 'none';
+      if (closeBottomBtn) closeBottomBtn.style.display = isMobile ? 'block' : 'none';
+      if (sidebar && isMobile && !sidebar.classList.contains('open')) sidebar.classList.remove('open');
+    }
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
 
-    /* === CUSTOM CHECKBOX CHO THỂ LOẠI === */
-.category-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.category-list input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #4A90E2; /* màu xanh khi được chọn */
-  transform: scale(1.1);
-  margin: 0;
-  flex-shrink: 0;
-}
-.category-list a {
-  text-decoration: none;
-  line-height: 1.4;
-}
-.category-list a:hover {
-  text-decoration: underline;
-}
-/* Hiệu ứng hover cho checkbox */
-.category-list input[type="checkbox"]:hover {
-  filter: brightness(1.2);
-}
-    </style>
-  </head>
-  <body class="{{ request.endpoint }}">
-    <div class="container">
-      <header>
-        <h1><a href="{{ url_for('index') }}" class="home-link">Trang web truyện</a></h1>
-        <nav>
-          <a href="{{ url_for('index') }}">Trang chủ</a><span class="separator">|</span>
-          <a href="{{ url_for('upload_login') }}">Admin</a>
-        </nav>
-
-
-
-<form action="{{ url_for('search') }}" method="get" class="search-form" style="display: flex; align-items: center; gap: 10px; position: relative;">
-  <input type="text" name="q" id="search-input" placeholder="Tìm kiếm..." value="{{ request.args.get('q', '') }}" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: #333; color: #fff; box-sizing: border-box;" autocomplete="off">
-  <div id="suggestions" style="position: absolute; top: 100%; left: 0; right: 0; background: #222; border: 1px solid #444; border-radius: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; display: none;"></div>
-  <select name="limit" style="padding: 8px 12px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box;">
-    {% set cur_limit = request.args.get('limit', '3') %}
-    <option value="1" {% if cur_limit == '1' %}selected{% endif %}>1 đoạn</option>
-    <option value="3" {% if cur_limit == '3' %}selected{% endif %}>3 đoạn</option>
-    <option value="5" {% if cur_limit == '5' %}selected{% endif %}>5 đoạn</option>
-    <option value="10" {% if cur_limit == '10' %}selected{% endif %}>10 đoạn</option>
-    <option value="all" {% if cur_limit == 'all' %}selected{% endif %}>Tất cả</option>
-  </select>
-  <button type="submit" style="padding: 8px 16px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; box-sizing: border-box;">Tìm</button>
-</form>
-
-
-
-      </header>
-      <div class="content-wrapper">
-        {% if categories %}
-          <aside class="sidebar">
-            <h3>Thể loại</h3>
-            <p style="font-size:0.85em; color:#aaa; margin-bottom:10px; line-height:1.4;">
-  <span style="display: flex; align-items: flex-start; gap: 8px;">
-    <svg width="20" height="20" viewBox="0 0 24 24" style="background-color: #4A90E2; border-radius: 3px; flex-shrink: 0;">
-      <polyline points="20 6 9 17 4 12" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span>Chọn ô vuông bên cạnh để xem danh sách truyện nhanh.</span>
-  </span>
-  <br>
-  <span style="display: inline-block; margin-top: -12px; margin-left: 28px;">Nhấp vào tên thể loại để xem chi tiết.</span>
-</p>
-            <ul class="category-list">
-              <!-- Truyện Dài / Truyện Ngắn -->
-              <li class="special-type">
-                <input type="checkbox" id="type_long" data-type="long" data-name="Truyện Dài">
-                <a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a>
-              </li>
-              <li class="special-type">
-                <input type="checkbox" id="type_short" data-type="short" data-name="Truyện Ngắn">
-                <a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a>
-              </li>
-
-              <!-- Logic xen kẽ xám (bỏ qua các thể loại bắt đầu bằng "Truyện ") -->
-              {% set ns = namespace(prev_first='', color_toggle=0) %}
-
-              {% for cat in categories_group1 %}
-                {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
-                {% if cat.name.startswith('Truyện ') %}
-                  <!-- Giữ màu mặc định cho "Truyện một phần", "Truyện nhiều phần" -->
-                  <li>
-                {% elif first_word != ns.prev_first %}
-                  {% set ns.prev_first = first_word %}
-                  {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
-                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-                {% else %}
-                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-                {% endif %}
-                  <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
-                  <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
-                </li>
-              {% endfor %}
-
-              {% if categories_group1 and categories_group2 %}<li class="group-separator"></li>{% endif %}
-
-              {% for cat in categories_group2 %}
-                {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
-                {% if cat.name.startswith('Truyện ') %}
-                  <li>
-                {% elif first_word != ns.prev_first %}
-                  {% set ns.prev_first = first_word %}
-                  {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
-                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-                {% else %}
-                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-                {% endif %}
-                  <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
-                  <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
-                </li>
-              {% endfor %}
-
-              {% if categories_group2 and categories_group3 %}<li class="group-separator"></li>{% endif %}
-
-              {% for cat in categories_group3 %}
-                {% set first_word = cat.name.split(' ')[0].lower() if cat.name else '' %}
-                {% if cat.name.startswith('Truyện ') %}
-                  <li>
-                {% elif first_word != ns.prev_first %}
-                  {% set ns.prev_first = first_word %}
-                  {% set ns.color_toggle = (ns.color_toggle + 1) % 2 %}
-                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-                {% else %}
-                  <li class="{{ 'category-group-even' if ns.color_toggle == 0 else 'category-group-odd' }}">
-                {% endif %}
-                  <input type="checkbox" id="cat_checkbox_{{ cat.id }}" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name }}">
-                  <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>
-                </li>
-              {% endfor %}
-            </ul>
-          </aside>
-        {% endif %}
-        <main>
-          {% with messages = get_flashed_messages() %}{% if messages %}<ul class="flash-messages">{% for msg in messages %}<li class="flash">{{ msg }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
-          {% if error %}<p class="error">{{ error }}</p>{% endif %}
-          <div id="selected-categories-container" class="section selected-categories"></div>
-          {% block content %}{% endblock %}
-        </main>
-      </div>
-      <footer>
-        <p>&copy; {{ datetime.utcnow().year }} Trang web truyện. Cảm ơn bạn đã đến đây, chúc bạn xem truyện được thoải mái và vui vẻ. Chúc một ngày hạnh phúc nha bạn!</p>
-      </footer>
-    </div>
-
-    {% block scripts %}
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const container = document.getElementById('selected-categories-container');
-        if (!container) return;
-
-        function renderSection(id, name, data, isType) {
-          let html = `<div id="selected-${isType ? 'type' : 'category'}-${id}" class="selected-category-section">`;
-          html += `<h3>${name} <span class="remove-item" data-id="${id}" data-is-type="${isType}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
-          html += '<div class="story-grid">';
-          data.stories.forEach(story => {
-            html += `<div class="story-card"><a href="/story/${story.id}">${story.title}</a></div>`;
-          });
-          html += '</div></div>';
-          return html;
-        }
-
-        async function loadItem(id, name, isType) {
-  const url = isType ? `/api/type/${id}` : `/api/category/${id}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  const html = renderSection(id, name, data, isType);
-  const existing = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
-  if (existing) existing.outerHTML = html;
-  else container.insertAdjacentHTML('beforeend', html);
-  
-  // Tự động cuộn lên vùng danh sách truyện vừa được thêm
-  const newSection = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
-  if (newSection) {
-    newSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-        const checkboxes = document.querySelectorAll('.category-list input[type="checkbox"]');
-        checkboxes.forEach(cb => {
-          cb.addEventListener('change', function() {
-            const isType = !!this.getAttribute('data-type');
-            const id = isType ? this.getAttribute('data-type') : this.getAttribute('data-cat-id');
-            const name = isType ? this.getAttribute('data-name') : this.getAttribute('data-cat-name');
-            if (this.checked) {
-              loadItem(id, name, isType);
-            } else {
-              const prefix = isType ? 'type' : 'category';
-              const sec = document.getElementById(`selected-${prefix}-${id}`);
-              if (sec) sec.remove();
-            }
-          });
-        });
-
-        container.addEventListener('click', function(evt) {
-          const removeBtn = evt.target.closest('.remove-item');
-          if (removeBtn) {
-            const id = removeBtn.getAttribute('data-id');
-            const isType = removeBtn.getAttribute('data-is-type') === 'true';
+    // === CHECKBOX FILTER ===
+    const container = document.getElementById('selected-categories-container');
+    if (container) {
+      function renderSection(id, name, data, isType) {
+        let html = `<div id="selected-${isType ? 'type' : 'category'}-${id}" class="selected-category-section">`;
+        html += `<h3>${name} <span class="remove-item" data-id="${id}" data-is-type="${isType}" style="cursor:pointer; color:#ff4444;">×</span></h3>`;
+        html += '<div class="story-grid">';
+        data.stories.forEach(story => { html += `<div class="story-card"><a href="/story/${story.id}">${story.title}</a></div>`; });
+        html += '</div></div>';
+        return html;
+      }
+      async function loadItem(id, name, isType) {
+        const url = isType ? `/api/type/${id}` : `/api/category/${id}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const html = renderSection(id, name, data, isType);
+        const existing = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
+        if (existing) existing.outerHTML = html;
+        else container.insertAdjacentHTML('beforeend', html);
+        const newSection = document.getElementById(`selected-${isType ? 'type' : 'category'}-${id}`);
+        if (newSection) newSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      document.querySelectorAll('.category-list input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', function() {
+          const isType = !!this.getAttribute('data-type');
+          const id = isType ? this.getAttribute('data-type') : this.getAttribute('data-cat-id');
+          const name = isType ? this.getAttribute('data-name') : this.getAttribute('data-cat-name');
+          if (this.checked) loadItem(id, name, isType);
+          else {
             const prefix = isType ? 'type' : 'category';
-            const checkbox = document.querySelector(`input[data-${isType ? 'type' : 'cat-id'}="${id}"]`);
-            if (checkbox) checkbox.checked = false;
             const sec = document.getElementById(`selected-${prefix}-${id}`);
             if (sec) sec.remove();
           }
         });
       });
-
-      // Autocomplete tìm kiếm
-const searchInput = document.getElementById('search-input');
-const suggestionsDiv = document.getElementById('suggestions');
-
-let debounceTimer;
-searchInput.addEventListener('input', function() {
-  clearTimeout(debounceTimer);
-  const query = this.value.trim();
-  if (query.length < 2) {
-    suggestionsDiv.style.display = 'none';
-    return;
-  }
-  debounceTimer = setTimeout(async () => {
-    try {
-      const res = await fetch(`/api/suggest?q=${encodeURIComponent(query)}`);
-      const data = await res.json();
-      if (data.length === 0) {
-        suggestionsDiv.style.display = 'none';
-        return;
-      }
-      suggestionsDiv.innerHTML = data.map(item => 
-        `<div style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #444; color: #00BFFF;" data-id="${item.id}" data-title="${item.title.replace(/"/g, '&quot;')}">${item.title}</div>`
-      ).join('');
-      suggestionsDiv.style.display = 'block';
-      document.querySelectorAll('#suggestions div').forEach(div => {
-        div.addEventListener('click', function() {
-          searchInput.value = this.getAttribute('data-title');
-          suggestionsDiv.style.display = 'none';
-          searchInput.closest('form').submit();
-        });
+      container.addEventListener('click', function(evt) {
+        const removeBtn = evt.target.closest('.remove-item');
+        if (removeBtn) {
+          const id = removeBtn.getAttribute('data-id');
+          const isType = removeBtn.getAttribute('data-is-type') === 'true';
+          const prefix = isType ? 'type' : 'category';
+          const checkbox = document.querySelector(`input[data-${isType ? 'type' : 'cat-id'}="${id}"]`);
+          if (checkbox) checkbox.checked = false;
+          const sec = document.getElementById(`selected-${prefix}-${id}`);
+          if (sec) sec.remove();
+        }
       });
-    } catch(e) { console.error(e); }
-  }, 300);
-});
+    }
 
-document.addEventListener('click', function(e) {
-  if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
-    suggestionsDiv.style.display = 'none';
-  }
-});
-    </script>
-    {% endblock %}
-  </body>
+    // === AUTOCOMPLETE ===
+    const searchInput = document.getElementById('search-input');
+    const suggestionsDiv = document.getElementById('suggestions');
+    if (searchInput && suggestionsDiv) {
+      let debounceTimer;
+      searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const query = this.value.trim();
+        if (query.length < 2) { suggestionsDiv.style.display = 'none'; return; }
+        debounceTimer = setTimeout(async () => {
+          try {
+            const res = await fetch(`/api/suggest?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if (data.length === 0) { suggestionsDiv.style.display = 'none'; return; }
+            suggestionsDiv.innerHTML = data.map(item => `<div style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #444; color: #00BFFF;" data-id="${item.id}" data-title="${item.title.replace(/"/g, '&quot;')}">${item.title}</div>`).join('');
+            suggestionsDiv.style.display = 'block';
+            document.querySelectorAll('#suggestions div').forEach(div => {
+              div.addEventListener('click', function() {
+                searchInput.value = this.getAttribute('data-title');
+                suggestionsDiv.style.display = 'none';
+                searchInput.closest('form').submit();
+              });
+            });
+          } catch(e) { console.error(e); }
+        }, 300);
+      });
+      document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) suggestionsDiv.style.display = 'none';
+      });
+    }
+
+    // === THÊM MÀU XANH DƯƠNG NHẠT CHO HAI THỂ LOẠI "Truyện một phần" và "Truyện nhiều phần" ===
+    // Tìm tất cả thẻ a trong category-list, lọc theo nội dung văn bản
+    const allCategoryLinks = document.querySelectorAll('.category-list li a');
+    allCategoryLinks.forEach(link => {
+      const text = link.innerText.trim();
+      if (text === 'Truyện một phần' || text === 'Truyện nhiều phần') {
+        link.style.color = '#00BFFF';
+        link.style.setProperty('color', '#00BFFF', 'important');
+      }
+    });
+  });
+</script>
+</body>
 </html>

@@ -59,11 +59,13 @@
       <div class="part-navigation">
         {% if current_index > 1 %}
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
+        {% else %}
+          <span class="disabled-nav">&larr; Phần trước</span>
         {% endif %}
         {% if current_index < total_parts %}
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
-        {% elif story.is_completed %}
-          <span class="no-link">Phần cuối</span>
+        {% else %}
+          <span class="disabled-nav">Phần sau &rarr;</span>
         {% endif %}
       </div>
     {% endif %}
@@ -135,11 +137,13 @@
       <div class="part-navigation">
         {% if current_index > 1 %}
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index - 1) }}">&larr; Phần trước</a>
+        {% else %}
+          <span class="disabled-nav">&larr; Phần trước</span>
         {% endif %}
         {% if current_index < total_parts %}
           <a href="{{ url_for('story_detail', story_id=story.id, part=current_index + 1) }}">Phần sau &rarr;</a>
-        {% elif story.is_completed %}
-          <span class="no-link">Phần cuối</span>
+        {% else %}
+          <span class="disabled-nav">Phần sau &rarr;</span>
         {% endif %}
       </div>
       <div class="part-list">
@@ -205,7 +209,7 @@
 </style>
 
 <script>
-// ==================== AUDIO PLAYER: TEXT Ở DƯỚI, PRELOAD, SPEED, LƯU VỊ TRÍ ====================
+// ==================== AUDIO PLAYER (đầy đủ chức năng) ====================
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -235,9 +239,7 @@ function savePlaybackPosition() {
 }
 
 function applyPlaybackRate() {
-  if (currentAudio) {
-    currentAudio.playbackRate = parseFloat(speedSelect.value);
-  }
+  if (currentAudio) currentAudio.playbackRate = parseFloat(speedSelect.value);
 }
 
 async function restorePlaybackPosition() {
