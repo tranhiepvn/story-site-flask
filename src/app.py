@@ -557,6 +557,7 @@ def index():
     # xác định số trang cho danh sách truyện ngắn và truyện dài
     short_page = request.args.get("short_page", 1, type=int)
     long_page = request.args.get("long_page", 1, type=int)
+    active_tab = request.args.get("tab", "recent")  # mặc định là recent
     per_page = 10
     # truyện ngắn (không bao gồm truyện ẩn)
     short_query = (
@@ -609,10 +610,11 @@ def index():
         long_stories=long_stories,
         short_pagination=short_pagination,
         long_pagination=long_pagination,
+        recent_stories=recent_stories,
+        active_tab=active_tab,  # thêm dòng này
         categories_group1=categories_group1,
         categories_group2=categories_group2,
         categories_group3=categories_group3,
-        recent_stories=recent_stories,
     )
 
 @app.route("/story/<int:story_id>")

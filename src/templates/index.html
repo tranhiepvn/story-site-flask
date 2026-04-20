@@ -5,132 +5,289 @@
 {% block content %}
 <style>
   .tab-container { margin-bottom: 20px; }
-  .tab-buttons { display: flex; gap: 10px; border-bottom: 1px solid #444; margin-bottom: 20px; }
-  .tab-btn { background: none; border: none; padding: 10px 20px; font-size: 1.1rem; cursor: pointer; color: #aaa; transition: all 0.2s; }
-  .tab-btn.active { color: #00BFFF; border-bottom: 2px solid #00BFFF; }
+  .tab-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-bottom: 1px solid #444;
+    margin-bottom: 20px;
+    padding-bottom: 0;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #aaa;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab-btn.active {
+    color: #00BFFF;
+    border-bottom: 2px solid #00BFFF;
+  }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
   .story-list { list-style: none; padding: 0; }
-  .story-list li { margin-bottom: 1.5em; border-bottom: 1px solid #444; padding-bottom: 1em; }
+  .story-list li {
+    margin-bottom: 1.5em;
+    border-bottom: 1px solid #444;
+    padding-bottom: 1em;
+  }
   .story-list li:last-child { border-bottom: none; }
   .rating { color: #ffcc00; }
   .status-message { margin: 0.3em 0 0.5em 0; font-size: 0.9em; }
   .completed-status { color: #39FF14; }
   .updating-status { color: #FF3366; }
   .snippet { font-style: italic; color: #ccc; }
-  .pagination { margin-top: 15px; }
-  .pagination a { margin-right: 10px; }
+  .pagination { margin-top: 15px; text-align: center; }
+  .pagination a {
+    margin: 0 5px;
+    padding: 4px 10px;
+    background: #333;
+    color: #00BFFF;
+    text-decoration: none;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .pagination a:hover { background: #555; }
+  .pagination span { margin: 0 5px; }
+
+  /* Trên mobile: rút gọn text và giảm padding */
+  @media (max-width: 768px) {
+    .tab-buttons { justify-content: center; gap: 6px; }
+    .tab-btn { padding: 6px 12px; font-size: 0.85rem; }
+    .tab-btn .full { display: none; }
+    .tab-btn .short { display: inline; }
+  }
+  /* Mặc định: hiển thị text đầy đủ, ẩn text rút gọn */
+  .tab-btn .full { display: inline; }
+  .tab-btn .short { display: none; }
 </style>
 
 <div class="tab-container">
   <div class="tab-buttons">
-    <button class="tab-btn active" data-tab="recent">🆕 Mới cập nhật</button>
-    <button class="tab-btn" data-tab="best">⭐ Hay nhất</button>
-    <button class="tab-btn" data-tab="trending">🔥 Nhiều người đọc</button>
+    <button class="tab-btn active" data-tab="recent">
+      <span class="full">🆕 Mới cập nhật</span>
+      <span class="short">🆕 Mới</span>
+    </button>
+    <button class="tab-btn" data-tab="best">
+      <span class="full">⭐ Hay nhất</span>
+      <span class="short">⭐ Hay</span>
+    </button>
+    <button class="tab-btn" data-tab="trending">
+      <span class="full">🔥 Nhiều người đọc</span>
+      <span class="short">🔥 Hot</span>
+    </button>
+    <button class="tab-btn" data-tab="short">
+      <span class="full">📖 Truyện ngắn</span>
+      <span class="short">📖 Ngắn</span>
+    </button>
+    <button class="tab-btn" data-tab="long">
+      <span class="full">📚 Truyện dài</span>
+      <span class="short">📚 Dài</span>
+    </button>
   </div>
+
+  <!-- Tab Mới cập nhật -->
   <div id="tab-recent" class="tab-content active">
-    {% if recent_stories %}
-      <ul class="story-list">
-        {% for story in recent_stories %}
-          <li>
-            <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
-            <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
-            {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-            <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
-            {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
-            {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}<p>Chưa có truyện mới cập nhật.</p>{% endif %}
+    <div class="recent-content">
+      {% if recent_stories %}
+        <ul class="story-list">
+          {% for story in recent_stories %}
+            <li>
+              <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+              <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
+              {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+              <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
+              {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
+              {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p>Chưa có truyện mới cập nhật.</p>{% endif %}
+    </div>
   </div>
+
+  <!-- Tab Hay nhất -->
   <div id="tab-best" class="tab-content">
-    {% if best %}
-      <ul class="story-list">
-        {% for story in best %}
-          <li>
-            <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
-            <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
-            {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-            <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
-            {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
-            {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}<p>Chưa có truyện được đánh giá.</p>{% endif %}
+    <div class="best-content">
+      {% if best %}
+        <ul class="story-list">
+          {% for story in best %}
+            <li>
+              <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+              <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
+              {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+              <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
+              {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
+              {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p>Chưa có truyện được đánh giá.</p>{% endif %}
+    </div>
   </div>
+
+  <!-- Tab Nhiều người đọc -->
   <div id="tab-trending" class="tab-content">
-    {% if trending %}
-      <ul class="story-list">
-        {% for story in trending %}
-          <li>
-            <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
-            <p class="meta">Lượt xem: {{ story.views }}{% if story.author %} | Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %} | Tác giả: Ẩn danh{% endif %}</p>
-            {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-            <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
-            {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
-            {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}<p>Chưa có truyện nhiều người đọc nhất.</p>{% endif %}
+    <div class="trending-content">
+      {% if trending %}
+        <ul class="story-list">
+          {% for story in trending %}
+            <li>
+              <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+              <p class="meta">Lượt xem: {{ story.views }}{% if story.author %} | Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %} | Tác giả: Ẩn danh{% endif %}</p>
+              {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+              <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
+              {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
+              {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n', ' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p>Chưa có truyện nhiều người đọc nhất.</p>{% endif %}
+    </div>
   </div>
-</div>
 
-<div class="section short">
-  <h2><a href="{{ url_for('type_view', story_type='short') }}">Truyện Ngắn</a></h2>
-  {% if short_stories %}
-    <ul class="story-list">
-      {% for story in short_stories %}
-        <li>
-          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
-          <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
-          {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-          <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
-          {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
-          {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n',' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-    <div class="pagination">
-      {% if short_pagination.has_prev %}<a href="{{ url_for('index', short_page=short_pagination.prev_num, long_page=long_pagination.page) }}">&laquo; Trang trước</a>{% endif %}
-      {% if short_pagination.has_next %}<a href="{{ url_for('index', short_page=short_pagination.next_num, long_page=long_pagination.page) }}">Trang tiếp theo &raquo;</a>{% endif %}
+  <!-- Tab Truyện ngắn -->
+  <div id="tab-short" class="tab-content">
+    <div class="short-content">
+      {% if short_stories %}
+        <ul class="story-list">
+          {% for story in short_stories %}
+            <li>
+              <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+              <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
+              {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+              <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
+              {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
+              {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n',' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if short_pagination.pages > 1 %}
+        <div class="pagination">
+          {% if short_pagination.has_prev %}
+            <a href="#" class="page-link" data-tab="short" data-page="{{ short_pagination.prev_num }}">&laquo; Trang trước</a>
+          {% endif %}
+          <span>Trang {{ short_pagination.page }} / {{ short_pagination.pages }}</span>
+          {% if short_pagination.has_next %}
+            <a href="#" class="page-link" data-tab="short" data-page="{{ short_pagination.next_num }}">Trang sau &raquo;</a>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% else %}<p>Chưa có truyện ngắn.</p>{% endif %}
     </div>
-  {% else %}<p>Chưa có truyện ngắn.</p>{% endif %}
-</div>
+  </div>
 
-<div class="section long">
-  <h2><a href="{{ url_for('type_view', story_type='long') }}">Truyện Dài</a></h2>
-  {% if long_stories %}
-    <ul class="story-list">
-      {% for story in long_stories %}
-        <li>
-          <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
-          <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
-          {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-          <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
-          {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
-          {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n',' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-    <div class="pagination">
-      {% if long_pagination.has_prev %}<a href="{{ url_for('index', short_page=short_pagination.page, long_page=long_pagination.prev_num) }}">&laquo; Trang trước</a>{% endif %}
-      {% if long_pagination.has_next %}<a href="{{ url_for('index', short_page=short_pagination.page, long_page=long_pagination.next_num) }}">Trang tiếp theo &raquo;</a>{% endif %}
+  <!-- Tab Truyện dài -->
+  <div id="tab-long" class="tab-content">
+    <div class="long-content">
+      {% if long_stories %}
+        <ul class="story-list">
+          {% for story in long_stories %}
+            <li>
+              <h3><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></h3>
+              <p class="meta">{% if story.author %}Tác giả: <a href="{{ url_for('author_view', author=story.author) }}">{{ story.author }}</a>{% else %}Tác giả: Ẩn danh{% endif %}</p>
+              {% if story.categories %}<p class="meta">Thể loại: {% for cat in story.categories %}<a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+              <p class="meta">{% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}Đánh giá: <span class="rating">{% for i in range(1,6) %}{% if i <= avg|round(0, 'floor') %}★{% else %}☆{% endif %}{% endfor %}{% if story.rating_count > 0 %} ({{ '%.1f'|format(avg) }}){% else %} (chưa có){% endif %}</span></p>
+              {% set total_parts = story.parts|length %}{% if story.is_completed %}<p class="status-message completed-status">Truyện đã hoàn thành (<em class="completed">{{ total_parts }} phần</em>)</p>{% else %}<p class="status-message updating-status">Truyện chưa hoàn thành (<em class="updating">Cập nhật đến phần {{ total_parts }}</em>)</p>{% endif %}
+              {% set first_part = story.parts|first %}{% if first_part %}{% set snippet = first_part.content[:200] %}{% if first_part.content|length > 200 %}{% set snippet = snippet.rsplit(' ', 1)[0] %}{% endif %}<p class="snippet">{{ snippet.replace('\n',' ') }}{% if first_part.content|length > 200 %}...{% endif %}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if long_pagination.pages > 1 %}
+        <div class="pagination">
+          {% if long_pagination.has_prev %}
+            <a href="#" class="page-link" data-tab="long" data-page="{{ long_pagination.prev_num }}">&laquo; Trang trước</a>
+          {% endif %}
+          <span>Trang {{ long_pagination.page }} / {{ long_pagination.pages }}</span>
+          {% if long_pagination.has_next %}
+            <a href="#" class="page-link" data-tab="long" data-page="{{ long_pagination.next_num }}">Trang sau &raquo;</a>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% else %}<p>Chưa có truyện dài.</p>{% endif %}
     </div>
-  {% else %}<p>Chưa có truyện dài.</p>{% endif %}
+  </div>
 </div>
 
 <script>
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      this.classList.add('active');
+  // Chuyển tab (lưu vào localStorage)
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  function activateTab(tabId) {
+    tabBtns.forEach(btn => {
+      if (btn.getAttribute('data-tab') === tabId) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    tabContents.forEach(content => {
+      if (content.id === `tab-${tabId}`) {
+        content.classList.add('active');
+      } else {
+        content.classList.remove('active');
+      }
+    });
+    localStorage.setItem('activeTab', tabId);
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', function(e) {
       const tabId = this.getAttribute('data-tab');
-      document.getElementById(`tab-${tabId}`).classList.add('active');
+      activateTab(tabId);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('short_page');
+      url.searchParams.delete('long_page');
+      window.history.pushState({}, '', url);
     });
   });
+
+  const savedTab = localStorage.getItem('activeTab');
+  if (savedTab && ['short', 'long', 'best', 'trending', 'recent'].includes(savedTab)) {
+    activateTab(savedTab);
+  }
+
+  async function loadPage(tab, page) {
+    const url = new URL(window.location.href);
+    if (tab === 'short') {
+      url.searchParams.set('short_page', page);
+      url.searchParams.delete('long_page');
+    } else if (tab === 'long') {
+      url.searchParams.set('long_page', page);
+      url.searchParams.delete('short_page');
+    }
+    url.searchParams.set('tab', tab);
+    try {
+      const res = await fetch(url);
+      const html = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const newContent = doc.querySelector(`#tab-${tab} .${tab}-content`).innerHTML;
+      document.querySelector(`#tab-${tab} .${tab}-content`).innerHTML = newContent;
+      attachPaginationEvents();
+      window.history.pushState({}, '', url);
+    } catch (err) { console.error(err); }
+  }
+
+  function attachPaginationEvents() {
+    document.querySelectorAll('.page-link').forEach(link => {
+      link.removeEventListener('click', paginationHandler);
+      link.addEventListener('click', paginationHandler);
+    });
+  }
+
+  async function paginationHandler(e) {
+    e.preventDefault();
+    const tab = this.getAttribute('data-tab');
+    const page = this.getAttribute('data-page');
+    await loadPage(tab, page);
+  }
+
+  attachPaginationEvents();
 </script>
 {% endblock %}
