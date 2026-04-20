@@ -404,33 +404,47 @@
       }
     });
 
-    // Hàm tô màu xanh cho hai thể loại đặc biệt
-    function colorSpecialCategories() {
-      const specialCategories = ['Truyện một phần', 'Truyện nhiều phần'];
-      // Sidebar
-      document.querySelectorAll('.category-list li a').forEach(link => {
-        const text = link.innerText.trim();
-        if (specialCategories.includes(text)) {
-          link.style.color = '#00BFFF';
-          link.style.setProperty('color', '#00BFFF', 'important');
+    // Hàm tô màu và sắp xếp lại hai thể loại đặc biệt lên đầu sidebar
+    function fixSpecialCategories() {
+      const specialNames = ['Truyện một phần', 'Truyện nhiều phần'];
+      
+      // Xử lý sidebar: tô màu và di chuyển lên đầu (sau Truyện Dài/Ngắn)
+      const categoryList = document.querySelector('.category-list');
+      if (categoryList) {
+        const specialItems = [];
+        const otherItems = [];
+        categoryList.querySelectorAll('li').forEach(li => {
+          const a = li.querySelector('a');
+          if (a && specialNames.includes(a.innerText.trim())) {
+            specialItems.push(li);
+            a.style.color = '#00BFFF';
+            a.style.setProperty('color', '#00BFFF', 'important');
+          } else if (a) {
+            otherItems.push(li);
+          }
+        });
+        // Nếu tìm thấy, sắp xếp lại: đưa các mục đặc biệt lên đầu (giữ nguyên thứ tự của chúng)
+        if (specialItems.length) {
+          const newList = [...specialItems, ...otherItems];
+          categoryList.innerHTML = '';
+          newList.forEach(li => categoryList.appendChild(li));
         }
-      });
-      // Upload forms (cả tạo mới và chỉnh sửa)
+      }
+      
+      // Upload forms: chỉ tô màu
       document.querySelectorAll('.category-list-admin ul li label').forEach(label => {
         const text = label.innerText.trim();
-        if (specialCategories.includes(text)) {
+        if (specialNames.includes(text)) {
           label.style.color = '#00BFFF';
           label.style.setProperty('color', '#00BFFF', 'important');
         }
       });
     }
 
-    // Gọi lần đầu
-    colorSpecialCategories();
-
-    // Quan sát DOM thay đổi để tô màu cho các phần tử được thêm sau (nếu có)
+    // Chạy lần đầu và quan sát thay đổi
+    fixSpecialCategories();
     if (window.MutationObserver) {
-      const observer = new MutationObserver(() => colorSpecialCategories());
+      const observer = new MutationObserver(() => fixSpecialCategories());
       observer.observe(document.body, { childList: true, subtree: true });
     }
   }); // <--- ĐÃ THÊM DẤU ĐÓNG NÀY
