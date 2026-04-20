@@ -75,7 +75,7 @@
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- AUDIO PLAYER: TEXT XUỐNG DƯỚI PROGRESS BAR -->
+      <!-- AUDIO PLAYER -->
       <div style="margin: 15px 0;">
         <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
           <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
@@ -111,7 +111,8 @@
       <p class="continuation">Còn tiếp…</p>
     {% endif %}
 
-    <p class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
+    <!-- THANK YOU MESSAGE - RANDOM MÀU VÀ NỘI DUNG -->
+    <p id="thank-you-message" class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
 
     <div class="rating-section">
       {% set avg = (story.rating_sum / story.rating_count) if story.rating_count > 0 else 0 %}
@@ -209,7 +210,7 @@
 </style>
 
 <script>
-// ==================== AUDIO PLAYER (đầy đủ chức năng) ====================
+// ==================== AUDIO PLAYER (giữ nguyên code cũ) ====================
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -505,5 +506,27 @@ speedSelect.addEventListener('change', applyPlaybackRate);
 
 setProgressBarEnabled(false);
 isAudioStarted = false;
+
+// ==================== RANDOM THANK YOU MESSAGE & COLOR (có !important) ====================
+const thankYouMessages = [
+  { text: "Cảm ơn bạn đã đồng hành. Chúc bạn những giây phút thư giãn!", icon: "📖" },
+  { text: "Hẹn gặp lại bạn ở những truyện sau. Chúc bạn luôn vui vẻ!", icon: "✨" },
+  { text: "Đọc truyện vui vẻ, nghe audio thư thái nhé!", icon: "💙" },
+  { text: "Cảm ơn bạn đã nghe và đọc. Chúc một ngày tốt lành!", icon: "🎧" },
+  { text: "Trang web luôn đồng hành cùng bạn. Chúc bạn hạnh phúc!", icon: "📚" },
+  { text: "Cảm ơn bạn đã ghé thăm. Hãy luôn mỉm cười bạn nhé!", icon: "🍃" },
+  { text: "Cảm ơn bạn đã tin tưởng. Chúc bạn đọc truyện vui vẻ!", icon: "⭐" }
+];
+
+const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#F7B731'];
+
+const randomMsg = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
+const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+const thankYouElem = document.getElementById('thank-you-message');
+if (thankYouElem) {
+  thankYouElem.innerHTML = `${randomMsg.icon} ${randomMsg.text}`;
+  thankYouElem.style.setProperty('color', randomColor, 'important');
+}
 </script>
 {% endblock %}
