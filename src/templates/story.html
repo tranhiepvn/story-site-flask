@@ -75,7 +75,7 @@
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- AUDIO PLAYER -->
+      <!-- AUDIO PLAYER: TEXT XUỐNG DƯỚI PROGRESS BAR -->
       <div style="margin: 15px 0;">
         <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
           <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
@@ -207,6 +207,23 @@
 <style>
   .highlight-green { color: #006400; }
   .highlight-red { color: #8B0000; }
+
+  /* Responsive fix cho phần navigation trên mobile */
+  @media (max-width: 768px) {
+    .part-navigation {
+      gap: 15px;
+      flex-wrap: nowrap;
+      justify-content: center;
+    }
+    .part-navigation a,
+    .part-navigation .disabled-nav {
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      display: inline-block;
+      text-align: center;
+    }
+  }
 </style>
 
 <script>
@@ -507,7 +524,7 @@ speedSelect.addEventListener('change', applyPlaybackRate);
 setProgressBarEnabled(false);
 isAudioStarted = false;
 
-// ==================== RANDOM THANK YOU MESSAGE & COLOR (có !important) ====================
+// ==================== RANDOM THANK YOU MESSAGE & COLOR ====================
 const thankYouMessages = [
   { text: "Cảm ơn bạn đã đồng hành. Chúc bạn những giây phút thư giãn!", icon: "📖" },
   { text: "Hẹn gặp lại bạn ở những truyện sau. Chúc bạn luôn vui vẻ!", icon: "✨" },
