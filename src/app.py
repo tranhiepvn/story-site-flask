@@ -2435,10 +2435,21 @@ def admin_announcements():
         action = request.form.get("action")
         if action == "create":
             content = request.form.get("content", "").strip()
-            device_type = request.form.get("device_type", "both")  # Lấy giá trị từ form
+            device_type = request.form.get("device_type", "both")
             if content:
-                # Tắt tất cả thông báo cũ
-                Announcement.query.update({Announcement.is_active: False})
+                # Tắt các thông báo có cùng device_type hoặc both nếu cần
+                if device_type == 'both':
+                    # Tắt tất cả thông báo both, desktop, mobile (vì both ảnh hưởng cả hai)
+                    Announcement.query.update({Announcement.is_active: False})
+                elif device_type == 'desktop':
+                    # Tắt các thông báo desktop và both
+                    Announcement.query.filter(
+                        (Announcement.device_type == 'desktop') | (Announcement.device_type == 'both')
+                    ).update({Announcement.is_active: False}, synchronize_session=False)
+                elif device_type == 'mobile':
+                    Announcement.query.filter(
+                        (Announcement.device_type == 'mobile') | (Announcement.device_type == 'both')
+                    ).update({Announcement.is_active: False}, synchronize_session=False)
                 ann = Announcement(content=content, is_active=True, device_type=device_type)
                 db.session.add(ann)
                 db.session.commit()
@@ -2450,11 +2461,19 @@ def admin_announcements():
             ann = Announcement.query.get(ann_id)
             if ann:
                 if not ann.is_active:
-                    # Nếu đang ẩn, bật nó lên và tắt tất cả các thông báo khác
-                    Announcement.query.update({Announcement.is_active: False})
+                    # Bật thông báo này, tắt các thông báo xung đột
+                    if ann.device_type == 'both':
+                        Announcement.query.update({Announcement.is_active: False})
+                    elif ann.device_type == 'desktop':
+                        Announcement.query.filter(
+                            (Announcement.device_type == 'desktop') | (Announcement.device_type == 'both')
+                        ).update({Announcement.is_active: False}, synchronize_session=False)
+                    elif ann.device_type == 'mobile':
+                        Announcement.query.filter(
+                            (Announcement.device_type == 'mobile') | (Announcement.device_type == 'both')
+                        ).update({Announcement.is_active: False}, synchronize_session=False)
                     ann.is_active = True
                 else:
-                    # Nếu đang hiện, chỉ tắt nó
                     ann.is_active = False
                 db.session.commit()
                 flash(f"Đã {'bật' if ann.is_active else 'tắt'} thông báo.")
@@ -2575,16 +2594,25 @@ def inject_announcement():
     from flask import request
     user_agent = request.headers.get('User-Agent', '').lower()
     is_mobile = 'mobile' in user_agent or 'android' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
-    announcement = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).first()
-    if announcement:
-        if announcement.device_type == 'both':
-            pass
-        elif announcement.device_type == 'desktop' and is_mobile:
-            announcement = None
-        elif announcement.device_type == 'mobile' and not is_mobile:
-            announcement = None
+    
+    if is_mobile:
+        # Ưu tiên thông báo có device_type = 'mobile', nếu không có thì lấy 'both'
+        announcement = Announcement.query.filter(
+            Announcement.is_active == True,
+            (Announcement.device_type == 'mobile') | (Announcement.device_type == 'both')
+        ).order_by(
+            db.case({'mobile': 1, 'both': 2}, value=Announcement.device_type)
+        ).first()
+    else:
+        # Desktop: ưu tiên 'desktop', sau đó 'both'
+        announcement = Announcement.query.filter(
+            Announcement.is_active == True,
+            (Announcement.device_type == 'desktop') | (Announcement.device_type == 'both')
+        ).order_by(
+            db.case({'desktop': 1, 'both': 2}, value=Announcement.device_type)
+        ).first()
     return dict(active_announcement=announcement)
-
+    
 @app.route("/view_all_comments")
 def view_all_comments():
     if 'upload_authenticated' not in session:
