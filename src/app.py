@@ -420,40 +420,38 @@ class Announcement(db.Model):
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
 with app.app_context():
     db.create_all()
-    # Chỉ thực hiện nâng cấp cột nếu đang sử dụng SQLite. Đối với PostgreSQL hoặc
-    # các hệ quản trị khác, cần dùng migration (ví dụ Alembic) để thay đổi lược đồ.
-    if db.engine.dialect.name == "sqlite":
-        def upgrade_db():
-            """
-            Kiểm tra và thêm các cột mới vào bảng stories, comments, announcements nếu chúng chưa tồn tại.
-            """
-            with db.engine.connect() as conn:
-                # Bảng stories
-                result = conn.execute(text("PRAGMA table_info(stories)")).fetchall()
-                columns = [row[1] for row in result]
-                if "is_hidden" not in columns:
-                    conn.execute(text("ALTER TABLE stories ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
-                if "rating_sum" not in columns:
-                    conn.execute(text("ALTER TABLE stories ADD COLUMN rating_sum INTEGER DEFAULT 0"))
-                if "rating_count" not in columns:
-                    conn.execute(text("ALTER TABLE stories ADD COLUMN rating_count INTEGER DEFAULT 0"))
-                if "is_completed" not in columns:
-                    conn.execute(text("ALTER TABLE stories ADD COLUMN is_completed BOOLEAN DEFAULT 0"))
 
-                # Bảng comments
-                result = conn.execute(text("PRAGMA table_info(comments)")).fetchall()
-                columns = [row[1] for row in result]
-                if "is_hidden" not in columns:
-                    conn.execute(text("ALTER TABLE comments ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+    # Helper function to check column existence (works for SQLite and PostgreSQL)
+    def column_exists(table_name, column_name):
+        if db.engine.dialect.name == 'postgresql':
+            # Use information_schema for PostgreSQL
+            result = db.session.execute(
+                text(f"SELECT column_name FROM information_schema.columns WHERE table_name='{table_name}' AND column_name='{column_name}'")
+            )
+            return result.fetchone() is not None
+        else:  # SQLite
+            result = db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+            columns = [row[1] for row in result]
+            return column_name in columns
 
-                # Bảng announcements
-                result = conn.execute(text("PRAGMA table_info(announcements)")).fetchall()
-                columns = [row[1] for row in result]
-                if "device_type" not in columns:
-                    conn.execute(text("ALTER TABLE announcements ADD COLUMN device_type VARCHAR(20) DEFAULT 'both'"))
+    # Add missing columns for stories
+    for col, dtype in [('is_hidden', 'BOOLEAN DEFAULT 0'),
+                       ('rating_sum', 'INTEGER DEFAULT 0'),
+                       ('rating_count', 'INTEGER DEFAULT 0'),
+                       ('is_completed', 'BOOLEAN DEFAULT 0')]:
+        if not column_exists('stories', col):
+            db.session.execute(text(f"ALTER TABLE stories ADD COLUMN {col} {dtype}"))
 
-        # gọi hàm nâng cấp sau khi tạo bảng
-        upgrade_db()
+    # Add is_hidden for comments
+    if not column_exists('comments', 'is_hidden'):
+        db.session.execute(text("ALTER TABLE comments ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+
+    # Add device_type for announcements
+    if not column_exists('announcements', 'device_type'):
+        db.session.execute(text("ALTER TABLE announcements ADD COLUMN device_type VARCHAR(20) DEFAULT 'both'"))
+
+    db.session.commit()
+
 
 def create_tables() -> None:
     """Tạo cơ sở dữ liệu và bảng nếu chưa tồn tại.
