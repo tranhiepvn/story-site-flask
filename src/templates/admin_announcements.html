@@ -11,6 +11,14 @@
     <textarea id="content" name="content" rows="3" cols="60" required></textarea>
   </div>
   <div class="form-group">
+    <label for="device_type">Hiển thị trên:</label><br>
+    <select id="device_type" name="device_type">
+      <option value="both">Cả hai (Desktop & Mobile)</option>
+      <option value="desktop">Chỉ Desktop</option>
+      <option value="mobile">Chỉ Mobile</option>
+    </select>
+  </div>
+  <div class="form-group">
     <label for="password">Password:</label><br>
     <input type="password" id="password" name="password" required>
   </div>
@@ -28,6 +36,7 @@
       <th style="padding:8px;">ID</th>
       <th style="padding:8px;">Nội dung</th>
       <th style="padding:8px;">Trạng thái</th>
+      <th style="padding:8px;">Hiển thị trên</th>
       <th style="padding:8px;">Ngày tạo</th>
       <th style="padding:8px;">Hành động</th>
     </tr>
@@ -38,6 +47,18 @@
       <td style="padding:8px; text-align:center;">{{ ann.id }}</td>
       <td style="padding:8px;">{{ ann.content }}</td>
       <td style="padding:8px; text-align:center;">{% if ann.is_active %}✅ Đang hiện{% else %}❌ Đã ẩn{% endif %}</td>
+      <td style="padding:8px; text-align:center;">
+        <form method="post" action="{{ url_for('update_announcement_device') }}" style="display:flex; gap:4px; align-items:center;">
+          <input type="hidden" name="ann_id" value="{{ ann.id }}">
+          <input type="password" name="password" placeholder="Mật khẩu" style="width:80px; padding:4px;" required>
+          <select name="device_type" style="padding:4px;">
+            <option value="both" {% if ann.device_type == 'both' %}selected{% endif %}>Cả hai</option>
+            <option value="desktop" {% if ann.device_type == 'desktop' %}selected{% endif %}>Desktop</option>
+            <option value="mobile" {% if ann.device_type == 'mobile' %}selected{% endif %}>Mobile</option>
+          </select>
+          <button type="submit" style="background:none; border:none; color:#00BFFF; cursor:pointer;">Cập nhật</button>
+        </form>
+      </td>
       <td style="padding:8px;">{{ ann.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
       <td style="padding:8px;">
         <form method="post" style="display:inline;">

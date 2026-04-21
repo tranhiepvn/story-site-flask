@@ -1,27 +1,42 @@
 {% extends "layout.html" %}
-
-{% block title %}Tất cả bình luận{% endblock %}
-
+{% block title %}Quản lý bình luận{% endblock %}
 {% block content %}
-<h2>📝 Tất cả bình luận (mới nhất trước)</h2>
-{% if comments %}
+<h2>📝 Quản lý bình luận</h2>
+<form method="post" action="{{ url_for('manage_comments') }}" id="commentsForm">
+  <div style="margin-bottom: 15px;">
+    <label for="password">Password:</label>
+    <input type="password" name="password" id="password" required>
+    <button type="submit" name="action" value="hide" onclick="return confirm('Ẩn các bình luận đã chọn?');">Ẩn</button>
+    <button type="submit" name="action" value="show" onclick="return confirm('Hiện các bình luận đã chọn?');">Hiện</button>
+    <button type="submit" name="action" value="delete" onclick="return confirm('Xóa vĩnh viễn?');">Xóa</button>
+    <label style="margin-left: 20px;">
+      <input type="checkbox" id="select-all"> Chọn tất cả
+    </label>
+  </div>
   <ul style="list-style: none; padding: 0;">
     {% for comment, story in comments %}
       <li style="margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 12px;">
+        <input type="checkbox" name="comment_ids" value="{{ comment.id }}" style="margin-right: 10px;">
         <div>
-          <strong><a href="{{ url_for('story_detail', story_id=story.id) }}" style="color: #00BFFF;">{{ story.title }}</a></strong>
+          <strong><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></strong>
           {% if story.author %} - {{ story.author }}{% endif %}
         </div>
         <div style="margin-top: 5px; color: #ccc;">
           <span style="color: #FF9800;">{{ comment.name or 'Ẩn danh' }}</span>:
           <span>{{ comment.content }}</span>
           <small style="color: #888; display: block; margin-top: 3px;">{{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+          {% if comment.is_hidden %}
+            <span style="color: #FF0000;">(Đã ẩn)</span>
+          {% endif %}
         </div>
       </li>
     {% endfor %}
   </ul>
-{% else %}
-  <p>Chưa có bình luận nào.</p>
-{% endif %}
+</form>
 <p><a href="{{ url_for('upload') }}">← Quay lại trang admin</a></p>
+<script>
+  document.getElementById('select-all')?.addEventListener('click', function() {
+    document.querySelectorAll('input[name="comment_ids"]').forEach(cb => cb.checked = this.checked);
+  });
+</script>
 {% endblock %}

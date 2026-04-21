@@ -347,6 +347,7 @@ class Comment(db.Model):
     email = db.Column(db.String(255), nullable=True)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_hidden = db.Column(db.Boolean, default=False)
 
     story = db.relationship("Story", backref=db.backref("comments", lazy=True))
 
@@ -407,6 +408,7 @@ class Announcement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
+    device_type = db.Column(db.String(20), default='both')  # Thêm dòng này
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -423,14 +425,10 @@ with app.app_context():
     if db.engine.dialect.name == "sqlite":
         def upgrade_db():
             """
-            Kiểm tra và thêm các cột mới vào bảng stories nếu chúng chưa tồn tại.
-
-            Khi cập nhật phiên bản mới, cơ sở dữ liệu cũ sẽ thiếu các cột như
-            `is_hidden`, `rating_sum`, `rating_count` và `is_completed`. Hàm này
-            sử dụng PRAGMA để kiểm tra thông tin bảng và thực hiện ALTER TABLE
-            nếu cần. Lưu ý: Chỉ áp dụng cho SQLite.
+            Kiểm tra và thêm các cột mới vào bảng stories, comments, announcements nếu chúng chưa tồn tại.
             """
             with db.engine.connect() as conn:
+                # Bảng stories
                 result = conn.execute(text("PRAGMA table_info(stories)")).fetchall()
                 columns = [row[1] for row in result]
                 if "is_hidden" not in columns:
@@ -442,9 +440,20 @@ with app.app_context():
                 if "is_completed" not in columns:
                     conn.execute(text("ALTER TABLE stories ADD COLUMN is_completed BOOLEAN DEFAULT 0"))
 
+                # Bảng comments
+                result = conn.execute(text("PRAGMA table_info(comments)")).fetchall()
+                columns = [row[1] for row in result]
+                if "is_hidden" not in columns:
+                    conn.execute(text("ALTER TABLE comments ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+
+                # Bảng announcements
+                result = conn.execute(text("PRAGMA table_info(announcements)")).fetchall()
+                columns = [row[1] for row in result]
+                if "device_type" not in columns:
+                    conn.execute(text("ALTER TABLE announcements ADD COLUMN device_type VARCHAR(20) DEFAULT 'both'"))
+
         # gọi hàm nâng cấp sau khi tạo bảng
         upgrade_db()
-
 
 def create_tables() -> None:
     """Tạo cơ sở dữ liệu và bảng nếu chưa tồn tại.
@@ -668,7 +677,7 @@ def story_detail(story_id: int):
     # Giữ nguyên tất cả xuống dòng
     content_processed = chapter_body.replace('\n', '<br>')
 
-    comments = Comment.query.filter_by(story_id=story.id).order_by(Comment.created_at.desc()).all()
+    comments = Comment.query.filter_by(story_id=story.id, is_hidden=False).order_by(Comment.created_at.desc()).all()
 
     return render_template(
         "story.html",
@@ -2424,10 +2433,11 @@ def admin_announcements():
         action = request.form.get("action")
         if action == "create":
             content = request.form.get("content", "").strip()
+            device_type = request.form.get("device_type", "both")  # Lấy giá trị từ form
             if content:
                 # Tắt tất cả thông báo cũ
                 Announcement.query.update({Announcement.is_active: False})
-                ann = Announcement(content=content, is_active=True)
+                ann = Announcement(content=content, is_active=True, device_type=device_type)
                 db.session.add(ann)
                 db.session.commit()
                 flash("Đã tạo thông báo mới và kích hoạt.")
@@ -2457,6 +2467,56 @@ def admin_announcements():
     
     announcements = Announcement.query.order_by(Announcement.created_at.desc()).all()
     return render_template("admin_announcements.html", announcements=announcements)
+
+@app.route("/admin/comments/manage", methods=["POST"])
+def manage_comments():
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    password = request.form.get("password", "")
+    if password != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("view_all_comments"))
+    
+    action = request.form.get("action")
+    comment_ids = request.form.getlist("comment_ids")
+    if not comment_ids:
+        flash("Chưa chọn bình luận nào.")
+        return redirect(url_for("view_all_comments"))
+    
+    if action == "hide":
+        Comment.query.filter(Comment.id.in_(comment_ids)).update({Comment.is_hidden: True}, synchronize_session=False)
+        flash(f"Đã ẩn {len(comment_ids)} bình luận.")
+    elif action == "show":
+        Comment.query.filter(Comment.id.in_(comment_ids)).update({Comment.is_hidden: False}, synchronize_session=False)
+        flash(f"Đã hiện {len(comment_ids)} bình luận.")
+    elif action == "delete":
+        Comment.query.filter(Comment.id.in_(comment_ids)).delete(synchronize_session=False)
+        flash(f"Đã xóa {len(comment_ids)} bình luận.")
+    else:
+        flash("Hành động không hợp lệ.")
+    db.session.commit()
+    return redirect(url_for("view_all_comments"))
+
+@app.route("/admin/announcements/update_device", methods=["POST"])
+def update_announcement_device():
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("admin_announcements"))
+    ann_id = request.form.get("ann_id")
+    device_type = request.form.get("device_type")
+    if device_type not in ['both', 'desktop', 'mobile']:
+        device_type = 'both'
+    ann = Announcement.query.get(ann_id)
+    if ann:
+        ann.device_type = device_type
+        db.session.commit()
+        flash("Đã cập nhật thiết bị hiển thị.")
+    return redirect(url_for("admin_announcements"))
 
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
@@ -2510,15 +2570,23 @@ def inject_comment_notifications():
 
 @app.context_processor
 def inject_announcement():
+    from flask import request
+    user_agent = request.headers.get('User-Agent', '').lower()
+    is_mobile = 'mobile' in user_agent or 'android' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
     announcement = Announcement.query.filter_by(is_active=True).order_by(Announcement.created_at.desc()).first()
+    if announcement:
+        if announcement.device_type == 'both':
+            pass
+        elif announcement.device_type == 'desktop' and is_mobile:
+            announcement = None
+        elif announcement.device_type == 'mobile' and not is_mobile:
+            announcement = None
     return dict(active_announcement=announcement)
 
 @app.route("/view_all_comments")
 def view_all_comments():
-    """Hiển thị tất cả bình luận (mới nhất trước) kèm nội dung và tác giả."""
     if 'upload_authenticated' not in session:
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
-    # Lấy tất cả bình luận, sắp xếp mới nhất trước, kèm theo story
-    comments = db.session.query(Comment, Story).join(Story, Comment.story_id == Story.id).filter(Story.is_hidden == False).order_by(Comment.created_at.desc()).all()
+    comments = db.session.query(Comment, Story).join(Story, Comment.story_id == Story.id).order_by(Comment.created_at.desc()).all()
     return render_template("comments_list.html", comments=comments)
