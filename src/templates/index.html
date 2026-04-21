@@ -54,8 +54,124 @@
   .pagination a:hover { background: #555; }
   .pagination span { margin: 0 5px; }
 
-  /* Trên mobile: rút gọn text và giảm padding */
+  /* --- Lịch sử đọc (chế độ tối mặc định) --- */
+  .history-container {
+    background: #1C1C1C;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  .history-container h3 {
+    color: #fff;
+    margin-top: 0;
+    margin-bottom: 12px;
+  }
+  .history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .history-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 6px;
+  }
+  .history-list li a.story-link {
+    font-weight: bold;
+    color: #00BFFF;
+    text-decoration: none;
+  }
+  .history-list li a.story-link:hover {
+    text-decoration: underline;
+  }
+  .history-part {
+    color: #aaa;
+    font-size: 0.85rem;
+  }
+  .history-time {
+    color: #666;
+    font-size: 0.75rem;
+    margin-left: 8px;
+  }
+  .remove-history {
+    color: #ff4444;
+    text-decoration: none;
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+  .remove-history:hover {
+    color: #ff8888;
+  }
+  .clear-history-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: #00BFFF;
+    text-decoration: none;
+  }
+  .clear-history-link:hover {
+    text-decoration: underline;
+  }
+
+  /* --- Chế độ sáng --- */
+  body.light-mode .history-container {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+  }
+  body.light-mode .history-container h3 {
+    color: #1a1a1a;
+  }
+  body.light-mode .history-list li {
+    border-bottom-color: #ddd;
+  }
+  body.light-mode .history-list li a.story-link {
+    color: #0056b3;
+  }
+  body.light-mode .history-part {
+    color: #555;
+  }
+  body.light-mode .history-time {
+    color: #888;
+  }
+  body.light-mode .remove-history {
+    color: #c00;
+  }
+  body.light-mode .remove-history:hover {
+    color: #f00;
+  }
+  body.light-mode .clear-history-link {
+    color: #0056b3;
+  }
+
+  /* --- Tăng kích thước nút xóa trên mobile, đẩy vào trong --- */
   @media (max-width: 768px) {
+    .history-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .remove-history {
+      font-size: 2rem;
+      padding: 8px 12px;
+      margin-right: 8px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .history-list li > div {
+      flex: 1;
+      min-width: 0;
+    }
+    .history-part {
+      display: inline-block;
+    }
+    .history-time {
+      display: block;
+      margin-left: 0;
+      margin-top: 4px;
+    }
     .tab-buttons { justify-content: center; gap: 6px; }
     .tab-btn { padding: 6px 12px; font-size: 0.85rem; }
     .tab-btn .full { display: none; }
@@ -65,6 +181,30 @@
   .tab-btn .full { display: inline; }
   .tab-btn .short { display: none; }
 </style>
+
+{% if history_list %}
+<div class="history-container">
+  <h3>📖 Lịch sử đọc gần đây</h3>
+  <ul class="history-list">
+    {% for item in history_list %}
+      {% set story = item.story %}
+      {% if story %}
+      <li>
+        <div>
+          <a href="{{ url_for('story_detail', story_id=story.id, part=item.part_number) }}" class="story-link">
+            {{ story.title }}
+          </a>
+          <span class="history-part"> - Phần {{ item.part_number }}</span>
+          <span class="history-time">({{ item.updated_at.strftime('%d/%m/%Y %H:%M') }})</span>
+        </div>
+        <a href="{{ url_for('remove_history_item', history_id=item.id) }}" class="remove-history" onclick="return confirm('Xóa mục này?');">&times;</a>
+      </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+  <a href="{{ url_for('clear_history') }}" class="clear-history-link" onclick="return confirm('Bạn có chắc muốn xóa toàn bộ lịch sử đọc?');">🗑️ Xóa toàn bộ lịch sử</a>
+</div>
+{% endif %}
 
 <div class="tab-container">
   <div class="tab-buttons">

@@ -178,6 +178,11 @@ def get_category_groups() -> tuple[list["Category"], list["Category"], list["Cat
     group3 = sorted(group3, key=lambda c: c.name.lower())
     return group1, group2, group3
 
+def get_user_session_id():
+    if 'reader_session_id' not in session:
+        session['reader_session_id'] = str(uuid.uuid4())
+    return session['reader_session_id']
+
 # Hàm mới: Trả về danh sách tất cả categories đã sắp xếp theo tên (case-insensitive)
 def get_sorted_categories() -> list["Category"]:
     """
@@ -383,6 +388,14 @@ class PartVideo(db.Model):
     def __repr__(self) -> str:
         return f"<PartVideo {self.id} for Part {self.part_id}>"
 
+class ReadingHistory(db.Model):
+    __tablename__ = "reading_history"
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(100), nullable=False)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    part_number = db.Column(db.Integer, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    story = db.relationship("Story", backref=db.backref("reading_history", lazy=True))
 
 # ====================== MODEL MỚI: VIEWS THEO NGÀY ======================
 class DailyView(db.Model):
@@ -557,10 +570,11 @@ def post_comment(story_id: int):
 @app.route("/")
 def index():
     """ Trang chủ hiển thị danh sách truyện nổi bật, truyện ngắn và truyện dài.
-
+    
     - Truyện nổi bật: tối đa 20 truyện có lượt xem cao nhất.
     - Truyện ngắn: phân trang 10 truyện mỗi trang, sắp xếp theo ngày đăng mới nhất.
     - Truyện dài: phân trang 10 truyện mỗi trang, sắp xếp theo ngày đăng mới nhất.
+    - Lịch sử đọc: 10 truyện gần nhất (mỗi truyện chỉ giữ phần đọc sau cùng).
     Người đọc có thể chuyển trang riêng biệt cho danh sách truyện ngắn và truyện dài bằng
     cách thay đổi tham số ``short_page`` hoặc ``long_page`` trên URL. Danh sách thể loại
     được lấy để hiển thị trong thanh bên.
@@ -613,6 +627,36 @@ def index():
     )
     # danh sách thể loại để hiển thị trong thanh bên
     categories_group1, categories_group2, categories_group3 = get_category_groups()
+
+    # --- Lấy lịch sử đọc (10 truyện gần nhất, mỗi truyện chỉ một bản ghi mới nhất) ---
+    session_id = get_user_session_id()
+    # Lấy tất cả bản ghi của session, sắp xếp theo thời gian cập nhật giảm dần
+    # Mỗi story chỉ xuất hiện một lần do unique constraint (session_id, story_id) trong bảng?
+    # Nếu chưa có unique constraint, ta vẫn lấy tất cả nhưng có thể trùng story.
+    # Để an toàn, ta sẽ lấy 10 bản ghi gần nhất nhưng nếu trùng story thì chỉ lấy bản mới nhất.
+    # Cách đơn giản: dùng DISTINCT ON (PostgreSQL) hoặc subquery.
+    # Dưới đây dùng subquery để lấy max updated_at cho mỗi story, sau đó join lại.
+    from sqlalchemy import func, and_
+    
+    subq = db.session.query(
+        ReadingHistory.story_id,
+        func.max(ReadingHistory.updated_at).label('max_updated')
+    ).filter(ReadingHistory.session_id == session_id).group_by(ReadingHistory.story_id).subquery()
+    
+    history_list = db.session.query(ReadingHistory).join(
+        subq,
+        and_(
+            ReadingHistory.story_id == subq.c.story_id,
+            ReadingHistory.updated_at == subq.c.max_updated
+        )
+    ).order_by(ReadingHistory.updated_at.desc()).limit(10).all()
+    
+    # Nếu bạn muốn đơn giản hơn và tin rằng mỗi story chỉ có một bản ghi (do unique constraint),
+    # thì chỉ cần:
+    # history_list = ReadingHistory.query.filter_by(session_id=session_id)\
+    #     .order_by(ReadingHistory.updated_at.desc()).limit(10).all()
+    # Tuy nhiên, đoạn trên vẫn an toàn hơn.
+
     return render_template(
         "index.html",
         best=best,
@@ -622,7 +666,8 @@ def index():
         short_pagination=short_pagination,
         long_pagination=long_pagination,
         recent_stories=recent_stories,
-        active_tab=active_tab,  # thêm dòng này
+        active_tab=active_tab,
+        history_list=history_list,          # <- biến mới thay cho continue_story, continue_part
         categories_group1=categories_group1,
         categories_group2=categories_group2,
         categories_group3=categories_group3,
@@ -680,6 +725,18 @@ def story_detail(story_id: int):
     content_processed = chapter_body.replace('\n', '<br>')
 
     comments = Comment.query.filter_by(story_id=story.id, is_hidden=False).order_by(Comment.created_at.desc()).all()
+
+    # Lưu lịch sử đọc
+    if current_part:
+        session_id = get_user_session_id()
+        history = ReadingHistory.query.filter_by(session_id=session_id, story_id=story.id).first()
+        if history:
+            history.part_number = current_index
+            history.updated_at = datetime.utcnow()
+        else:
+            history = ReadingHistory(session_id=session_id, story_id=story.id, part_number=current_index)
+            db.session.add(history)
+        db.session.commit()
 
     return render_template(
         "story.html",
@@ -2539,6 +2596,23 @@ def update_announcement_device():
         flash("Đã cập nhật thiết bị hiển thị.")
     return redirect(url_for("admin_announcements"))
 
+@app.route("/clear_history")
+def clear_history():
+    session_id = get_user_session_id()
+    ReadingHistory.query.filter_by(session_id=session_id).delete()
+    db.session.commit()
+    flash("Đã xóa lịch sử đọc.")
+    return redirect(url_for('index'))
+
+@app.route("/remove_history/<int:history_id>")
+def remove_history_item(history_id: int):
+    session_id = get_user_session_id()
+    history = ReadingHistory.query.filter_by(id=history_id, session_id=session_id).first_or_404()
+    db.session.delete(history)
+    db.session.commit()
+    flash("Đã xóa một mục khỏi lịch sử.")
+    return redirect(url_for('index'))
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
@@ -2612,7 +2686,7 @@ def inject_announcement():
             db.case({'desktop': 1, 'both': 2}, value=Announcement.device_type)
         ).first()
     return dict(active_announcement=announcement)
-    
+
 @app.route("/view_all_comments")
 def view_all_comments():
     if 'upload_authenticated' not in session:
