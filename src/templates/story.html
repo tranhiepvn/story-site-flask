@@ -1,17 +1,19 @@
 {% extends "layout.html" %}
 {% block title %}{{ story.title }}{% endblock %}
 {% block content %}
-<div class="follow-section" style="margin-top: 20px; padding: 10px; background: #2c3e50; border-radius: 8px;">
+<div class="follow-section">
   <h3>🔔 Theo dõi truyện</h3>
   <p>Nhận email thông báo khi có chương mới.</p>
-  <form method="post" action="{{ url_for('follow_story', story_id=story.id) }}" style="display: inline-block;">
-    <input type="email" name="email" placeholder="Email của bạn" required style="padding: 6px; width: 200px;">
-    <button type="submit">Theo dõi</button>
-  </form>
-  <form method="post" action="{{ url_for('unfollow_story', story_id=story.id) }}" style="display: inline-block; margin-left: 10px;">
-    <input type="email" name="email" placeholder="Email đã đăng ký" required style="padding: 6px; width: 200px;">
-    <button type="submit">Hủy theo dõi</button>
-  </form>
+  <div class="follow-forms">
+    <form method="post" action="{{ url_for('follow_story', story_id=story.id) }}" class="follow-form">
+      <input type="email" name="email" placeholder="Email của bạn" required>
+      <button type="submit">Theo dõi</button>
+    </form>
+    <form method="post" action="{{ url_for('unfollow_story', story_id=story.id) }}" class="unfollow-form">
+      <input type="email" name="email" placeholder="Email đã đăng ký" required>
+      <button type="submit">Hủy theo dõi</button>
+    </form>
+  </div>
 </div>
 
 <article>
@@ -235,6 +237,100 @@
       white-space: nowrap;
       display: inline-block;
       text-align: center;
+    }
+  }
+
+  /* ===== FOLLOW SECTION STYLES (chế độ tối mặc định) ===== */
+  .follow-section {
+    background: #2c3e50;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  .follow-section h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #fff;
+  }
+  .follow-section p {
+    margin-bottom: 12px;
+    color: #ddd;
+  }
+  .follow-forms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  .follow-form, .unfollow-form {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .follow-form input, .unfollow-form input {
+    flex: 2;
+    min-width: 150px;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    color: #000;
+  }
+  .follow-form button, .unfollow-form button {
+    flex: 1;
+    min-width: 80px;
+    padding: 8px 12px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .follow-form button:hover, .unfollow-form button:hover {
+    background-color: #0056b3;
+  }
+
+  /* Chế độ sáng */
+  body.light-mode .follow-section {
+    background: #e9ecef;
+    border: 1px solid #ced4da;
+  }
+  body.light-mode .follow-section h3 {
+    color: #1a1a1a;
+  }
+  body.light-mode .follow-section p {
+    color: #333;
+  }
+  body.light-mode .follow-form input, 
+  body.light-mode .unfollow-form input {
+    background: #fff;
+    border-color: #adb5bd;
+    color: #1a1a1a;
+  }
+  body.light-mode .follow-form button, 
+  body.light-mode .unfollow-form button {
+    background-color: #0056b3;
+  }
+  body.light-mode .follow-form button:hover, 
+  body.light-mode .unfollow-form button:hover {
+    background-color: #004080;
+  }
+
+  /* Trên mobile: xếp dọc các form và các thành phần bên trong */
+  @media (max-width: 768px) {
+    .follow-forms {
+      flex-direction: column;
+    }
+    .follow-form, .unfollow-form {
+      flex-direction: column;
+      width: 100%;
+    }
+    .follow-form input, .unfollow-form input,
+    .follow-form button, .unfollow-form button {
+      width: 100%;
+      min-width: auto;
     }
   }
 </style>
