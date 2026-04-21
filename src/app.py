@@ -420,13 +420,14 @@ class Announcement(db.Model):
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
 with app.app_context():
     db.create_all()
-
-    # Helper function to check column existence (works for SQLite and PostgreSQL)
+    
     def column_exists(table_name, column_name):
+        """Check if a column exists in a table, compatible with SQLite and PostgreSQL."""
         if db.engine.dialect.name == 'postgresql':
             # Use information_schema for PostgreSQL
             result = db.session.execute(
-                text(f"SELECT column_name FROM information_schema.columns WHERE table_name='{table_name}' AND column_name='{column_name}'")
+                text("SELECT column_name FROM information_schema.columns WHERE table_name = :table AND column_name = :col"),
+                {"table": table_name, "col": column_name}
             )
             return result.fetchone() is not None
         else:  # SQLite
@@ -434,24 +435,27 @@ with app.app_context():
             columns = [row[1] for row in result]
             return column_name in columns
 
-    # Add missing columns for stories
-    for col, dtype in [('is_hidden', 'BOOLEAN DEFAULT 0'),
+    # --- Upgrade Stories Table (works for both) ---
+    # For PostgreSQL, use BOOLEAN DEFAULT FALSE; for SQLite, BOOLEAN DEFAULT 0 is fine.
+    # SQLite will accept either.
+    default_false = "FALSE" if db.engine.dialect.name == 'postgresql' else "0"
+    
+    for col, dtype in [('is_hidden', f'BOOLEAN DEFAULT {default_false}'),
                        ('rating_sum', 'INTEGER DEFAULT 0'),
                        ('rating_count', 'INTEGER DEFAULT 0'),
-                       ('is_completed', 'BOOLEAN DEFAULT 0')]:
+                       ('is_completed', f'BOOLEAN DEFAULT {default_false}')]:
         if not column_exists('stories', col):
             db.session.execute(text(f"ALTER TABLE stories ADD COLUMN {col} {dtype}"))
-
-    # Add is_hidden for comments
+    
+    # --- Upgrade Comments Table ---
     if not column_exists('comments', 'is_hidden'):
-        db.session.execute(text("ALTER TABLE comments ADD COLUMN is_hidden BOOLEAN DEFAULT 0"))
+        db.session.execute(text(f"ALTER TABLE comments ADD COLUMN is_hidden BOOLEAN DEFAULT {default_false}"))
 
-    # Add device_type for announcements
+    # --- Upgrade Announcements Table ---
     if not column_exists('announcements', 'device_type'):
         db.session.execute(text("ALTER TABLE announcements ADD COLUMN device_type VARCHAR(20) DEFAULT 'both'"))
 
     db.session.commit()
-
 
 def create_tables() -> None:
     """Tạo cơ sở dữ liệu và bảng nếu chưa tồn tại.
