@@ -1,6 +1,19 @@
 {% extends "layout.html" %}
 {% block title %}{{ story.title }}{% endblock %}
 {% block content %}
+<div class="follow-section" style="margin-top: 20px; padding: 10px; background: #2c3e50; border-radius: 8px;">
+  <h3>🔔 Theo dõi truyện</h3>
+  <p>Nhận email thông báo khi có chương mới.</p>
+  <form method="post" action="{{ url_for('follow_story', story_id=story.id) }}" style="display: inline-block;">
+    <input type="email" name="email" placeholder="Email của bạn" required style="padding: 6px; width: 200px;">
+    <button type="submit">Theo dõi</button>
+  </form>
+  <form method="post" action="{{ url_for('unfollow_story', story_id=story.id) }}" style="display: inline-block; margin-left: 10px;">
+    <input type="email" name="email" placeholder="Email đã đăng ký" required style="padding: 6px; width: 200px;">
+    <button type="submit">Hủy theo dõi</button>
+  </form>
+</div>
+
 <article>
   <h2>{{ story.title }}</h2>
   <p class="meta">

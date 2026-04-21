@@ -35,6 +35,10 @@ import io
 import smtplib
 from email.message import EmailMessage
 
+from dotenv import load_dotenv   # thêm dòng này
+
+load_dotenv()                     # thêm dòng này
+
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
@@ -247,6 +251,17 @@ def inject_utilities():
         "categories_group3": cat3,
     }
 
+class Follow(db.Model):
+    """Mô hình lưu email theo dõi truyện."""
+    __tablename__ = "follows"
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
+    email = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    story = db.relationship("Story", backref=db.backref("followers", lazy=True))
+    
+    __table_args__ = (db.UniqueConstraint('story_id', 'email', name='uq_follow_story_email'),)
 
 class Story(db.Model):
     """Mô hình dữ liệu cho truyện.
@@ -303,6 +318,124 @@ class Story(db.Model):
         return f"<Story {self.id} {self.title}>"
 
 
+def send_new_chapter_notification(story: Story, part_number: int, part_title: str, recipients: list[str]) -> bool:
+    """Gửi email thông báo có chương mới cho danh sách email."""
+    if not recipients:
+        return False
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_username = os.environ.get("SMTP_USERNAME")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    if not smtp_username or not smtp_password:
+        return False
+    from_name = os.environ.get("EMAIL_FROM_NAME", "Webdoctruyen Admin")
+    from_addr = os.environ.get("EMAIL_FROM_ADDR", "admin@webdoctruyen.org")
+    
+    subject = f"[{story.title}] Có chương mới: {part_title}"
+    story_url = url_for("story_detail", story_id=story.id, part=part_number, _external=True)
+    body = f"""Xin chào,
+
+Truyện "{story.title}" vừa được cập nhật chương mới.
+
+{part_title}
+Xem tại: {story_url}
+
+Cảm ơn bạn đã theo dõi.
+
+Trân trọng,
+Webdoctruyen
+"""
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["To"] = ", ".join(recipients)
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Lỗi gửi email: {e}")
+        return False
+
+def send_follow_confirmation(story: Story, email: str) -> bool:
+    """Gửi email xác nhận khi người dùng đăng ký theo dõi truyện."""
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_username = os.environ.get("SMTP_USERNAME")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    if not smtp_username or not smtp_password:
+        return False
+    from_name = os.environ.get("EMAIL_FROM_NAME", "Webdoctruyen Admin")
+    from_addr = os.environ.get("EMAIL_FROM_ADDR", "admin@webdoctruyen.org")
+    
+    subject = f"Xác nhận theo dõi truyện: {story.title}"
+    body = f"""Xin chào,
+
+Bạn vừa đăng ký theo dõi truyện "{story.title}" trên Webdoctruyen.
+
+Bạn sẽ nhận được email thông báo mỗi khi truyện có phần mới.
+
+Để hủy theo dõi, truy cập trang truyện và sử dụng form "Hủy theo dõi".
+
+Trân trọng,
+Webdoctruyen
+"""
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["To"] = email
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Lỗi gửi email xác nhận follow: {e}")
+        return False
+
+def send_unfollow_confirmation(story: Story, email: str) -> bool:
+    """Gửi email xác nhận khi người dùng hủy theo dõi truyện."""
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_username = os.environ.get("SMTP_USERNAME")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    if not smtp_username or not smtp_password:
+        return False
+    from_name = os.environ.get("EMAIL_FROM_NAME", "Webdoctruyen Admin")
+    from_addr = os.environ.get("EMAIL_FROM_ADDR", "admin@webdoctruyen.org")
+    
+    subject = f"Xác nhận hủy theo dõi truyện: {story.title}"
+    body = f"""Xin chào,
+
+Bạn đã hủy theo dõi truyện "{story.title}" trên Webdoctruyen.
+
+Bạn sẽ không còn nhận được email thông báo khi truyện có phần mới.
+
+Nếu muốn theo dõi lại, hãy truy cập trang truyện và đăng ký lại.
+
+Trân trọng,
+Webdoctruyen
+"""
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["To"] = email
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Lỗi gửi email xác nhận hủy follow: {e}")
+        return False
+        
 class Category(db.Model):
     """Mô hình thể loại truyện."""
 
@@ -1050,7 +1183,17 @@ def upload():
                             db.session.add(PartVideo(part_id=new_part.id, url=url))
 
                 db.session.commit()
+
                 flash(f"Đã thêm {len(parts_data)} phần mới (đã dọn dẹp, tách tự động và gán video).", "success")
+
+                # Gửi thông báo cho người theo dõi
+                if story.followers:
+                    recipient_emails = [f.email for f in story.followers]
+                    # Lấy tiêu đề phần mới (dòng đầu tiên của nội dung)
+                    part_title = cleaned_content.split('\n', 1)[0].strip()
+                    send_new_chapter_notification(story, next_number, part_title, recipient_emails)
+                    flash(f"Đã gửi thông báo đến {len(recipient_emails)} người theo dõi.")
+
                 return redirect(url_for("upload", story_id=story.id))
 
             elif action == "update_part":
@@ -2613,11 +2756,68 @@ def remove_history_item(history_id: int):
     flash("Đã xóa một mục khỏi lịch sử.")
     return redirect(url_for('index'))
 
-if __name__ == "__main__":
-    # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
-    create_tables()
-    # Chạy ứng dụng khi chạy trực tiếp file này
-    app.run(debug=True)
+@app.route("/follow/<int:story_id>", methods=["POST"])
+def follow_story(story_id: int):
+    story = Story.query.get_or_404(story_id)
+    email = request.form.get("email", "").strip()
+    if not email:
+        flash("Vui lòng nhập email.")
+        return redirect(url_for("story_detail", story_id=story_id))
+    
+    # Kiểm tra đã tồn tại chưa
+    existing = Follow.query.filter_by(story_id=story_id, email=email).first()
+    if existing:
+        flash("Bạn đã theo dõi truyện này rồi.")
+    else:
+        follow = Follow(story_id=story_id, email=email)
+        db.session.add(follow)
+        db.session.commit()
+        send_follow_confirmation(story, email)
+        flash("Đã đăng ký theo dõi thành công. Bạn sẽ nhận được email khi có chương mới.")
+    return redirect(url_for("story_detail", story_id=story_id))
+
+@app.route("/unfollow/<int:story_id>", methods=["POST"])
+def unfollow_story(story_id: int):
+    email = request.form.get("email", "").strip()
+    if not email:
+        flash("Email không hợp lệ.")
+        return redirect(url_for("story_detail", story_id=story_id))
+    
+    follow = Follow.query.filter_by(story_id=story_id, email=email).first()
+    if follow:
+        story = follow.story
+        db.session.delete(follow)
+        db.session.commit()
+        send_unfollow_confirmation(story, email)   # Gửi email xác nhận hủy
+        flash("Đã hủy theo dõi truyện.")
+    else:
+        flash("Bạn chưa theo dõi truyện này.")
+    return redirect(url_for("story_detail", story_id=story_id))
+
+@app.route("/admin/follows")
+def admin_follows():
+    if not session.get("upload_authenticated"):
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+    
+    # Lấy tất cả các bản ghi follow, kèm theo thông tin story
+    follows = db.session.query(Follow, Story).join(Story, Follow.story_id == Story.id).order_by(Follow.created_at.desc()).all()
+    return render_template("admin_follows.html", follows=follows)
+
+@app.route("/my_follows", methods=["GET", "POST"])
+def my_follows():
+    stories = []
+    email = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        if email:
+            # Lấy tất cả follow của email này
+            follows = Follow.query.filter_by(email=email).all()
+            story_ids = [f.story_id for f in follows]
+            stories = Story.query.filter(Story.id.in_(story_ids), Story.is_hidden == False).all()
+        else:
+            flash("Vui lòng nhập email.")
+    return render_template("my_follows.html", stories=stories, email=email)
 
 @app.route("/skip_comments", methods=["POST"])
 def skip_comments():
@@ -2694,3 +2894,9 @@ def view_all_comments():
         return redirect(url_for('upload_login'))
     comments = db.session.query(Comment, Story).join(Story, Comment.story_id == Story.id).order_by(Comment.created_at.desc()).all()
     return render_template("comments_list.html", comments=comments)
+
+if __name__ == "__main__":
+    # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
+    create_tables()
+    # Chạy ứng dụng khi chạy trực tiếp file này
+    app.run(debug=True)

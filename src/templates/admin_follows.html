@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block title %}Quản lý theo dõi truyện{% endblock %}
+{% block content %}
+<h2>📧 Danh sách email theo dõi truyện</h2>
+<table style="width:100%; border-collapse: collapse; background:#1C1C1C;">
+  <thead>
+    <tr style="background:#4A90E2; color:white;">
+      <th style="padding:8px;">ID</th>
+      <th style="padding:8px;">Email</th>
+      <th style="padding:8px;">Truyện</th>
+      <th style="padding:8px;">Ngày đăng ký</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for follow, story in follows %}
+    <tr style="border-bottom:1px solid #333;">
+      <td style="padding:8px; text-align:center;">{{ follow.id }}</td>
+      <td style="padding:8px;">{{ follow.email }}</td>
+      <td style="padding:8px;"><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></td>
+      <td style="padding:8px;">{{ follow.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p><a href="{{ url_for('upload') }}">← Quay lại trang admin</a></p>
+{% endblock %}
