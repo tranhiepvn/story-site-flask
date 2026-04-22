@@ -418,6 +418,12 @@
   .play-btn .spinner {
     display: none;
   }
+
+  /* Chế độ sáng: spinner tối màu hơn */
+  body.light-mode .spinner {
+    border: 3px solid rgba(0,0,0,0.2);
+    border-top-color: #333;
+  }
 </style>
 
 <script>
@@ -430,7 +436,7 @@ let currentChunkIndex = 1;
 let totalChunks = 1;
 let nextChunkUrl = null;
 let isPreloading = false;
-let isAudioStarted = false; // true nếu audio đã được khởi tạo và có thể phát
+let isAudioStarted = false;
 let activeFetchController = null;
 
 const progressBar = document.getElementById('progress-bar');
