@@ -54,14 +54,14 @@
     </p>
   {% endif %}
 
-  <!-- Nút chia sẻ mạng xã hội -->
-  {% set share_url = current_url|urlencode %}
-  {% set share_text = ("Đọc truyện " ~ story.title ~ " trên Webdoctruyen")|urlencode %}
+  <!-- Nút chia sẻ -->
   <div class="share-buttons">
-    <a href="https://twitter.com/intent/tweet?text={{ share_text }}&url={{ share_url }}" target="_blank" rel="noopener noreferrer" class="share-twitter">🐦 X (Twitter)</a>
-    <a href="https://t.me/share/url?url={{ share_url }}&text={{ share_text }}" target="_blank" rel="noopener noreferrer" class="share-telegram">✈️ Telegram</a>
-    <a href="#" id="share-zalo-btn" class="share-zalo">💬 Zalo</a>
-    <a href="#" id="share-facebook-btn" class="share-facebook">📘 Facebook</a>
+    <button class="share-btn share-twitter" data-platform="twitter">🐦 X (Twitter)</button>
+    <button class="share-btn share-telegram" data-platform="telegram">✈️ Telegram</button>
+    <button class="share-btn share-zalo" data-platform="zalo">💬 Zalo</button>
+    <button class="share-btn share-facebook" data-platform="facebook">📘 Facebook</button>
+    <button class="share-btn share-whatsapp" data-platform="whatsapp">💬 WhatsApp</button>
+    <button class="share-btn share-copy" data-platform="copy">🔗 Sao chép link</button>
   </div>
 
   {% if total_parts > 0 %}
@@ -233,7 +233,6 @@
   .highlight-green { color: #006400; }
   .highlight-red { color: #8B0000; }
 
-  /* Responsive fix cho phần navigation trên mobile */
   @media (max-width: 768px) {
     .part-navigation {
       gap: 15px;
@@ -250,7 +249,6 @@
     }
   }
 
-  /* ===== FOLLOW SECTION ===== */
   .follow-section {
     background: #2c3e50;
     padding: 15px;
@@ -342,18 +340,13 @@
     }
   }
 
-  /* ===== SHARE BUTTONS ===== */
   .share-buttons {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 12px;
     margin: 20px 0 15px 0;
   }
-  .share-buttons a,
-  .share-buttons a:link,
-  .share-buttons a:visited,
-  .share-buttons a:hover,
-  .share-buttons a:active {
+  .share-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -365,36 +358,40 @@
     font-weight: 500;
     transition: opacity 0.2s;
     color: white !important;
-    background-color: #3b5998; /* fallback */
+    background-color: #3b5998;
+    border: none;
+    cursor: pointer;
+    width: 100%;
     white-space: nowrap;
   }
   .share-facebook { background-color: #3b5998; }
   .share-twitter  { background-color: #1da1f2; }
   .share-zalo     { background-color: #0068ff; }
   .share-telegram { background-color: #0088cc; }
-  .share-buttons a:hover {
+  .share-whatsapp { background-color: #25D366; }
+  .share-copy     { background-color: #6c757d; }
+  .share-btn:hover {
     opacity: 0.85;
+  }
+
+  body.light-mode .share-btn {
     color: white !important;
   }
 
-  /* Light mode override */
-  body.light-mode .share-buttons a,
-  body.light-mode .share-buttons a:link,
-  body.light-mode .share-buttons a:visited,
-  body.light-mode .share-buttons a:hover,
-  body.light-mode .share-buttons a:active {
-    color: white !important;
-  }
-
-  @media (max-width: 550px) {
+  @media (max-width: 800px) {
     .share-buttons {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 10px;
     }
-    .share-buttons a {
-      padding: 6px 4px;
-      font-size: 0.8rem;
-      white-space: nowrap;
+  }
+  @media (max-width: 500px) {
+    .share-buttons {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 350px) {
+    .share-buttons {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -697,7 +694,7 @@ speedSelect.addEventListener('change', applyPlaybackRate);
 setProgressBarEnabled(false);
 isAudioStarted = false;
 
-// ==================== RANDOM THANK YOU MESSAGE & COLOR ====================
+// ==================== RANDOM THANK YOU MESSAGE ====================
 const thankYouMessages = [
   { text: "Cảm ơn bạn đã đồng hành. Chúc bạn những giây phút thư giãn!", icon: "📖" },
   { text: "Hẹn gặp lại bạn ở những truyện sau. Chúc bạn luôn vui vẻ!", icon: "✨" },
@@ -707,56 +704,58 @@ const thankYouMessages = [
   { text: "Cảm ơn bạn đã ghé thăm. Hãy luôn mỉm cười bạn nhé!", icon: "🍃" },
   { text: "Cảm ơn bạn đã tin tưởng. Chúc bạn đọc truyện vui vẻ!", icon: "⭐" }
 ];
-
 const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#F7B731'];
-
 const randomMsg = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
 const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
 const thankYouElem = document.getElementById('thank-you-message');
 if (thankYouElem) {
   thankYouElem.innerHTML = `${randomMsg.icon} ${randomMsg.text}`;
   thankYouElem.style.setProperty('color', randomColor, 'important');
 }
 
-// ==================== XỬ LÝ CHIA SẺ ZALO & FACEBOOK ====================
-// Nút Zalo
-const zaloBtn = document.getElementById('share-zalo-btn');
-if (zaloBtn) {
-    zaloBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const url = '{{ current_url }}';
-        const payload = JSON.stringify({ url: url });
-        const encodedPayload = btoa(unescape(encodeURIComponent(payload)));
-        const zaloShareUrl = `https://button-share.zalo.me/share_external?d=${encodedPayload}`;
-        window.open(zaloShareUrl, '_blank', 'noopener,noreferrer');
-    });
-}
+// ==================== CHIA SẺ + COPY LINK ====================
+document.addEventListener('DOMContentLoaded', function() {
+  const shareUrl = '{{ current_url }}';
+  const shareTitle = '{{ story.title }}';
+  const shareText = 'Đọc truyện {{ story.title }} trên Webdoctruyen';
 
-// Nút Facebook (dùng Web Share API nếu có, fallback sharer.php)
-const fbBtn = document.getElementById('share-facebook-btn');
-if (fbBtn) {
-    fbBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const shareData = {
-            title: {{ story.title|tojson }},
-            text: {{ ('Đọc truyện ' ~ story.title ~ ' trên Webdoctruyen')|tojson }},
-            url: {{ current_url|tojson }}
-        };
-        if (navigator.share) {
-            try {
-                await navigator.share(shareData);
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error('Lỗi chia sẻ:', err);
-                    alert('Không thể chia sẻ lúc này. Vui lòng thử lại.');
-                }
-            }
-        } else {
-            const fbShareUrl = `https://www.facebook.com/sharer/sharer.php?u={{ current_url|urlencode }}&quote={{ share_text }}`;
-            window.open(fbShareUrl, '_blank', 'noopener,noreferrer');
-        }
+  function fallbackShare(platform) {
+    let link = '';
+    switch(platform) {
+      case 'twitter':
+        link = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+        break;
+      case 'telegram':
+        link = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+        break;
+      case 'zalo':
+        link = `https://zalo.me/share?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+        break;
+      case 'facebook':
+        link = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+        break;
+      case 'whatsapp':
+        link = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          alert('✅ Đã sao chép đường dẫn truyện!');
+        }).catch(() => {
+          alert('❌ Không thể sao chép, vui lòng thử lại.');
+        });
+        return;
+      default: return;
+    }
+    window.open(link, '_blank', 'noopener,noreferrer');
+  }
+
+  document.querySelectorAll('.share-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const platform = btn.getAttribute('data-platform');
+      fallbackShare(platform);
     });
-}
+  });
+});
 </script>
 {% endblock %}
