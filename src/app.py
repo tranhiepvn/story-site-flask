@@ -1436,11 +1436,29 @@ def upload():
                 return redirect(url_for("upload", story_id=story.id))
 
             elif action == "delete_story":
-                story.categories = []
+                # Xóa tất cả bản ghi có khóa ngoại trỏ tới story
+                Comment.query.filter_by(story_id=story.id).delete()
+                Follow.query.filter_by(story_id=story.id).delete()
+                ReadingHistory.query.filter_by(story_id=story.id).delete()
+                DailyView.query.filter_by(story_id=story.id).delete()
+                DailyListen.query.filter_by(story_id=story.id).delete()
+                
+                # Xóa video của các phần (trước khi xóa phần)
+                for part in story.parts:
+                    PartVideo.query.filter_by(part_id=part.id).delete()
+                # Xóa các phần
                 Part.query.filter_by(story_id=story.id).delete()
+                
+                # Xóa liên kết nhiều-nhiều với thể loại
+                story.categories = []
+                db.session.flush()  # Đảm bảo các thay đổi được ghi nhận
+                
+                # Xóa truyện
                 db.session.delete(story)
                 db.session.commit()
+                flash("Đã xóa truyện thành công.")
                 return redirect(url_for("upload"))
+
 
             elif action == "replace_text":
                 search_str = request.form.get("search_string", "").strip()
@@ -1476,7 +1494,18 @@ def upload():
                 is_completed=bool(request.form.get("is_completed"))
             )
             db.session.add(story)
-            db.session.commit()
+            db.session.flush()  # Lấy ID nhưng chưa commit
+
+            # Xử lý thể loại
+            cat_ids = [int(x) for x in request.form.getlist("category_ids") if x]
+            if cat_ids:
+                story.categories = Category.query.filter(Category.id.in_(cat_ids)).all()
+                story.category_id = cat_ids[0]
+            else:
+                story.categories = []
+                story.category_id = None
+
+            db.session.commit()  # Lưu story cùng categories
 
             parts_data = split_and_clean_content(raw_content)
 
@@ -3280,7 +3309,7 @@ def export_subscribers_csv():
         as_attachment=True,
         download_name="subscribers.csv"
     )
-    
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
