@@ -187,6 +187,11 @@ def get_user_session_id():
         session['reader_session_id'] = str(uuid.uuid4())
     return session['reader_session_id']
 
+def is_mobile():
+    """Xác định request có đến từ mobile hay không dựa vào User-Agent."""
+    user_agent = request.headers.get('User-Agent', '').lower()
+    return 'mobile' in user_agent or 'android' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
+
 # Hàm mới: Trả về danh sách tất cả categories đã sắp xếp theo tên (case-insensitive)
 def get_sorted_categories() -> list["Category"]:
     """
@@ -538,6 +543,8 @@ class DailyView(db.Model):
     story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
     date = db.Column(db.Date, nullable=False)
     views = db.Column(db.Integer, default=0, nullable=False)
+    views_desktop = db.Column(db.Integer, default=0, nullable=False)
+    views_mobile = db.Column(db.Integer, default=0, nullable=False)
     __table_args__ = (db.UniqueConstraint('story_id', 'date', name='uq_daily_story_date'),)
     story = db.relationship('Story', backref=db.backref('daily_views', lazy=True))
 
@@ -547,6 +554,8 @@ class DailyListen(db.Model):
     story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
     date = db.Column(db.Date, nullable=False)
     listens = db.Column(db.Integer, default=0, nullable=False)
+    listens_desktop = db.Column(db.Integer, default=0, nullable=False)
+    listens_mobile = db.Column(db.Integer, default=0, nullable=False)
     __table_args__ = (db.UniqueConstraint('story_id', 'date', name='uq_listen_story_date'),)
     story = db.relationship('Story', backref=db.backref('daily_listens', lazy=True))
 
@@ -606,6 +615,18 @@ with app.app_context():
     if not column_exists('reading_history', 'email'):
         db.session.execute(text("ALTER TABLE reading_history ADD COLUMN email VARCHAR(255)"))
         print("Đã thêm cột email vào bảng reading_history")
+
+    # --- Thêm cột views_desktop, views_mobile cho daily_view ---
+    for col in ['views_desktop', 'views_mobile']:
+        if not column_exists('daily_view', col):
+            db.session.execute(text(f"ALTER TABLE daily_view ADD COLUMN {col} INTEGER DEFAULT 0"))
+            print(f"Đã thêm cột {col} vào bảng daily_view")
+
+    # --- Thêm cột listens_desktop, listens_mobile cho daily_listen ---
+    for col in ['listens_desktop', 'listens_mobile']:
+        if not column_exists('daily_listen', col):
+            db.session.execute(text(f"ALTER TABLE daily_listen ADD COLUMN {col} INTEGER DEFAULT 0"))
+            print(f"Đã thêm cột {col} vào bảng daily_listen")
 
     db.session.commit()
 
@@ -821,10 +842,18 @@ def story_detail(story_id: int):
     story.views = (story.views or 0) + 1
     today = date.today()
     daily = DailyView.query.filter_by(story_id=story.id, date=today).first()
+    mobile = is_mobile()
     if daily:
         daily.views += 1
+        if mobile:
+            daily.views_mobile = (daily.views_mobile or 0) + 1
+        else:
+            daily.views_desktop = (daily.views_desktop or 0) + 1
     else:
-        db.session.add(DailyView(story_id=story.id, date=today, views=1))
+        daily = DailyView(story_id=story.id, date=today, views=1,
+                          views_desktop=0 if mobile else 1,
+                          views_mobile=1 if mobile else 0)
+        db.session.add(daily)
     db.session.commit()
 
     parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
@@ -951,10 +980,18 @@ def start_audio(part_id: int):
     # === GHI NHẬN LƯỢT NGHE MỚI ===
     today = date.today()
     listen_record = DailyListen.query.filter_by(story_id=story_id, date=today).first()
+    mobile = is_mobile()
     if listen_record:
         listen_record.listens += 1
+        if mobile:
+            listen_record.listens_mobile = (listen_record.listens_mobile or 0) + 1
+        else:
+            listen_record.listens_desktop = (listen_record.listens_desktop or 0) + 1
     else:
-        db.session.add(DailyListen(story_id=story_id, date=today, listens=1))
+        listen_record = DailyListen(story_id=story_id, date=today, listens=1,
+                                    listens_desktop=0 if mobile else 1,
+                                    listens_mobile=1 if mobile else 0)
+        db.session.add(listen_record)
     db.session.commit()
     # ================================
 
@@ -2395,7 +2432,6 @@ def views_analytics():
     story_data = []
 
     for story in stories:
-        # Sửa ở đây: Query trực tiếp từ DailyView thay vì story.daily_views.filter
         daily_views = DailyView.query.filter(
             DailyView.story_id == story.id,
             DailyView.date.between(start_date, end_date)
@@ -2406,26 +2442,27 @@ def views_analytics():
             daily_map[dv.date] = dv.views
 
         total_week = sum(daily_map.values())
+        total_desktop = sum(dv.views_desktop or 0 for dv in daily_views)
+        total_mobile = sum(dv.views_mobile or 0 for dv in daily_views)
 
-        # Tính % thay đổi so với tuần trước
         prev_start = start_date - timedelta(days=7)
         prev_views = DailyView.query.filter(
             DailyView.story_id == story.id,
             DailyView.date.between(prev_start, prev_start + timedelta(days=6))
         ).all()
         prev_total = sum(dv.views for dv in prev_views)
-        
         change_pct = round(((total_week - prev_total) / prev_total * 100), 1) if prev_total > 0 else None
 
         story_data.append({
             'story': story,
             'daily': daily_map,
             'total_week': total_week,
+            'total_desktop': total_desktop,
+            'total_mobile': total_mobile,
             'change_pct': change_pct,
             'created_at': story.created_at
         })
 
-    # Sắp xếp
     sort = request.args.get('sort', 'total')
     if sort == 'name':
         story_data.sort(key=lambda x: x['story'].title.lower())
@@ -2466,8 +2503,9 @@ def hears_analytics():
             daily_map[dl.date] = dl.listens
 
         total_week = sum(daily_map.values())
+        total_desktop = sum(dl.listens_desktop or 0 for dl in daily_listens)
+        total_mobile = sum(dl.listens_mobile or 0 for dl in daily_listens)
 
-        # So sánh với tuần trước
         prev_start = start_date - timedelta(days=7)
         prev_listens = DailyListen.query.filter(
             DailyListen.story_id == story.id,
@@ -2480,6 +2518,8 @@ def hears_analytics():
             'story': story,
             'daily': daily_map,
             'total_week': total_week,
+            'total_desktop': total_desktop,
+            'total_mobile': total_mobile,
             'change_pct': change_pct,
             'created_at': story.created_at
         })
