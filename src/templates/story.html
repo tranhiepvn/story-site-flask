@@ -101,10 +101,10 @@
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- AUDIO PLAYER -->
+      <!-- AUDIO PLAYER với loading spinner -->
       <div style="margin: 15px 0;">
         <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
-          <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
+          <button id="play-btn" class="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
           <div style="flex: 1; min-width: 0;">
             <input type="range" id="progress-bar" min="1" max="100" value="1" style="width: 100%; pointer-events: none; opacity: 0.4; margin: 0; display: block;">
           </div>
@@ -394,10 +394,34 @@
       grid-template-columns: 1fr;
     }
   }
+
+  /* === SPINNER CSS === */
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+  }
+  .play-btn.loading {
+    font-size: 0 !important;
+  }
+  .play-btn.loading .spinner {
+    display: inline-block;
+  }
+  .play-btn .spinner {
+    display: none;
+  }
 </style>
 
 <script>
-// ==================== AUDIO PLAYER (giữ nguyên) ====================
+// ==================== AUDIO PLAYER với loading spinner & đúng icon khi pause ====================
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -406,13 +430,32 @@ let currentChunkIndex = 1;
 let totalChunks = 1;
 let nextChunkUrl = null;
 let isPreloading = false;
-let isAudioStarted = false;
+let isAudioStarted = false; // true nếu audio đã được khởi tạo và có thể phát
 let activeFetchController = null;
 
 const progressBar = document.getElementById('progress-bar');
 const playText = document.getElementById('play-text');
 const playBtn = document.getElementById('play-btn');
 const speedSelect = document.getElementById('speed-select');
+
+function updatePlayButtonIcon() {
+  if (playBtn.classList.contains('loading')) return;
+  if (currentAudio && !currentAudio.paused) {
+    playBtn.innerHTML = '⏸️';
+  } else {
+    playBtn.innerHTML = '▶️';
+  }
+}
+
+function setLoading(loading) {
+  if (loading) {
+    playBtn.classList.add('loading');
+    playBtn.innerHTML = '<div class="spinner"></div>';
+  } else {
+    playBtn.classList.remove('loading');
+    updatePlayButtonIcon();
+  }
+}
 
 function savePlaybackPosition() {
   if (!currentAudio || !currentStoryId || !currentPartNumber || !isAudioStarted) return;
@@ -445,7 +488,7 @@ async function restorePlaybackPosition() {
           audioEl.currentTime = pos.current_time || 0;
           await audioEl.play();
           playText.textContent = "Đang nghe...";
-          playBtn.innerHTML = "⏸️";
+          setLoading(false);
           setProgressBarEnabled(true);
           isAudioStarted = true;
           applyPlaybackRate();
@@ -456,7 +499,7 @@ async function restorePlaybackPosition() {
         currentAudio.currentTime = pos.current_time;
         await currentAudio.play();
         playText.textContent = "Đang nghe...";
-        playBtn.innerHTML = "⏸️";
+        setLoading(false);
         setProgressBarEnabled(true);
         isAudioStarted = true;
         applyPlaybackRate();
@@ -538,22 +581,22 @@ async function toggleAudio(partId) {
     if (currentAudio.paused) {
       await currentAudio.play();
       playText.textContent = "Đang nghe...";
-      playBtn.innerHTML = "⏸️";
+      setLoading(false);
       setProgressBarEnabled(true);
       applyPlaybackRate();
       if (currentChunkIndex < totalChunks && !nextChunkUrl && !isPreloading) preloadNextChunk();
     } else {
       currentAudio.pause();
       playText.textContent = "Tạm dừng...";
-      playBtn.innerHTML = "▶️";
+      setLoading(false);
       savePlaybackPosition();
     }
+    updatePlayButtonIcon();
     return;
   }
 
-  playBtn.innerHTML = "⏳";
+  setLoading(true);
   playText.textContent = "Đang khởi tạo...";
-  playBtn.disabled = true;
   setProgressBarEnabled(false);
   nextChunkUrl = null;
   isPreloading = false;
@@ -575,9 +618,8 @@ async function toggleAudio(partId) {
       currentAudio.partId = partId;
       applyPlaybackRate();
 
-      playBtn.innerHTML = "⏸️";
+      setLoading(false);
       playText.textContent = "Đang nghe...";
-      playBtn.disabled = false;
       isAudioStarted = true;
       setProgressBarEnabled(true);
       progressBar.max = totalChunks;
@@ -594,10 +636,10 @@ async function toggleAudio(partId) {
   } catch (e) {
     console.error(e);
     playText.textContent = "Lỗi kết nối";
-    playBtn.innerHTML = "▶️";
-    playBtn.disabled = false;
+    setLoading(false);
     setProgressBarEnabled(false);
   }
+  updatePlayButtonIcon();
 }
 
 document.getElementById('audio-element').addEventListener('ended', async function() {
@@ -618,30 +660,27 @@ document.getElementById('audio-element').addEventListener('ended', async functio
   } else {
     this.pause();
     playText.textContent = `Đang tải chunk ${currentChunkIndex}/${totalChunks}...`;
-    playBtn.innerHTML = "⏳";
-    playBtn.disabled = true;
+    setLoading(true);
     const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, this, true);
     if (success) {
       applyPlaybackRate();
       if (currentChunkIndex < totalChunks) preloadNextChunk();
     } else {
       playText.textContent = "Lỗi tải audio";
-      playBtn.innerHTML = "▶️";
-      playBtn.disabled = false;
+      setLoading(false);
       return;
     }
   }
   playText.textContent = "Đang nghe...";
-  playBtn.innerHTML = "⏸️";
-  playBtn.disabled = false;
+  setLoading(false);
+  updatePlayButtonIcon();
 });
 
 function resetAudioPlayer() {
   if (currentAudio) currentAudio.pause();
   currentAudio = null;
-  playBtn.innerHTML = "▶️";
+  setLoading(false);
   playText.textContent = "Nhấn play để nghe...";
-  playBtn.disabled = false;
   isAudioStarted = false;
   setProgressBarEnabled(false);
   progressBar.value = 1;
@@ -650,6 +689,7 @@ function resetAudioPlayer() {
   if (activeFetchController) activeFetchController.abort();
   activeFetchController = null;
   localStorage.removeItem('audio_position');
+  updatePlayButtonIcon();
 }
 
 progressBar.addEventListener('change', async function() {
@@ -669,24 +709,22 @@ progressBar.addEventListener('change', async function() {
   }
 
   playText.textContent = `Đang tải chunk ${currentChunkIndex}/${totalChunks}...`;
-  playBtn.innerHTML = "⏳";
-  playBtn.disabled = true;
+  setLoading(true);
 
   const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, document.getElementById('audio-element'), true);
   if (success) {
     playText.textContent = "Đang nghe...";
-    playBtn.innerHTML = "⏸️";
-    playBtn.disabled = false;
+    setLoading(false);
     applyPlaybackRate();
     if (currentChunkIndex < totalChunks) preloadNextChunk();
     savePlaybackPosition();
   } else {
     if (!activeFetchController) {
       playText.textContent = "Lỗi tải";
-      playBtn.innerHTML = "▶️";
-      playBtn.disabled = false;
+      setLoading(false);
     }
   }
+  updatePlayButtonIcon();
 });
 
 speedSelect.addEventListener('change', applyPlaybackRate);
