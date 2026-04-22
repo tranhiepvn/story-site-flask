@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block title %}Danh sách đăng ký nhận truyện mới{% endblock %}
+{% block content %}
+<h2>📧 Danh sách email nhận thông báo truyện mới</h2>
+<div style="margin-bottom: 15px;">
+  <a href="{{ url_for('export_subscribers_csv') }}" style="background:#28a745; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">📎 Xuất CSV</a>
+</div>
+<p>Tổng số: {{ subscribers|length }}</p>
+{% if subscribers %}
+<table style="width:100%; border-collapse: collapse; background:#1C1C1C;">
+  <thead>
+    <tr style="background:#4A90E2; color:white;">
+      <th style="padding:8px;">ID</th>
+      <th style="padding:8px;">Email</th>
+      <th style="padding:8px;">Ngày đăng ký</th>
+      <th style="padding:8px;">Hành động</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for sub in subscribers %}
+    <tr style="border-bottom:1px solid #333;">
+      <td style="padding:8px; text-align:center;">{{ sub.id }}</td>
+      <td style="padding:8px;">{{ sub.email }}</td>
+      <td style="padding:8px;">{{ sub.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td style="padding:8px;">
+        <form method="post" action="{{ url_for('delete_subscriber', sub_id=sub.id) }}" onsubmit="return confirm('Xóa email này khỏi danh sách?');">
+          <input type="password" name="password" placeholder="Mật khẩu" style="width:100px; margin-right:4px;" required>
+          <button type="submit" style="background:#d9534f; color:white; border:none; padding:4px 12px; border-radius:4px;">Xóa</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Chưa có email nào đăng ký nhận thông báo truyện mới.</p>
+{% endif %}
+<p><a href="{{ url_for('upload') }}">← Quay lại trang admin</a></p>
+{% endblock %}

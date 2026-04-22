@@ -3195,6 +3195,92 @@ def view_all_comments():
     comments = db.session.query(Comment, Story).join(Story, Comment.story_id == Story.id).order_by(Comment.created_at.desc()).all()
     return render_template("comments_list.html", comments=comments)
 
+# Xóa một follow cụ thể
+@app.route("/admin/follows/delete/<int:follow_id>", methods=["POST"])
+def delete_follow(follow_id: int):
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("admin_follows"))
+    follow = Follow.query.get_or_404(follow_id)
+    story_title = follow.story.title
+    email = follow.email
+    db.session.delete(follow)
+    db.session.commit()
+    flash(f"Đã xóa theo dõi của {email} đối với truyện '{story_title}'.")
+    return redirect(url_for("admin_follows"))
+
+# Export danh sách follow ra CSV
+@app.route("/admin/follows/export")
+def export_follows_csv():
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    import csv
+    from io import StringIO
+    follows = db.session.query(Follow, Story).join(Story, Follow.story_id == Story.id).order_by(Follow.created_at.desc()).all()
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Email", "Truyện ID", "Truyện", "Ngày đăng ký"])
+    for follow, story in follows:
+        writer.writerow([follow.id, follow.email, story.id, story.title, follow.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode("utf-8")),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="follows.csv"
+    )
+
+# Trang quản lý đăng ký nhận truyện mới
+@app.route("/admin/subscribers")
+def admin_subscribers():
+    if not session.get("upload_authenticated"):
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+    subscribers = NewStorySubscription.query.order_by(NewStorySubscription.created_at.desc()).all()
+    return render_template("admin_subscribers.html", subscribers=subscribers)
+
+# Xóa một đăng ký nhận truyện mới
+@app.route("/admin/subscribers/delete/<int:sub_id>", methods=["POST"])
+def delete_subscriber(sub_id: int):
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("admin_subscribers"))
+    sub = NewStorySubscription.query.get_or_404(sub_id)
+    email = sub.email
+    db.session.delete(sub)
+    db.session.commit()
+    flash(f"Đã xóa {email} khỏi danh sách nhận thông báo truyện mới.")
+    return redirect(url_for("admin_subscribers"))
+
+# (Tuỳ chọn) Export danh sách subscribers ra CSV
+@app.route("/admin/subscribers/export")
+def export_subscribers_csv():
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    import csv
+    from io import StringIO
+    subscribers = NewStorySubscription.query.order_by(NewStorySubscription.created_at.desc()).all()
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Email", "Ngày đăng ký"])
+    for sub in subscribers:
+        writer.writerow([sub.id, sub.email, sub.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode("utf-8")),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="subscribers.csv"
+    )
+    
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()

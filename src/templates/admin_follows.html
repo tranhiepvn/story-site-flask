@@ -2,6 +2,9 @@
 {% block title %}Quản lý theo dõi truyện{% endblock %}
 {% block content %}
 <h2>📧 Danh sách email theo dõi truyện</h2>
+<div style="margin-bottom: 15px;">
+  <a href="{{ url_for('export_follows_csv') }}" style="background:#28a745; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">📎 Xuất CSV</a>
+</div>
 <table style="width:100%; border-collapse: collapse; background:#1C1C1C;">
   <thead>
     <tr style="background:#4A90E2; color:white;">
@@ -10,7 +13,8 @@
       <th style="padding:8px;">Truyện</th>
       <th style="padding:8px;">Ngày đăng ký</th>
       <th style="padding:8px;">Phần đọc gần nhất</th>
-     </tr>
+      <th style="padding:8px;">Hành động</th>
+    </tr>
   </thead>
   <tbody>
     {% for item in follows %}
@@ -20,7 +24,13 @@
       <td style="padding:8px;"><a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a></td>
       <td style="padding:8px;">{{ item.follow.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
       <td style="padding:8px; text-align:center;">{{ item.last_part }}</td>
-     </tr>
+      <td style="padding:8px;">
+        <form method="post" action="{{ url_for('delete_follow', follow_id=item.follow.id) }}" onsubmit="return confirm('Xóa theo dõi này?');">
+          <input type="password" name="password" placeholder="Mật khẩu" style="width:80px; margin-right:4px;" required>
+          <button type="submit" style="background:#d9534f; color:white; border:none; padding:4px 8px; border-radius:4px;">Xóa</button>
+        </form>
+      </td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>
