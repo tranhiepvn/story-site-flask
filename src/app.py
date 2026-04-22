@@ -103,6 +103,16 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
     return sections
 # ==========================================================================================
 
+# Helper để chạy edge_tts một cách an toàn trong thread, tạo event loop riêng
+def run_async_save(communicate, file_path: str) -> None:
+    """Chạy communicate.save() với event loop riêng cho thread hiện tại."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(communicate.save(file_path))
+    finally:
+        loop.close()
+
 # Tạo ứng dụng Flask
 app = Flask(__name__)
 
@@ -1006,7 +1016,7 @@ def start_audio(part_id: int):
         print(f"[AUDIO] 🔨 Đang tạo CHUNK 1/{total_chunks}...")
         try:
             communicate = edge_tts.Communicate(text=chunks[0], voice="vi-VN-HoaiMyNeural")
-            asyncio.run(communicate.save(str(tmp1)))
+            run_async_save(communicate, str(tmp1))
             if tmp1.exists():
                 os.replace(tmp1, chunk1_path)
                 print(f"[AUDIO] ✅ CHUNK 1 HOÀN TẤT")
@@ -1030,7 +1040,7 @@ def start_audio(part_id: int):
                 print(f"[BACKGROUND] 🔨 Đang tạo chunk {i+1}/{total_chunks}...")
                 try:
                     communicate = edge_tts.Communicate(text=chunks[i], voice="vi-VN-HoaiMyNeural")
-                    asyncio.run(communicate.save(str(tmp_path)))
+                    run_async_save(communicate, str(tmp_path))
                     if tmp_path.exists():
                         os.replace(tmp_path, chunk_path)
                         print(f"[BACKGROUND] ✅ Chunk {i+1}/{total_chunks} HOÀN TẤT")
@@ -1088,7 +1098,7 @@ def get_chunk(story_id: int, part_number: int, chunk_index: int):
 
     try:
         communicate = edge_tts.Communicate(text=chunks[chunk_index-1], voice="vi-VN-HoaiMyNeural")
-        asyncio.run(communicate.save(str(tmp_path)))
+        run_async_save(communicate, str(tmp_path))
 
         if tmp_path.exists():
             os.replace(tmp_path, chunk_path)
