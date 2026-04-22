@@ -9,16 +9,18 @@
       <th style="padding:8px;">Email</th>
       <th style="padding:8px;">Truyện</th>
       <th style="padding:8px;">Ngày đăng ký</th>
-    </tr>
+      <th style="padding:8px;">Phần đọc gần nhất</th>
+     </tr>
   </thead>
   <tbody>
-    {% for follow, story in follows %}
+    {% for item in follows %}
     <tr style="border-bottom:1px solid #333;">
-      <td style="padding:8px; text-align:center;">{{ follow.id }}</td>
-      <td style="padding:8px;">{{ follow.email }}</td>
-      <td style="padding:8px;"><a href="{{ url_for('story_detail', story_id=story.id) }}">{{ story.title }}</a></td>
-      <td style="padding:8px;">{{ follow.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-    </tr>
+      <td style="padding:8px; text-align:center;">{{ item.follow.id }}</td>
+      <td style="padding:8px;">{{ item.follow.email }}</td>
+      <td style="padding:8px;"><a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a></td>
+      <td style="padding:8px;">{{ item.follow.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td style="padding:8px; text-align:center;">{{ item.last_part }}</td>
+     </tr>
     {% endfor %}
   </tbody>
 </table>

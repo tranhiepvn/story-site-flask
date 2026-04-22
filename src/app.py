@@ -525,6 +525,7 @@ class ReadingHistory(db.Model):
     __tablename__ = "reading_history"
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(255), nullable=True)          # <-- THÊM CỘT EMAIL
     story_id = db.Column(db.Integer, db.ForeignKey("stories.id"), nullable=False)
     part_number = db.Column(db.Integer, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -600,6 +601,11 @@ with app.app_context():
     # --- Upgrade Announcements Table ---
     if not column_exists('announcements', 'device_type'):
         db.session.execute(text("ALTER TABLE announcements ADD COLUMN device_type VARCHAR(20) DEFAULT 'both'"))
+
+    # --- Thêm cột email vào bảng reading_history nếu chưa có ---
+    if not column_exists('reading_history', 'email'):
+        db.session.execute(text("ALTER TABLE reading_history ADD COLUMN email VARCHAR(255)"))
+        print("Đã thêm cột email vào bảng reading_history")
 
     db.session.commit()
 
@@ -862,13 +868,27 @@ def story_detail(story_id: int):
     # Lưu lịch sử đọc
     if current_part:
         session_id = get_user_session_id()
-        history = ReadingHistory.query.filter_by(session_id=session_id, story_id=story.id).first()
-        if history:
-            history.part_number = current_index
-            history.updated_at = datetime.utcnow()
+        email_in_session = session.get('reader_email')
+        
+        # Nếu có email trong session, ưu tiên dùng email để tìm bản ghi
+        if email_in_session:
+            history = ReadingHistory.query.filter_by(email=email_in_session, story_id=story.id).first()
+            if history:
+                history.part_number = current_index
+                history.updated_at = datetime.utcnow()
+                history.session_id = session_id
+            else:
+                history = ReadingHistory(session_id=session_id, email=email_in_session, story_id=story.id, part_number=current_index)
+                db.session.add(history)
         else:
-            history = ReadingHistory(session_id=session_id, story_id=story.id, part_number=current_index)
-            db.session.add(history)
+            # Không có email, dùng session_id
+            history = ReadingHistory.query.filter_by(session_id=session_id, story_id=story.id).first()
+            if history:
+                history.part_number = current_index
+                history.updated_at = datetime.utcnow()
+            else:
+                history = ReadingHistory(session_id=session_id, story_id=story.id, part_number=current_index)
+                db.session.add(history)
         db.session.commit()
 
     return render_template(
@@ -2760,11 +2780,11 @@ def remove_history_item(history_id: int):
 def follow_story(story_id: int):
     story = Story.query.get_or_404(story_id)
     email = request.form.get("email", "").strip()
+    part_number = request.form.get("part_number", type=int)
     if not email:
         flash("Vui lòng nhập email.")
         return redirect(url_for("story_detail", story_id=story_id))
     
-    # Kiểm tra đã tồn tại chưa
     existing = Follow.query.filter_by(story_id=story_id, email=email).first()
     if existing:
         flash("Bạn đã theo dõi truyện này rồi.")
@@ -2774,7 +2794,23 @@ def follow_story(story_id: int):
         db.session.commit()
         send_follow_confirmation(story, email)
         flash("Đã đăng ký theo dõi thành công. Bạn sẽ nhận được email khi có chương mới.")
-    return redirect(url_for("story_detail", story_id=story_id))
+        
+        # Tạo hoặc cập nhật lịch sử đọc cho email này
+        session['reader_email'] = email
+        session_id = get_user_session_id()
+        history = ReadingHistory.query.filter_by(email=email, story_id=story.id).first()
+        if history:
+            if part_number:
+                history.part_number = part_number
+                history.updated_at = datetime.utcnow()
+            history.session_id = session_id
+        else:
+            if part_number:
+                history = ReadingHistory(session_id=session_id, email=email, story_id=story.id, part_number=part_number)
+                db.session.add(history)
+        db.session.commit()
+    
+    return redirect(url_for("story_detail", story_id=story_id, part=part_number) if part_number else url_for("story_detail", story_id=story_id))
 
 @app.route("/unfollow/<int:story_id>", methods=["POST"])
 def unfollow_story(story_id: int):
@@ -2800,23 +2836,72 @@ def admin_follows():
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
     
-    # Lấy tất cả các bản ghi follow, kèm theo thông tin story
+    # Subquery lấy max updated_at cho mỗi (email, story_id)
+    from sqlalchemy import and_
+    subq = db.session.query(
+        ReadingHistory.email,
+        ReadingHistory.story_id,
+        func.max(ReadingHistory.updated_at).label('max_updated')
+    ).group_by(ReadingHistory.email, ReadingHistory.story_id).subquery()
+    
+    # Lấy phần đọc gần nhất
+    latest_read = db.session.query(
+        ReadingHistory.email,
+        ReadingHistory.story_id,
+        ReadingHistory.part_number
+    ).join(
+        subq,
+        and_(
+            ReadingHistory.email == subq.c.email,
+            ReadingHistory.story_id == subq.c.story_id,
+            ReadingHistory.updated_at == subq.c.max_updated
+        )
+    ).all()
+    
+    read_map = {(r.email, r.story_id): r.part_number for r in latest_read}
+    
+    # Lấy danh sách follow
     follows = db.session.query(Follow, Story).join(Story, Follow.story_id == Story.id).order_by(Follow.created_at.desc()).all()
-    return render_template("admin_follows.html", follows=follows)
+    follow_data = []
+    for follow, story in follows:
+        follow_data.append({
+            'follow': follow,
+            'story': story,
+            'last_part': read_map.get((follow.email, story.id), 'Chưa đọc')
+        })
+    
+    return render_template("admin_follows.html", follows=follow_data)
 
 @app.route("/my_follows", methods=["GET", "POST"])
 def my_follows():
     stories = []
     email = None
+    history_map = {}
+    
     if request.method == "POST":
         email = request.form.get("email", "").strip()
         if email:
+            # Lưu email vào session để dùng khi đọc truyện
+            session['reader_email'] = email
             # Lấy tất cả follow của email này
             follows = Follow.query.filter_by(email=email).all()
             story_ids = [f.story_id for f in follows]
             stories = Story.query.filter(Story.id.in_(story_ids), Story.is_hidden == False).all()
+            
+            # Lấy lịch sử đọc theo email (KHÔNG dùng session_id)
+            history_records = ReadingHistory.query.filter_by(email=email).all()
+            # Lấy bản ghi mới nhất cho mỗi story
+            for rec in history_records:
+                if rec.story_id not in history_map or rec.updated_at > history_map[rec.story_id][1]:
+                    history_map[rec.story_id] = (rec.part_number, rec.updated_at)
         else:
             flash("Vui lòng nhập email.")
+    
+    # Gắn last_read_part vào mỗi story
+    for story in stories:
+        last_part = history_map.get(story.id, (1, None))[0]
+        story.last_read_part = last_part
+    
     return render_template("my_follows.html", stories=stories, email=email)
 
 @app.route("/skip_comments", methods=["POST"])

@@ -7,6 +7,7 @@
   <div class="follow-forms">
     <form method="post" action="{{ url_for('follow_story', story_id=story.id) }}" class="follow-form">
       <input type="email" name="email" placeholder="Email của bạn" required>
+      <input type="hidden" name="part_number" value="{{ current_index }}">
       <button type="submit">Theo dõi</button>
     </form>
     <form method="post" action="{{ url_for('unfollow_story', story_id=story.id) }}" class="unfollow-form">
@@ -53,6 +54,16 @@
     </p>
   {% endif %}
 
+  <!-- Nút chia sẻ mạng xã hội -->
+  {% set share_url = current_url|urlencode %}
+  {% set share_text = ("Đọc truyện " ~ story.title ~ " trên Webdoctruyen")|urlencode %}
+  <div class="share-buttons">
+    <a href="https://twitter.com/intent/tweet?text={{ share_text }}&url={{ share_url }}" target="_blank" rel="noopener noreferrer" class="share-twitter">🐦 X (Twitter)</a>
+    <a href="https://t.me/share/url?url={{ share_url }}&text={{ share_text }}" target="_blank" rel="noopener noreferrer" class="share-telegram">✈️ Telegram</a>
+    <a href="#" id="share-zalo-btn" class="share-zalo">💬 Zalo</a>
+    <a href="#" id="share-facebook-btn" class="share-facebook">📘 Facebook</a>
+  </div>
+
   {% if total_parts > 0 %}
     {% if total_parts > 1 %}
       <div class="part-list" style="margin-top: 2em;">
@@ -90,7 +101,7 @@
         <h3 class="chapter-title">{{ chapter_title }}</h3>
       {% endif %}
 
-      <!-- AUDIO PLAYER: TEXT XUỐNG DƯỚI PROGRESS BAR -->
+      <!-- AUDIO PLAYER -->
       <div style="margin: 15px 0;">
         <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
           <button id="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
@@ -126,7 +137,6 @@
       <p class="continuation">Còn tiếp…</p>
     {% endif %}
 
-    <!-- THANK YOU MESSAGE - RANDOM MÀU VÀ NỘI DUNG -->
     <p id="thank-you-message" class="thank-you">Cảm ơn bạn đã đọc truyện tại đây. Chúc bạn vui nha!</p>
 
     <div class="rating-section">
@@ -240,7 +250,7 @@
     }
   }
 
-  /* ===== FOLLOW SECTION STYLES (chế độ tối mặc định) ===== */
+  /* ===== FOLLOW SECTION ===== */
   .follow-section {
     background: #2c3e50;
     padding: 15px;
@@ -292,7 +302,6 @@
     background-color: #0056b3;
   }
 
-  /* Chế độ sáng */
   body.light-mode .follow-section {
     background: #e9ecef;
     border: 1px solid #ced4da;
@@ -318,7 +327,6 @@
     background-color: #004080;
   }
 
-  /* Trên mobile: xếp dọc các form và các thành phần bên trong */
   @media (max-width: 768px) {
     .follow-forms {
       flex-direction: column;
@@ -333,10 +341,66 @@
       min-width: auto;
     }
   }
+
+  /* ===== SHARE BUTTONS ===== */
+  .share-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 20px 0 15px 0;
+  }
+  .share-buttons a,
+  .share-buttons a:link,
+  .share-buttons a:visited,
+  .share-buttons a:hover,
+  .share-buttons a:active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 6px;
+    border-radius: 30px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: opacity 0.2s;
+    color: white !important;
+    background-color: #3b5998; /* fallback */
+    white-space: nowrap;
+  }
+  .share-facebook { background-color: #3b5998; }
+  .share-twitter  { background-color: #1da1f2; }
+  .share-zalo     { background-color: #0068ff; }
+  .share-telegram { background-color: #0088cc; }
+  .share-buttons a:hover {
+    opacity: 0.85;
+    color: white !important;
+  }
+
+  /* Light mode override */
+  body.light-mode .share-buttons a,
+  body.light-mode .share-buttons a:link,
+  body.light-mode .share-buttons a:visited,
+  body.light-mode .share-buttons a:hover,
+  body.light-mode .share-buttons a:active {
+    color: white !important;
+  }
+
+  @media (max-width: 550px) {
+    .share-buttons {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .share-buttons a {
+      padding: 6px 4px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+  }
 </style>
 
 <script>
-// ==================== AUDIO PLAYER (giữ nguyên code cũ) ====================
+// ==================== AUDIO PLAYER (giữ nguyên) ====================
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -653,6 +717,46 @@ const thankYouElem = document.getElementById('thank-you-message');
 if (thankYouElem) {
   thankYouElem.innerHTML = `${randomMsg.icon} ${randomMsg.text}`;
   thankYouElem.style.setProperty('color', randomColor, 'important');
+}
+
+// ==================== XỬ LÝ CHIA SẺ ZALO & FACEBOOK ====================
+// Nút Zalo
+const zaloBtn = document.getElementById('share-zalo-btn');
+if (zaloBtn) {
+    zaloBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = '{{ current_url }}';
+        const payload = JSON.stringify({ url: url });
+        const encodedPayload = btoa(unescape(encodeURIComponent(payload)));
+        const zaloShareUrl = `https://button-share.zalo.me/share_external?d=${encodedPayload}`;
+        window.open(zaloShareUrl, '_blank', 'noopener,noreferrer');
+    });
+}
+
+// Nút Facebook (dùng Web Share API nếu có, fallback sharer.php)
+const fbBtn = document.getElementById('share-facebook-btn');
+if (fbBtn) {
+    fbBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const shareData = {
+            title: {{ story.title|tojson }},
+            text: {{ ('Đọc truyện ' ~ story.title ~ ' trên Webdoctruyen')|tojson }},
+            url: {{ current_url|tojson }}
+        };
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Lỗi chia sẻ:', err);
+                    alert('Không thể chia sẻ lúc này. Vui lòng thử lại.');
+                }
+            }
+        } else {
+            const fbShareUrl = `https://www.facebook.com/sharer/sharer.php?u={{ current_url|urlencode }}&quote={{ share_text }}`;
+            window.open(fbShareUrl, '_blank', 'noopener,noreferrer');
+        }
+    });
 }
 </script>
 {% endblock %}
