@@ -152,7 +152,7 @@
 {% endif %}
 
 <h3>Thêm phần mới</h3>
-<form method="post">
+<form method="post" enctype="multipart/form-data">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
   <div class="form-group">
     <label for="new_content">Nội dung phần mới:</label><br>
