@@ -44,36 +44,58 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 
+import markdown
+def markdown_to_html(text: str) -> str:
+    return markdown.markdown(text, extensions=['extra'])
+
+def clean_title_line(line: str) -> str:
+    """Loại bỏ các cặp dấu * (***, **, *) ở đầu và cuối dòng (tiêu đề phần)."""
+    original = line
+    changed = True
+    while changed:
+        changed = False
+        if line.startswith('***') and line.endswith('***'):
+            line = line[3:-3].strip()
+            changed = True
+        elif line.startswith('**') and line.endswith('**'):
+            line = line[2:-2].strip()
+            changed = True
+        elif line.startswith('*') and line.endswith('*'):
+            line = line[1:-1].strip()
+            changed = True
+    return line if line else original
+
 # ====================== HÀM DỌN DẸP + TÁCH PHẦN (theo script anh đưa) ======================
 def clean_line(line: str) -> str:
     line = line.rstrip('\n')
+    # Xóa các dấu # ở đầu dòng (nếu có)
     line = re.sub(r'^#+\s*', '', line)
-    
-    if line.startswith('*') and line.endswith('*') and len(line) > 1 and line[1] != '*' and line[-2] != '*':
-        content = line[1:-1].strip()
-        line = f'"{content}"'
-    else:
-        line = line.strip('*')
-    
-    if line.startswith('- '):
-        line = f'"{line[2:].strip()}"'
-    if line.startswith('– '):
-        line = f'"{line[2:].strip()}"'
-    
+
+    # KHÔNG xử lý dấu * nữa, giữ nguyên cho Markdown (nghiêng, đậm, ...)
+    # Đoạn cũ xóa * đã được bỏ qua
+
+    # Xử lý các trường hợp đặc biệt: dấu gạch ngang đầu dòng -> thêm ngoặc kép
+    # if line.startswith('- '):
+    #     line = f'"{line[2:].strip()}"'
+    # if line.startswith('– '):
+    #     line = f'"{line[2:].strip()}"'
+
+    # Thay thế các dấu ngoặc và dấu câu
     line = line.replace("’", "'").replace("‘", "'")
     line = line.replace("…", "...")
     line = line.replace("”", '"').replace("“", '"')
     line = line.replace("–", "-")
-    
+
+    # Thay thế từ ngữ nhạy cảm (nếu cần)
     line = line.replace("cái cặc", "con cặc").replace("Cái cặc", "Con cặc")
     line = line.replace("quần lót", "xì-líp").replace("Quần lót", "Xì-líp")
     line = line.replace("địt", "đụ").replace("Địt", "Đụ")
-    
+
+    # Dọn dẹp một số trường hợp dấu ngoặc kép thừa
     line = line.replace('"*', '"')
     line = line.replace('""', '"')
-    
-    return line
 
+    return line
 
 def split_and_clean_content(content: str) -> list[tuple[int, str]]:
     lines = content.splitlines()
@@ -86,6 +108,9 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
         match = re.match(r'^\s*Phần\s+(\d+)\s*:', cleaned, re.IGNORECASE)
         if match:
             if current_content and part_num is not None:
+                # Xử lý dòng đầu của phần hiện tại (loại bỏ * bao quanh)
+                if current_content:
+                    current_content[0] = clean_title_line(current_content[0])
                 sections.append((part_num, '\n'.join(current_content)))
             part_num = int(match.group(1))
             current_content = [cleaned]
@@ -94,10 +119,16 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
                 current_content.append(cleaned)
 
     if current_content and part_num is not None:
+        if current_content:
+            current_content[0] = clean_title_line(current_content[0])
         sections.append((part_num, '\n'.join(current_content)))
 
     if not sections and content.strip():
         full_clean = '\n'.join(clean_line(line) for line in content.splitlines())
+        lines_full = full_clean.splitlines()
+        if lines_full:
+            lines_full[0] = clean_title_line(lines_full[0])
+            full_clean = '\n'.join(lines_full)
         sections = [(1, full_clean)]
 
     return sections
@@ -972,7 +1003,7 @@ def index():
 
 @app.route("/story/<int:story_id>")
 def story_detail(story_id: int):
-    """Trang chi tiết truyện - ĐÃ FIX TIÊU ĐỀ LẶP + giữ nguyên xuống dòng"""
+    """Trang chi tiết truyện - hỗ trợ Markdown và giữ nguyên xuống dòng"""
     story = Story.query.get_or_404(story_id)
     
     # Tăng lượt xem
@@ -1022,21 +1053,23 @@ def story_detail(story_id: int):
 
     chapter_title = chapter_title.strip()
 
-    # Highlight chỉ áp dụng cho nội dung
+    # Chuyển đổi Markdown sang HTML (nghiêng, đậm, gạch ngang, gạch dưới)
+    chapter_body = markdown_to_html(chapter_body)
+
+    # Highlight (có thể áp dụng sau Markdown, an toàn vì thẻ HTML không ảnh hưởng)
     chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
     chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
 
-    # Giữ nguyên tất cả xuống dòng
+    # Giữ nguyên xuống dòng: chuyển \n thành <br>
     content_processed = chapter_body.replace('\n', '<br>')
 
     comments = Comment.query.filter_by(story_id=story.id, is_hidden=False).order_by(Comment.created_at.desc()).all()
 
-    # Lưu lịch sử đọc
+    # Lưu lịch sử đọc (giữ nguyên)
     if current_part:
         session_id = get_user_session_id()
         email_in_session = session.get('reader_email')
         
-        # Nếu có email trong session, ưu tiên dùng email để tìm bản ghi
         if email_in_session:
             history = ReadingHistory.query.filter_by(email=email_in_session, story_id=story.id).first()
             if history:
@@ -1047,7 +1080,6 @@ def story_detail(story_id: int):
                 history = ReadingHistory(session_id=session_id, email=email_in_session, story_id=story.id, part_number=current_index)
                 db.session.add(history)
         else:
-            # Không có email, dùng session_id
             history = ReadingHistory.query.filter_by(session_id=session_id, story_id=story.id).first()
             if history:
                 history.part_number = current_index
@@ -1399,7 +1431,11 @@ def upload():
 
                 part_obj = Part.query.get(int(part_id))
                 if part_obj and part_obj.story_id == story.id:
-                    cleaned_content = '\n'.join(clean_line(line) for line in raw_content.splitlines())
+                    cleaned_lines = [clean_line(line) for line in raw_content.splitlines()]
+                    if cleaned_lines:
+                        cleaned_lines[0] = clean_title_line(cleaned_lines[0])
+                    cleaned_content = '\n'.join(cleaned_lines)
+                    
                     part_obj.content = cleaned_content
 
                     PartVideo.query.filter_by(part_id=part_obj.id).delete()

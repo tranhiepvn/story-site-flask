@@ -147,153 +147,195 @@
 
     /* MOBILE */
     @media (max-width: 768px) {
-  .container { padding: 0 8px !important; margin: 0 !important; max-width: 100% !important; }
-  header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    gap: 8px;
-  }
-  .sidebar-toggle {
-    order: 1;
-    flex-shrink: 0;
-    font-size: 28px;
-    background: none;
-    border: none;
-    color: white;
-    padding: 0;
-    margin-left: 6px;
-    display: inline-block !important;
-    line-height: 1.2;
-    transform: translateY(-10%);  /* dời lên 25% chiều cao */
-  }
-  header h1 {
-    order: 2;
-    flex: 1;
-    font-size: 1rem;
-    margin: 0;
-    text-align: left;
-    white-space: nowrap;
-    overflow-x: auto;
-    line-height: 1.2;
-  }
-  header nav {
-    order: 3;
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
-    align-items: center;
-    margin-right: 8px;
-  }
-  header nav a,
-  header nav button {
-    line-height: 1.2;
-  }
-  /* Ẩn link "Theo dõi của tôi" trong nav */
-  header nav a[href*="my_follows"] {
-    display: none !important;
-  }
-  header nav a:first-child {
-    font-size: 0.9rem;
-  }
-  header nav button {
-    font-size: 1.1rem;
-    margin-left: 0;
-  }
-  .search-form {
-    order: 4;
-    width: 100%;
-    margin: 4px 0;
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 8px;
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-  .search-form input {
-    flex: 1;
-    min-width: 0;
-  }
-  .search-form select, .search-form button {
-    flex-shrink: 0;
-  }
-  .search-form button {
-    font-weight: normal;
-  }
-  .mobile-follow-row {
-    order: 5;
-    display: block;
-    width: 100%;
-    text-align: center;
-    margin: 12px 0 8px 0;
-  }
-  .mobile-follow-row a {
-    font-size: 0.9rem;
-    color: #fff !important;
-    text-decoration: none;
-    font-weight: bold;
-    line-height: 1.2;
-  }
-  .mobile-follow-row a:hover {
-    text-decoration: underline;
-  }
-  /* Các phần còn lại giữ nguyên */
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 85%;
-    max-width: 320px;
-    height: 100%;
-    z-index: 1000;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    overflow-y: auto;
-    padding: 15px;
-    background: #000 !important;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.5);
-  }
-  .sidebar.open { transform: translateX(0); }
-  .close-sidebar {
-    display: block !important;
-    background: none;
-    border: none;
-    color: #FF9800;
-    font-size: 24px;
-    float: right;
-    cursor: pointer;
-  }
-  .close-sidebar-bottom {
-    display: block !important;
-    background: #333;
-    color: #FF9800;
-    border: 1px solid #FF9800;
-    padding: 8px 16px;
-    border-radius: 4px;
-    width: 100%;
-    text-align: center;
-    margin-top: 20px;
-    cursor: pointer;
-  }
-  #openSidebarFooter {
-    display: block !important;
-    background: #333;
-    color: #00BFFF;
-    border: 1px solid #00BFFF;
-    padding: 8px 16px;
-    border-radius: 4px;
-    margin: 20px auto;
-    text-align: center;
-    cursor: pointer;
-  }
-  .content-wrapper { display: block; }
-  main { width: 100%; padding: 0 4px; }
-  .story-part p { font-size: 1.2rem; line-height: 1.5; padding: 0; margin: 0 0 0.8em 0; }
-  .part-navigation { gap: 15px; }
-  .part-navigation a, .part-navigation .disabled-nav { padding: 8px 16px; font-size: 0.9em; }
-}
+      .container { padding: 0 8px !important; margin: 0 !important; max-width: 100% !important; }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0;
+        gap: 8px;
+      }
+      .sidebar-toggle {
+        order: 1;
+        flex-shrink: 0;
+        font-size: 28px;
+        background: none;
+        border: none;
+        color: white;
+        padding: 0;
+        margin-left: 6px;
+        display: inline-block !important;
+        line-height: 1.2;
+        transform: translateY(-10%);  /* dời lên 25% chiều cao */
+      }
+      header h1 {
+        order: 2;
+        flex: 1;
+        font-size: 1rem;
+        margin: 0;
+        text-align: left;
+        white-space: nowrap;
+        overflow-x: auto;
+        line-height: 1.2;
+      }
+      header nav {
+        order: 3;
+        display: flex;
+        gap: 2px;
+        flex-shrink: 0;
+        align-items: center;
+        margin-right: 8px;
+      }
+      header nav a,
+      header nav button {
+        line-height: 1.2;
+      }
+      /* Ẩn link "Theo dõi của tôi" trong nav */
+      header nav a[href*="my_follows"] {
+        display: none !important;
+      }
+      header nav a:first-child {
+        font-size: 0.9rem;
+      }
+      header nav button {
+        font-size: 1.1rem;
+        margin-left: 0;
+      }
+      .search-form {
+        order: 4;
+        width: 100%;
+        margin: 4px 0;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      .search-form input {
+        flex: 1;
+        min-width: 0;
+      }
+      .search-form select, .search-form button {
+        flex-shrink: 0;
+      }
+      .search-form button {
+        font-weight: normal;
+      }
+      .mobile-follow-row {
+        order: 5;
+        display: block;
+        width: 100%;
+        text-align: center;
+        margin: 12px 0 8px 0;
+      }
+      .mobile-follow-row a {
+        font-size: 0.9rem;
+        color: #fff !important;
+        text-decoration: none;
+        font-weight: bold;
+        line-height: 1.2;
+      }
+      .mobile-follow-row a:hover {
+        text-decoration: underline;
+      }
+      /* Các phần còn lại giữ nguyên */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 85%;
+        max-width: 320px;
+        height: 100%;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+        padding: 15px;
+        background: #000 !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .close-sidebar {
+        display: block !important;
+        background: none;
+        border: none;
+        color: #FF9800;
+        font-size: 24px;
+        float: right;
+        cursor: pointer;
+      }
+      .close-sidebar-bottom {
+        display: block !important;
+        background: #333;
+        color: #FF9800;
+        border: 1px solid #FF9800;
+        padding: 8px 16px;
+        border-radius: 4px;
+        width: 100%;
+        text-align: center;
+        margin-top: 20px;
+        cursor: pointer;
+      }
+      #openSidebarFooter {
+        display: block !important;
+        background: #333;
+        color: #00BFFF;
+        border: 1px solid #00BFFF;
+        padding: 8px 16px;
+        border-radius: 4px;
+        margin: 20px auto;
+        text-align: center;
+        cursor: pointer;
+      }
+      .content-wrapper { display: block; }
+      main { width: 100%; padding: 0 4px; }
+      .story-part p { font-size: 1.2rem; line-height: 1.5; padding: 0; margin: 0 0 0.8em 0; }
+      .part-navigation { gap: 15px; }
+      .part-navigation a, .part-navigation .disabled-nav { padding: 8px 16px; font-size: 0.9em; }
+
+      .story-part p {
+        margin: 0 0 -0.25em 0;
+        line-height: 1.4;
+        }
+      .story-part ul {
+        margin: -1.0em 0 -1.0em 1.0em;      /* Xóa margin trên/dưới */
+        padding-left: 1.5em;   /* Giữ thụt đầu dòng cho bullet */
+       }
+    }
+
+    .story-part p {
+        margin: 0 0 -0.25em 0;
+        line-height: 1.5;
+    }
+
+    /* Trong vùng nội dung truyện (.story-part) */
+    .story-part ul {
+        margin: -1.0em 0 -1.0em 1.0em;      /* Xóa margin trên/dưới */
+        padding-left: 1.5em;   /* Giữ thụt đầu dòng cho bullet */
+    }
+    .story-part li {
+        margin: 0;
+        padding: 0;
+    }
+    .story-part li br {
+        display: none;         /* Ẩn xuống dòng thừa trong bullet */
+    }
+
+    .story-part li {
+        margin: 0;
+        padding: 0;
+    }
+
+    .story-part li br {
+        display: none;
+    }
+
+    /* Ẩn các thẻ p rỗng (do markdown sinh ra từ dòng trống) */
+    .story-part p:empty {
+        display: none;
+    }
+
 
     .special-blue a {
       color: #00BFFF !important;
