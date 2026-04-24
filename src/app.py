@@ -48,23 +48,6 @@ import markdown
 def markdown_to_html(text: str) -> str:
     return markdown.markdown(text, extensions=['extra'])
 
-def clean_title_line(line: str) -> str:
-    """Loại bỏ các cặp dấu * (***, **, *) ở đầu và cuối dòng (tiêu đề phần)."""
-    original = line
-    changed = True
-    while changed:
-        changed = False
-        if line.startswith('***') and line.endswith('***'):
-            line = line[3:-3].strip()
-            changed = True
-        elif line.startswith('**') and line.endswith('**'):
-            line = line[2:-2].strip()
-            changed = True
-        elif line.startswith('*') and line.endswith('*'):
-            line = line[1:-1].strip()
-            changed = True
-    return line if line else original
-
 # ====================== HÀM DỌN DẸP + TÁCH PHẦN (theo script anh đưa) ======================
 def clean_line(line: str) -> str:
     line = line.rstrip('\n')
@@ -97,6 +80,34 @@ def clean_line(line: str) -> str:
 
     return line
 
+def clean_title_line(line: str) -> str:
+    """Loại bỏ các cặp dấu * (***, **, *) ở đầu và cuối dòng (tiêu đề phần)."""
+    original = line
+    changed = True
+    while changed:
+        changed = False
+        if line.startswith('***') and line.endswith('***'):
+            line = line[3:-3].strip()
+            changed = True
+        elif line.startswith('**') and line.endswith('**'):
+            line = line[2:-2].strip()
+            changed = True
+        elif line.startswith('*') and line.endswith('*'):
+            line = line[1:-1].strip()
+            changed = True
+    return line if line else original
+
+def format_part_title(title):
+    title = re.sub(r'^\*+|\*+$', '', title).strip()
+    m = re.search(r'^Phần\s*:?\s*(\d+)\s*[:\-]?\s*(.*)$', title, re.IGNORECASE)
+    if not m:
+        return title
+    num = m.group(1)
+    rest = m.group(2).strip()
+    if rest:
+        rest = rest[0].upper() + rest[1:].lower()
+    return f"Phần {num}: {rest}".strip()
+
 def split_and_clean_content(content: str) -> list[tuple[int, str]]:
     lines = content.splitlines()
     sections = []
@@ -108,9 +119,8 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
         match = re.match(r'^\s*Phần\s+(\d+)\s*:', cleaned, re.IGNORECASE)
         if match:
             if current_content and part_num is not None:
-                # Xử lý dòng đầu của phần hiện tại (loại bỏ * bao quanh)
                 if current_content:
-                    current_content[0] = clean_title_line(current_content[0])
+                    current_content[0] = format_part_title(current_content[0])
                 sections.append((part_num, '\n'.join(current_content)))
             part_num = int(match.group(1))
             current_content = [cleaned]
@@ -120,14 +130,14 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
 
     if current_content and part_num is not None:
         if current_content:
-            current_content[0] = clean_title_line(current_content[0])
+            current_content[0] = format_part_title(current_content[0])
         sections.append((part_num, '\n'.join(current_content)))
 
     if not sections and content.strip():
         full_clean = '\n'.join(clean_line(line) for line in content.splitlines())
         lines_full = full_clean.splitlines()
         if lines_full:
-            lines_full[0] = clean_title_line(lines_full[0])
+            lines_full[0] = format_part_title(lines_full[0])
             full_clean = '\n'.join(lines_full)
         sections = [(1, full_clean)]
 
@@ -1429,14 +1439,14 @@ def upload():
                     flash("Nội dung không được trống.", "error")
                     return redirect(url_for("upload", story_id=story.id))
 
+
                 part_obj = Part.query.get(int(part_id))
                 if part_obj and part_obj.story_id == story.id:
                     cleaned_lines = [clean_line(line) for line in raw_content.splitlines()]
                     if cleaned_lines:
-                        cleaned_lines[0] = clean_title_line(cleaned_lines[0])
+                        cleaned_lines[0] = format_part_title(cleaned_lines[0])
                     cleaned_content = '\n'.join(cleaned_lines)
-                    
-                    part_obj.content = cleaned_content
+                    part_obj.content = cleaned_content                    
 
                     PartVideo.query.filter_by(part_id=part_obj.id).delete()
                     for url in video_urls[:9]:
