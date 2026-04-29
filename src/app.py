@@ -36,6 +36,8 @@ import smtplib
 from email.message import EmailMessage
 
 from dotenv import load_dotenv   # thêm dòng này
+import sys
+import requests
 
 load_dotenv()                     # thêm dòng này
 
@@ -3373,6 +3375,53 @@ def export_subscribers_csv():
         as_attachment=True,
         download_name="subscribers.csv"
     )
+
+@app.route("/admin/restart", methods=["POST"])
+def restart_server():
+    """Khởi động lại server (local: dùng os.execv, production: dùng Render API)"""
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload"))
+    
+    # Kiểm tra môi trường
+    if os.environ.get("RENDER"):  # Render
+        render_api_key = os.environ.get("RENDER_API_KEY")
+        service_id = os.environ.get("RENDER_SERVICE_ID")
+        
+        if not render_api_key or not service_id:
+            flash("Thiếu RENDER_API_KEY hoặc RENDER_SERVICE_ID trong biến môi trường.")
+            return redirect(url_for("upload"))
+        
+        url = f"https://api.render.com/v1/services/{service_id}/restart"
+        headers = {
+            "Authorization": f"Bearer {render_api_key}",
+            "Accept": "application/json"
+        }
+        try:
+            response = requests.post(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                flash("Đã gửi yêu cầu restart server trên Render. Web service sẽ khởi động lại trong vài giây.")
+            else:
+                flash(f"Lỗi khi gọi Render API: {response.status_code} - {response.text}")
+        except Exception as e:
+            flash(f"Không thể kết nối đến Render API: {e}")
+        return redirect(url_for("upload"))
+    
+    else:  # Local development
+        # Thông báo trước khi restart
+        flash("Đang khởi động lại server (local)... Vui lòng đợi vài giây. Trang sẽ tự động tải lại.")
+        # Gửi response và restart sau 2 giây
+        def _restart():
+            time.sleep(2)  # Đảm bảo response đã được gửi đi
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        thread = threading.Thread(target=_restart, daemon=True)
+        thread.start()
+        return redirect(url_for("upload"))
 
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
