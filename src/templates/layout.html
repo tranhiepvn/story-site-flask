@@ -304,6 +304,10 @@
        }
     }
 
+    .story-part {
+        line-height: 1.5;   /* hoặc 1.6, 1.7 tùy ý, đây là khoảng cách giữa hai dòng */
+    }
+
     .story-part p {
         margin: 0 0 -0.25em 0;
         line-height: 1.5;
@@ -322,20 +326,15 @@
         display: none;         /* Ẩn xuống dòng thừa trong bullet */
     }
 
-    .story-part li {
-        margin: 0;
-        padding: 0;
-    }
-
-    .story-part li br {
-        display: none;
-    }
-
     /* Ẩn các thẻ p rỗng (do markdown sinh ra từ dòng trống) */
     .story-part p:empty {
         display: none;
     }
 
+    .story-part .small-gap {
+        display: block;
+        height: 0.7em;  /* Điều chỉnh theo ý bạn */
+    }
 
     .special-blue a {
       color: #00BFFF !important;

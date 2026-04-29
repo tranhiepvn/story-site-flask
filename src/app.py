@@ -44,9 +44,21 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 
-import markdown
-def markdown_to_html(text: str) -> str:
-    return markdown.markdown(text, extensions=['extra'])
+def simple_markdown_to_html(text: str) -> str:
+    """Chuyển đổi inline Markdown (đậm, nghiêng, gạch ngang, gạch dưới) sang HTML.
+    Không xử lý block (danh sách, heading) để giữ nguyên xuống dòng và không phá vỡ cấu trúc highlight.
+    """
+    # Đậm nghiêng
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text, flags=re.DOTALL)
+    # Đậm
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
+    # Nghiêng
+    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text, flags=re.DOTALL)
+    # Gạch ngang
+    text = re.sub(r'\~\~(.+?)\~\~', r'<del>\1</del>', text, flags=re.DOTALL)
+    # Gạch dưới
+    text = re.sub(r'__(.+?)__', r'<u>\1</u>', text, flags=re.DOTALL)
+    return text
 
 # ====================== HÀM DỌN DẸP + TÁCH PHẦN (theo script anh đưa) ======================
 def clean_line(line: str) -> str:
@@ -1063,15 +1075,17 @@ def story_detail(story_id: int):
 
     chapter_title = chapter_title.strip()
 
-    # Chuyển đổi Markdown sang HTML (nghiêng, đậm, gạch ngang, gạch dưới)
-    chapter_body = markdown_to_html(chapter_body)
-
-    # Highlight (có thể áp dụng sau Markdown, an toàn vì thẻ HTML không ảnh hưởng)
+    # Bước 1: Highlight màu xanh/đỏ trên văn bản thô (chưa có bất kỳ thẻ HTML nào)
     chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
     chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
 
-    # Giữ nguyên xuống dòng: chuyển \n thành <br>
-    content_processed = chapter_body.replace('\n', '<br>')
+    # Bước 2: Chuyển đổi inline Markdown (không ảnh hưởng đến các thẻ span vừa thêm)
+    chapter_body = simple_markdown_to_html(chapter_body)
+
+    # Bước 3: Giữ nguyên xuống dòng (chuyển \n thành <br>)
+    # Thay \n bằng <br>, nhưng gom các <br> liên tiếp thành một <div class="small-gap">
+    temp = chapter_body.replace('\n', '<br>')
+    content_processed = re.sub(r'(<br>\s*){2,}', r'<div class="small-gap"></div>', temp)
 
     comments = Comment.query.filter_by(story_id=story.id, is_hidden=False).order_by(Comment.created_at.desc()).all()
 
