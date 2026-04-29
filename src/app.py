@@ -2671,13 +2671,15 @@ def views_analytics():
             DailyView.date.between(start_date, end_date)
         ).all()
 
-        daily_map = {d: 0 for d in dates}
+        # Tạo map cho mỗi ngày lưu desktop và mobile
+        daily_map = {d: {'desktop': 0, 'mobile': 0} for d in dates}
         for dv in daily_views:
-            daily_map[dv.date] = dv.views
+            daily_map[dv.date]['desktop'] = dv.views_desktop or 0
+            daily_map[dv.date]['mobile'] = dv.views_mobile or 0
 
-        total_week = sum(daily_map.values())
-        total_desktop = sum(dv.views_desktop or 0 for dv in daily_views)
-        total_mobile = sum(dv.views_mobile or 0 for dv in daily_views)
+        total_week = sum(d['desktop'] + d['mobile'] for d in daily_map.values())
+        total_desktop = sum(d['desktop'] for d in daily_map.values())
+        total_mobile = sum(d['mobile'] for d in daily_map.values())
 
         prev_start = start_date - timedelta(days=7)
         prev_views = DailyView.query.filter(
@@ -2732,13 +2734,15 @@ def hears_analytics():
             DailyListen.date.between(start_date, end_date)
         ).all()
 
-        daily_map = {d: 0 for d in dates}
+        # Tạo map cho mỗi ngày lưu desktop và mobile
+        daily_map = {d: {'desktop': 0, 'mobile': 0} for d in dates}
         for dl in daily_listens:
-            daily_map[dl.date] = dl.listens
+            daily_map[dl.date]['desktop'] = dl.listens_desktop or 0
+            daily_map[dl.date]['mobile'] = dl.listens_mobile or 0
 
-        total_week = sum(daily_map.values())
-        total_desktop = sum(dl.listens_desktop or 0 for dl in daily_listens)
-        total_mobile = sum(dl.listens_mobile or 0 for dl in daily_listens)
+        total_week = sum(d['desktop'] + d['mobile'] for d in daily_map.values())
+        total_desktop = sum(d['desktop'] for d in daily_map.values())
+        total_mobile = sum(d['mobile'] for d in daily_map.values())
 
         prev_start = start_date - timedelta(days=7)
         prev_listens = DailyListen.query.filter(

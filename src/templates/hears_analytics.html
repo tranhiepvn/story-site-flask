@@ -150,7 +150,11 @@
         <td class="col-desktop {% if item.total_desktop > 0 %}positive{% else %}zero{% endif %}">{{ item.total_desktop }}</td>
         <td class="col-mobile {% if item.total_mobile > 0 %}positive{% else %}zero{% endif %}">{{ item.total_mobile }}</td>
         {% for d in dates %}
-        <td class="col-day {% if item.daily[d] > 0 %}positive{% else %}zero{% endif %}">{{ item.daily[d] }}</td>
+        <td class="col-day">
+            <span class="{% if item.daily[d].desktop > 0 %}positive{% else %}zero{% endif %}">{{ item.daily[d].desktop }}</span>
+            /
+            <span style="color: #ff4444;">{{ item.daily[d].mobile }}</span>
+        </td>
         {% endfor %}
         <td class="col-change">
           {% if item.change_pct is not none %}
