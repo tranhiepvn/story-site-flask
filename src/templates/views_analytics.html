@@ -38,18 +38,29 @@
   .col-change { width: 100px; }
   .col-trend { width: 80px; }
 
-  td.col-day.zero { color: #FFFFFF; }
-  td.col-day.positive { color: #00BFFF; }
   td.col-total { color: #FF8C00; font-weight: bold; }
 
-  /* Desktop & Mobile màu đỏ nếu > 0 */
-  td.col-desktop.positive, td.col-mobile.positive {
+  /* Desktop màu hồng khi > 0 */
+  td.col-desktop.pink {
+    color: #FF69B4 !important;
+    font-weight: bold;
+  }
+  td.col-desktop.zero {
+    color: #FFFFFF;
+  }
+  /* Mobile màu đỏ khi > 0 */
+  td.col-mobile.red {
     color: #FF4444 !important;
     font-weight: bold;
   }
-  td.col-desktop.zero, td.col-mobile.zero {
+  td.col-mobile.zero {
     color: #FFFFFF;
   }
+
+  /* Màu cho số desktop/mobile trong ô ngày */
+  .desktop-pink { color: #FF69B4 !important; }
+  .mobile-red { color: #FF4444 !important; }
+  .zero { color: #FFFFFF; }
 
   .filter-buttons {
     margin: 20px 0 30px 0;
@@ -93,21 +104,22 @@
   body.light-mode td.col-name a {
     color: #0056b3;
   }
-  body.light-mode td.col-day.zero {
-    color: #000 !important;
-  }
-  body.light-mode td.col-day.positive {
-    color: #0056b3 !important;
-  }
   body.light-mode td.col-total {
     color: #e67e22 !important;
   }
-  body.light-mode td.col-desktop.positive,
-  body.light-mode td.col-mobile.positive {
+  body.light-mode td.col-desktop.pink {
+    color: #c71585 !important;
+  }
+  body.light-mode td.col-mobile.red {
     color: #c00 !important;
   }
-  body.light-mode td.col-desktop.zero,
-  body.light-mode td.col-mobile.zero {
+  body.light-mode .desktop-pink {
+    color: #c71585 !important;
+  }
+  body.light-mode .mobile-red {
+    color: #c00 !important;
+  }
+  body.light-mode .zero {
     color: #1a1a1a !important;
   }
   body.light-mode .pagination a {
@@ -152,13 +164,13 @@
         <td class="col-name"><a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a></td>
         <td class="col-total">{{ item.story.views }}</td>
         <td class="col-week" style="color:#32CD32; font-weight:bold;">{{ item.total_week }}</td>
-        <td class="col-desktop {% if item.total_desktop > 0 %}positive{% else %}zero{% endif %}">{{ item.total_desktop }}</td>
-        <td class="col-mobile {% if item.total_mobile > 0 %}positive{% else %}zero{% endif %}">{{ item.total_mobile }}</td>
+        <td class="col-desktop {% if item.total_desktop > 0 %}pink{% else %}zero{% endif %}">{{ item.total_desktop }}</td>
+        <td class="col-mobile {% if item.total_mobile > 0 %}red{% else %}zero{% endif %}">{{ item.total_mobile }}</td>
         {% for d in dates %}
         <td class="col-day">
-            <span class="{% if item.daily[d].desktop > 0 %}positive{% else %}zero{% endif %}">{{ item.daily[d].desktop }}</span>
+            <span class="{% if item.daily[d].desktop > 0 %}desktop-pink{% else %}zero{% endif %}">{{ item.daily[d].desktop }}</span>
             /
-            <span style="color: #ff4444;">{{ item.daily[d].mobile }}</span>
+            <span class="{% if item.daily[d].mobile > 0 %}mobile-red{% else %}zero{% endif %}">{{ item.daily[d].mobile }}</span>
         </td>
         {% endfor %}
         <td class="col-change">
