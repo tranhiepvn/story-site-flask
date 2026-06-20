@@ -135,10 +135,12 @@
 <p><strong>Từ {{ start_date.strftime('%d/%m/%Y') }} đến {{ end_date.strftime('%d/%m/%Y') }}</strong></p>
 
 <div class="filter-buttons">
-  <a href="{{ url_for('views_analytics') }}" class="filter-btn {% if request.args.get('sort') != 'name' and request.args.get('sort') != 'created' %}active{% endif %}">Tổng views cao nhất</a>
-  <a href="{{ url_for('views_analytics') }}?sort=name" class="filter-btn {% if request.args.get('sort') == 'name' %}active{% endif %}">Tên A-Z</a>
-  <a href="{{ url_for('views_analytics') }}?sort=created" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">Ngày tạo mới nhất</a>
+  <a href="{{ url_for('views_analytics', sort='week') }}" class="filter-btn {% if request.args.get('sort') == 'week' or not request.args.get('sort') %}active{% endif %}">📅 Tổng views tuần</a>
+  <a href="{{ url_for('views_analytics', sort='alltime') }}" class="filter-btn {% if request.args.get('sort') == 'alltime' %}active{% endif %}">📊 Tổng views toàn thời gian</a>
+  <a href="{{ url_for('views_analytics', sort='name') }}" class="filter-btn {% if request.args.get('sort') == 'name' %}active{% endif %}">🔤 Tên A-Z</a>
+  <a href="{{ url_for('views_analytics', sort='created') }}" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">🆕 Ngày tạo mới nhất</a>
 </div>
+
 
 <div class="table-wrapper">
   <table>

@@ -1115,6 +1115,8 @@ def story_detail(story_id: int):
                 db.session.add(history)
         db.session.commit()
 
+    auto_play = request.args.get('auto_play', '0') == '1'
+
     return render_template(
         "story.html",
         story=story,
@@ -1126,6 +1128,7 @@ def story_detail(story_id: int):
         parts=parts,
         comments=comments,
         current_url=request.url,
+        auto_play=auto_play,
     )
 
 def split_to_chunks(text: str, max_chars: int = 800) -> list:
@@ -1306,6 +1309,10 @@ def upload():
 
     UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
     categories = Category.query.order_by(Category.name).all()
+
+    # Lấy danh sách tác giả đã có trong database
+    all_authors = db.session.query(Story.author).filter(Story.author.isnot(None)).distinct().all()
+    all_authors = [a[0] for a in all_authors if a[0]]
 
     # === PHẦN GET ===
     page = request.args.get("page", 1, type=int)
@@ -1607,6 +1614,7 @@ def upload():
             categories=categories,
             edit_part=edit_part_obj,
             error_update=None,
+            all_authors=all_authors,
         )
 
     return render_template(
@@ -1623,6 +1631,7 @@ def upload():
         filter_date_from=filter_date_from,
         filter_date_to=filter_date_to,
         all_categories=all_categories,
+        all_authors=all_authors,
     )
 
 @app.route("/admin/dashboard")
@@ -2701,12 +2710,14 @@ def views_analytics():
             'created_at': story.created_at
         })
 
-    sort = request.args.get('sort', 'total')
+    sort = request.args.get('sort', 'week')   # mặc định là week
     if sort == 'name':
         story_data.sort(key=lambda x: x['story'].title.lower())
     elif sort == 'created':
         story_data.sort(key=lambda x: x['created_at'], reverse=True)
-    else:
+    elif sort == 'alltime':
+        story_data.sort(key=lambda x: x['story'].views, reverse=True)
+    else:  # week
         story_data.sort(key=lambda x: x['total_week'], reverse=True)
 
     return render_template('views_analytics.html',
@@ -2746,6 +2757,9 @@ def hears_analytics():
         total_desktop = sum(d['desktop'] for d in daily_map.values())
         total_mobile = sum(d['mobile'] for d in daily_map.values())
 
+        # Tính tổng listens toàn thời gian
+        total_listens_alltime = db.session.query(func.sum(DailyListen.listens)).filter(DailyListen.story_id == story.id).scalar() or 0
+
         prev_start = start_date - timedelta(days=7)
         prev_listens = DailyListen.query.filter(
             DailyListen.story_id == story.id,
@@ -2760,16 +2774,19 @@ def hears_analytics():
             'total_week': total_week,
             'total_desktop': total_desktop,
             'total_mobile': total_mobile,
+            'total_listens_alltime': total_listens_alltime,  # <- thêm dòng này
             'change_pct': change_pct,
             'created_at': story.created_at
         })
 
-    sort = request.args.get('sort', 'total')
+    sort = request.args.get('sort', 'week')
     if sort == 'name':
         story_data.sort(key=lambda x: x['story'].title.lower())
     elif sort == 'created':
         story_data.sort(key=lambda x: x['created_at'], reverse=True)
-    else:
+    elif sort == 'alltime':
+        story_data.sort(key=lambda x: x['total_listens_alltime'], reverse=True)  # dùng tổng listens
+    else:  # week
         story_data.sort(key=lambda x: x['total_week'], reverse=True)
 
     return render_template('hears_analytics.html',

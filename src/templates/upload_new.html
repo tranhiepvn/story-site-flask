@@ -157,10 +157,18 @@
     <input type="text" id="title" name="title" required>
   </div>
 
-  <div class="form-group">
-    <label for="author">Tác giả (tuỳ chọn):</label><br>
-    <input type="text" id="author" name="author">
+  <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+    <label for="author" style="flex-shrink: 0;">Tác giả (tuỳ chọn):</label>
+    <div style="flex: 1; position: relative;">
+      <input type="text" id="author" name="author" list="author-list" autocomplete="off" style="width: 100%; padding-right: 30px;">
+      <span id="clear-author" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #888; font-size: 18px; line-height: 1;">&times;</span>
+    </div>
   </div>
+  <datalist id="author-list">
+    {% for author in all_authors %}
+      <option value="{{ author }}">
+    {% endfor %}
+  </datalist>
 
   <div class="form-group">
     <label for="story_type">Loại truyện:</label><br>
@@ -335,6 +343,12 @@ document.addEventListener('DOMContentLoaded', function() {
       if (iframe) iframe.src = embedUrl;
     });
   });
+});
+
+document.getElementById('clear-author')?.addEventListener('click', function() {
+  const input = document.getElementById('author');
+  input.value = '';
+  input.focus();
 });
 </script>
 

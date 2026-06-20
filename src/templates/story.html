@@ -103,6 +103,7 @@
 
       <!-- AUDIO PLAYER với loading spinner -->
       <div style="margin: 15px 0;">
+        <!-- Hàng trên: Play, thanh trượt, tốc độ -->
         <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
           <button id="play-btn" class="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
           <div style="flex: 1; min-width: 0;">
@@ -116,8 +117,13 @@
             <option value="2">2x</option>
           </select>
         </div>
-        <div style="margin-top: 8px; text-align: center;">
-          <span id="play-text" style="font-size: 1rem; color: #00BFFF; line-height: 1.3;">Nhấn play để nghe...</span>
+        <!-- Hàng dưới: checkbox căn trái, trạng thái -->
+        <div style="margin-top: 8px; margin-left: 8px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+          <label id="autoplay-label" style="display: flex; align-items: center; gap: 6px; font-size: 1rem; color: #00BFFF; cursor: pointer;">
+            <input type="checkbox" id="autoplay-next" {% if auto_play %}checked{% endif %}>
+            Tự động phát phần tiếp theo
+          </label>
+          <span id="play-text" style="font-size: 1rem; margin-left: 5px; color: #FF0000; line-height: 1.3;">Nhấn play để nghe...</span>
         </div>
       </div>
       <audio id="audio-element" style="display:none;"></audio>
@@ -424,6 +430,24 @@
     border: 3px solid rgba(0,0,0,0.2);
     border-top-color: #333;
   }
+
+  #autoplay-label {
+    color: #0000FF;
+  }
+  #play-text {
+    color: #FF0000;
+  }
+  body.light-mode #autoplay-label
+  {
+    color: #0000FF !important;
+  }
+  body.light-mode #play-text {
+    color: #FF0000 !important;
+  }
+  /* Tăng độ tương phản cho checkbox trong chế độ sáng */
+  body.light-mode #autoplay-next {
+    accent-color: #0056b3;
+  }
 </style>
 
 <script>
@@ -443,6 +467,33 @@ const progressBar = document.getElementById('progress-bar');
 const playText = document.getElementById('play-text');
 const playBtn = document.getElementById('play-btn');
 const speedSelect = document.getElementById('speed-select');
+const audioElem = document.getElementById('audio-element');
+
+// ==================== BIẾN TOÀN CỤC ====================
+const currentIndex = {{ current_index }};
+const totalParts = {{ total_parts }};
+const autoPlay = {{ 'true' if auto_play else 'false' }};
+
+// ==================== CHECKBOX AUTO-PLAY NEXT PART ====================
+const autoplayCheckbox = document.getElementById('autoplay-next');
+
+// Đọc trạng thái từ localStorage khi load
+document.addEventListener('DOMContentLoaded', function() {
+  const saved = localStorage.getItem('autoplay_next_part');
+  if (saved !== null) {
+    autoplayCheckbox.checked = saved === 'true';
+  }
+  // Nếu autoPlay từ URL là true, tự động tích checkbox (người dùng có thể bỏ chọn sau)
+  if (autoPlay) {
+    autoplayCheckbox.checked = true;
+    localStorage.setItem('autoplay_next_part', 'true');
+  }
+});
+
+// Lưu trạng thái khi checkbox thay đổi
+autoplayCheckbox.addEventListener('change', function() {
+  localStorage.setItem('autoplay_next_part', String(this.checked));
+});
 
 function updatePlayButtonIcon() {
   if (playBtn.classList.contains('loading')) return;
@@ -488,11 +539,10 @@ async function restorePlaybackPosition() {
       if (pos.chunk_index && pos.chunk_index !== currentChunkIndex) {
         currentChunkIndex = pos.chunk_index;
         progressBar.value = currentChunkIndex;
-        const audioEl = document.getElementById('audio-element');
-        const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, audioEl, false);
+        const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, audioElem, false);
         if (success) {
-          audioEl.currentTime = pos.current_time || 0;
-          await audioEl.play();
+          audioElem.currentTime = pos.current_time || 0;
+          await audioElem.play();
           playText.textContent = "Đang nghe...";
           setLoading(false);
           setProgressBarEnabled(true);
@@ -581,8 +631,6 @@ async function loadChunk(storyId, partNumber, chunkIndex, audioElement, shouldPl
 }
 
 async function toggleAudio(partId) {
-  const audioEl = document.getElementById('audio-element');
-
   if (currentAudio && currentAudio.partId === partId) {
     if (currentAudio.paused) {
       await currentAudio.play();
@@ -617,10 +665,10 @@ async function toggleAudio(partId) {
       currentChunkIndex = data.current_chunk;
       totalChunks = data.total_chunks;
 
-      audioEl.src = data.url;
-      await audioEl.play();
+      audioElem.src = data.url;
+      await audioElem.play();
 
-      currentAudio = audioEl;
+      currentAudio = audioElem;
       currentAudio.partId = partId;
       applyPlaybackRate();
 
@@ -648,10 +696,17 @@ async function toggleAudio(partId) {
   updatePlayButtonIcon();
 }
 
-document.getElementById('audio-element').addEventListener('ended', async function() {
+audioElem.addEventListener('ended', async function() {
   if (currentChunkIndex >= totalChunks) {
-    resetAudioPlayer();
-    return;
+      // Kiểm tra còn phần tiếp theo không và checkbox được bật
+      if (currentIndex < totalParts && autoplayCheckbox.checked) {
+          // Chuyển sang phần tiếp theo với auto_play=1
+          const nextPart = currentIndex + 1;
+          window.location.href = `/story/{{ story.id }}?part=${nextPart}&auto_play=1`;
+          return;
+      }
+      resetAudioPlayer();
+      return;
   }
 
   currentChunkIndex++;
@@ -681,6 +736,16 @@ document.getElementById('audio-element').addEventListener('ended', async functio
   setLoading(false);
   updatePlayButtonIcon();
 });
+
+// ==================== TỰ ĐỘNG PLAY KHI CÓ auto_play ====================
+if (autoPlay) {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Chờ một chút để DOM load xong
+        setTimeout(() => {
+            toggleAudio({{ current_part.id }});
+        }, 500);
+    });
+}
 
 function resetAudioPlayer() {
   if (currentAudio) currentAudio.pause();
@@ -717,7 +782,7 @@ progressBar.addEventListener('change', async function() {
   playText.textContent = `Đang tải chunk ${currentChunkIndex}/${totalChunks}...`;
   setLoading(true);
 
-  const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, document.getElementById('audio-element'), true);
+  const success = await loadChunk(currentStoryId, currentPartNumber, currentChunkIndex, audioElem, true);
   if (success) {
     playText.textContent = "Đang nghe...";
     setLoading(false);
@@ -737,6 +802,36 @@ speedSelect.addEventListener('change', applyPlaybackRate);
 
 setProgressBarEnabled(false);
 isAudioStarted = false;
+
+// ==================== XỬ LÝ LỖI AUDIO KHI FILE BỊ XÓA ====================
+audioElem.addEventListener('error', async function(e) {
+  const src = audioElem.src;
+  if (src && src.includes('/static/audio/') && src.endsWith('.mp3')) {
+    const match = src.match(/\/static\/audio\/(\d+)\/(\d+)_chunk_(\d+)\.mp3/);
+    if (match) {
+      const storyId = match[1];
+      const partNumber = match[2];
+      const chunkIndex = parseInt(match[3], 10);
+      console.log(`Audio error, trying to recreate chunk ${chunkIndex}`);
+      playText.textContent = "Đang khôi phục audio...";
+      try {
+        const res = await fetch(`/api/get_chunk/${storyId}/${partNumber}/${chunkIndex}`);
+        const data = await res.json();
+        if (data.status === 'success') {
+          audioElem.src = data.url;
+          await audioElem.play();
+          playText.textContent = "Đang nghe...";
+        } else {
+          console.error('Unable to recreate chunk');
+          playText.textContent = "Lỗi: không thể tạo lại audio";
+        }
+      } catch(err) {
+        console.error('Fetch error:', err);
+        playText.textContent = "Lỗi kết nối khi tạo lại audio";
+      }
+    }
+  }
+});
 
 // ==================== RANDOM THANK YOU MESSAGE ====================
 const thankYouMessages = [

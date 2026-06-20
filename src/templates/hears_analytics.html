@@ -126,9 +126,10 @@
 <p><strong>Từ {{ start_date.strftime('%d/%m/%Y') }} đến {{ end_date.strftime('%d/%m/%Y') }}</strong></p>
 
 <div class="filter-buttons">
-  <a href="{{ url_for('hears_analytics') }}" class="filter-btn {% if request.args.get('sort') != 'name' and request.args.get('sort') != 'created' %}active{% endif %}">Tổng nghe cao nhất</a>
-  <a href="{{ url_for('hears_analytics') }}?sort=name" class="filter-btn {% if request.args.get('sort') == 'name' %}active{% endif %}">Tên A-Z</a>
-  <a href="{{ url_for('hears_analytics') }}?sort=created" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">Ngày tạo mới nhất</a>
+  <a href="{{ url_for('hears_analytics', sort='week') }}" class="filter-btn {% if request.args.get('sort') == 'week' or not request.args.get('sort') %}active{% endif %}">📅 Tổng nghe tuần</a>
+  <a href="{{ url_for('hears_analytics', sort='alltime') }}" class="filter-btn {% if request.args.get('sort') == 'alltime' %}active{% endif %}">📊 Tổng nghe toàn thời gian</a>
+  <a href="{{ url_for('hears_analytics', sort='name') }}" class="filter-btn {% if request.args.get('sort') == 'name' %}active{% endif %}">🔤 Tên A-Z</a>
+  <a href="{{ url_for('hears_analytics', sort='created') }}" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">🆕 Ngày tạo mới nhất</a>
 </div>
 
 <div class="table-wrapper">
