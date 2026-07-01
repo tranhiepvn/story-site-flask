@@ -45,6 +45,26 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
+from datetime import date as date_type
+
+def parse_date(value):
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    elif isinstance(value, date_type):
+        return value
+    # Fallback: nếu không parse được, dùng ngày hiện tại
+    return datetime.utcnow().date()
+
+def parse_datetime(value):
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            pass
+    return datetime.utcnow()
 
 def simple_markdown_to_html(text: str) -> str:
     """Chuyển đổi inline Markdown (đậm, nghiêng, gạch ngang, gạch dưới) sang HTML.
@@ -253,9 +273,15 @@ def get_user_session_id():
     return session['reader_session_id']
 
 def is_mobile():
-    """Xác định request có đến từ mobile hay không dựa vào User-Agent."""
-    user_agent = request.headers.get('User-Agent', '').lower()
-    return 'mobile' in user_agent or 'android' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
+    ua = request.headers.get('User-Agent', '').lower()
+    # Desktop patterns
+    desktop_patterns = ['windows nt', 'macintosh', 'linux x86_64', 'linux i686']
+    if any(p in ua for p in desktop_patterns):
+        # Nếu có cả từ khóa mobile, có thể là tablet hoặc mobile nhưng user-agent desktop
+        if 'ipad' in ua or 'iphone' in ua or 'android' in ua:
+            return True
+        return False
+    return 'mobile' in ua or 'android' in ua or 'iphone' in ua or 'ipad' in ua
 
 # Hàm mới: Trả về danh sách tất cả categories đã sắp xếp theo tên (case-insensitive)
 def get_sorted_categories() -> list["Category"]:
@@ -1413,13 +1439,13 @@ def upload():
     # Lọc theo khoảng ngày
     if filter_date_from:
         try:
-            date_from = datetime.strptime(filter_date_from, "%Y-%m-%d")
+            date_from = parse_date(filter_date_from)
             stories_query = stories_query.filter(Story.created_at >= date_from)
         except:
             pass
     if filter_date_to:
         try:
-            date_to = datetime.strptime(filter_date_to, "%Y-%m-%d")
+            date_to = parse_date(filter_date_to)
             stories_query = stories_query.filter(Story.created_at <= date_to)
         except:
             pass
@@ -1765,31 +1791,29 @@ def upload_login():
 
 @app.route("/export_data", methods=["POST"])
 def export_data():
-    """Export tất cả dữ liệu về truyện, phần, video, bình luận và thể loại ra một file JSON.
-
-    Người dùng phải đăng nhập trang quản trị và cung cấp mật khẩu hợp lệ để tải dữ liệu.
-    Sau khi thu thập dữ liệu, hàm trả về file JSON để người dùng tải xuống.
-    """
-    # Chỉ cho phép khi đã đăng nhập trang upload
     if not session.get("upload_authenticated"):
         return redirect(url_for("upload_login"))
-    # Kiểm tra mật khẩu được gửi kèm trong form
     UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
     pw = request.form.get("password", "")
     if pw != UPLOAD_PASSWORD:
         flash("Mật khẩu không hợp lệ.")
         return redirect(url_for("upload"))
-    # Lấy dữ liệu từ cơ sở dữ liệu
+
     stories = Story.query.all()
     categories = Category.query.all()
     parts = Part.query.all()
     videos = PartVideo.query.all()
     comments = Comment.query.all()
-    # Chuyển đổi dữ liệu sang dict
+
+    # Lấy dữ liệu thống kê
+    daily_views = DailyView.query.all()
+    daily_listens = DailyListen.query.all()
+    reading_histories = ReadingHistory.query.all()
+    follows = Follow.query.all()
+    subscriptions = NewStorySubscription.query.all()
+
     data = {
-        "categories": [
-            {"id": c.id, "name": c.name} for c in categories
-        ],
+        "categories": [{"id": c.id, "name": c.name} for c in categories],
         "stories": [
             {
                 "id": s.id,
@@ -1830,15 +1854,64 @@ def export_data():
             for c in comments
         ],
         "videos": [
-            {
-                "id": v.id,
-                "part_id": v.part_id,
-                "url": v.url,
-            }
+            {"id": v.id, "part_id": v.part_id, "url": v.url}
             for v in videos
         ],
+        # ===== THÊM MỚI =====
+        "daily_views": [
+            {
+                "id": dv.id,
+                "story_id": dv.story_id,
+                "part_number": dv.part_number,
+                "date": dv.date.isoformat(),
+                "views": dv.views,
+                "views_desktop": dv.views_desktop,
+                "views_mobile": dv.views_mobile,
+            }
+            for dv in daily_views
+        ],
+        "daily_listens": [
+            {
+                "id": dl.id,
+                "story_id": dl.story_id,
+                "part_number": dl.part_number,
+                "date": dl.date.isoformat(),
+                "listens": dl.listens,
+                "listens_desktop": dl.listens_desktop,
+                "listens_mobile": dl.listens_mobile,
+            }
+            for dl in daily_listens
+        ],
+        "reading_histories": [
+            {
+                "id": rh.id,
+                "session_id": rh.session_id,
+                "email": rh.email,
+                "story_id": rh.story_id,
+                "part_number": rh.part_number,
+                "updated_at": rh.updated_at.isoformat() if rh.updated_at else None,
+            }
+            for rh in reading_histories
+        ],
+        "follows": [
+            {
+                "id": f.id,
+                "story_id": f.story_id,
+                "email": f.email,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+            }
+            for f in follows
+        ],
+        "new_story_subscriptions": [
+            {
+                "id": sub.id,
+                "email": sub.email,
+                "created_at": sub.created_at.isoformat() if sub.created_at else None,
+            }
+            for sub in subscriptions
+        ],
     }
-    # Chuyển đổi sang JSON và gửi file
+
     json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     buf = io.BytesIO(json_bytes)
     filename = f"stories_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
@@ -2211,6 +2284,129 @@ def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple
         url = vid.get("url")
         if url:
             db.session.add(PartVideo(part_id=new_part_id, url=url))
+    db.session.commit()
+
+    # Import daily_views
+    for dv in data.get("daily_views", []):
+        old_story_id = dv.get("story_id")
+        new_story_id = story_map.get(old_story_id)
+        if not new_story_id:
+            continue
+        date_obj = parse_date(dv["date"])
+        part_num = dv.get("part_number", 0)
+        existing = DailyView.query.filter_by(
+            story_id=new_story_id,
+            part_number=part_num,
+            date=date_obj
+        ).first()
+        if existing:
+            # Nếu muốn cập nhật, cộng dồn views:
+            existing.views += dv.get("views", 0)
+            existing.views_desktop += dv.get("views_desktop", 0)
+            existing.views_mobile += dv.get("views_mobile", 0)
+            continue
+        new_dv = DailyView(
+            story_id=new_story_id,
+            part_number=part_num,
+            date=date_obj,
+            views=dv.get("views", 0),
+            views_desktop=dv.get("views_desktop", 0),
+            views_mobile=dv.get("views_mobile", 0),
+        )
+        db.session.add(new_dv)
+    db.session.commit()
+
+    # Import daily_listens (tương tự)
+    for dl in data.get("daily_listens", []):
+        old_story_id = dl.get("story_id")
+        new_story_id = story_map.get(old_story_id)
+        if not new_story_id:
+            continue
+        date_obj = parse_date(dl["date"])
+        part_num = dl.get("part_number", 0)
+        existing = DailyListen.query.filter_by(
+            story_id=new_story_id,
+            part_number=part_num,
+            date=date_obj
+        ).first()
+        if existing:
+            existing.listens += dl.get("listens", 0)
+            existing.listens_desktop += dl.get("listens_desktop", 0)
+            existing.listens_mobile += dl.get("listens_mobile", 0)
+            continue
+        new_dl = DailyListen(
+            story_id=new_story_id,
+            part_number=part_num,
+            date=date_obj,
+            listens=dl.get("listens", 0),
+            listens_desktop=dl.get("listens_desktop", 0),
+            listens_mobile=dl.get("listens_mobile", 0),
+        )
+        db.session.add(new_dl)
+    db.session.commit()
+
+    # Import reading_histories (không kiểm tra trùng)
+    for rh in data.get("reading_histories", []):
+        old_story_id = rh.get("story_id")
+        new_story_id = story_map.get(old_story_id)
+        if not new_story_id:
+            continue
+        new_rh = ReadingHistory(
+            session_id=rh.get("session_id", ""),
+            email=rh.get("email"),
+            story_id=new_story_id,
+            part_number=rh.get("part_number", 1),
+            updated_at=parse_datetime(rh.get("updated_at")),
+        )
+        db.session.add(new_rh)
+    db.session.commit()
+
+    # Import follows (đã có kiểm tra trùng)
+    for f in data.get("follows", []):
+        old_story_id = f.get("story_id")
+        new_story_id = story_map.get(old_story_id)
+        if not new_story_id:
+            continue
+        email = f.get("email")
+        if not email:
+            continue
+        existing = Follow.query.filter_by(story_id=new_story_id, email=email).first()
+        if existing:
+            # Có thể cập nhật created_at nếu muốn
+            continue
+        new_f = Follow(
+            story_id=new_story_id,
+            email=email,
+            created_at=parse_datetime(f.get("created_at")),
+        )
+        db.session.add(new_f)
+    db.session.commit()
+
+    # Import new_story_subscriptions (đã có kiểm tra trùng)
+    for sub in data.get("new_story_subscriptions", []):
+        email = sub.get("email")
+        if not email:
+            continue
+        existing = NewStorySubscription.query.filter_by(email=email).first()
+        if existing:
+            continue
+        new_sub = NewStorySubscription(
+            email=email,
+            created_at=parse_datetime(sub.get("created_at")),
+        )
+        db.session.add(new_sub)
+    db.session.commit()
+
+    # Đồng bộ story.views sau khi import
+    db.session.execute(text("""
+        UPDATE stories 
+        SET views = COALESCE(
+            (SELECT SUM(views) FROM daily_view 
+             WHERE daily_view.story_id = stories.id 
+             AND daily_view.part_number > 0),
+            0
+        )
+    """))
     db.session.commit()
 
     # Cập nhật sequence tự tăng khi sử dụng PostgreSQL
