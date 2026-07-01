@@ -2445,18 +2445,26 @@ def delete_all_stories():
         return redirect(url_for("upload"))
     # Xoá toàn bộ dữ liệu liên quan tới truyện, bao gồm cả video và bình luận
     try:
-        # Gỡ quan hệ nhiều-nhiều giữa truyện và thể loại
+        # Gỡ quan hệ nhiều-nhiều
         db.session.execute(story_categories.delete())
-        # Xoá bình luận trước để tránh khoá ngoại tới story
+        
+        # Xóa các bảng có khóa ngoại
         Comment.query.delete()
-        # Xoá liên kết video của các chương
         PartVideo.query.delete()
-        # Xoá tất cả các chương
         Part.query.delete()
-        # Xoá truyện
+        
+        # Xóa thêm các bảng thống kê và lịch sử
+        DailyView.query.delete()
+        DailyListen.query.delete()
+        ReadingHistory.query.delete()
+        Follow.query.delete()
+        NewStorySubscription.query.delete()
+        # Nếu có Announcement, có thể giữ hoặc xóa tùy ý
+        
+        # Xóa truyện
         Story.query.delete()
         db.session.commit()
-        flash("Đã xoá toàn bộ truyện thành công!")
+        flash("Đã xoá toàn bộ truyện và dữ liệu liên quan thành công!")
     except Exception:
         db.session.rollback()
         flash("Đã xảy ra lỗi khi xoá truyện. Vui lòng thử lại.")
