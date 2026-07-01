@@ -792,3 +792,37 @@ body.upload aside.sidebar {
   font-weight: bold;
   text-align: center;
 }
+
+/* Phần badge hiển thị thống kê phần */
+.part-stats {
+    font-size: 0.8em;
+    color: #aaa;
+    margin-top: 4px;
+}
+.part-badge {
+    display: inline-block;
+    background: #333;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin: 0 4px 4px 0;
+    color: #eee;
+    font-weight: normal;
+}
+.part-badge .part-num {
+    color: #4A90E2;
+    font-weight: bold;
+}
+.part-badge .part-count {
+    color: #FF8C00;
+}
+/* Chế độ sáng */
+body.light-mode .part-badge {
+    background: #e0e0e0;
+    color: #333;
+}
+body.light-mode .part-badge .part-num {
+    color: #0056b3;
+}
+body.light-mode .part-badge .part-count {
+    color: #e67e22;
+}
