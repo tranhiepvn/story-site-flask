@@ -47,6 +47,37 @@ from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from datetime import date as date_type
 
+def get_geo_info(ip):
+    """Lấy thông tin quốc gia, thành phố, múi giờ từ IP."""
+    if ip in ['127.0.0.1', '::1', 'localhost']:
+        return {'country': 'Local', 'city': 'Local', 'timezone': 'UTC'}
+    try:
+        response = requests.get(f'http://ip-api.com/json/{ip}', timeout=2)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('status') == 'success':
+                return {
+                    'country': data.get('country', 'Unknown'),
+                    'city': data.get('city', 'Unknown'),
+                    'timezone': data.get('timezone', 'UTC')
+                }
+    except Exception as e:
+        print(f"Geo lookup error: {e}")
+    return {'country': 'Unknown', 'city': 'Unknown', 'timezone': 'UTC'}
+
+def get_country_from_ip(ip):
+    if ip in ('127.0.0.1', '::1', 'localhost'):
+        return 'LOCAL'  # hoặc 'XX' cho local
+    try:
+        # Sử dụng ip-api.com free, không cần API key
+        response = requests.get(f'http://ip-api.com/json/{ip}?fields=countryCode', timeout=2)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('countryCode', 'UNKNOWN')
+    except Exception:
+        pass
+    return 'UNKNOWN'
+
 def parse_date(value):
     if isinstance(value, str):
         try:
@@ -792,6 +823,26 @@ class Announcement(db.Model):
     def __repr__(self):
         return f"<Announcement {self.id}>"
 
+class VisitLog(db.Model):
+    __tablename__ = "visit_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(100), nullable=False)
+    user_agent = db.Column(db.String(500))
+    ip_address = db.Column(db.String(50))
+    device_type = db.Column(db.String(20))  # 'desktop', 'mobile', 'tablet'
+    theme = db.Column(db.String(10))        # 'light', 'dark'
+    path = db.Column(db.String(500))
+    referrer = db.Column(db.String(500))
+    country = db.Column(db.String(100))     # <-- thêm
+    city = db.Column(db.String(100))        # <-- thêm
+    timezone = db.Column(db.String(50))     # <-- thêm
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('idx_visit_created', 'created_at'),
+        db.Index('idx_visit_session', 'session_id'),
+    )
+
 # Khi module được import (dù bởi flask CLI hay chạy trực tiếp),
 # đảm bảo rằng các bảng trong SQLite được tạo. Thực hiện trong
 # app context để tránh lỗi "no such table" khi truy cập lần đầu.
@@ -856,6 +907,12 @@ with app.app_context():
     if not column_exists('daily_listen', 'part_number'):
         db.session.execute(text("ALTER TABLE daily_listen ADD COLUMN part_number INTEGER DEFAULT 0"))
         print("Đã thêm cột part_number vào bảng daily_listen")
+
+    # === THÊM MỚI: Kiểm tra và thêm cột cho visit_logs ===
+    for col in ['city', 'timezone']:
+        if not column_exists('visit_logs', col):
+            db.session.execute(text(f"ALTER TABLE visit_logs ADD COLUMN {col} VARCHAR(100)"))
+            print(f"Đã thêm cột {col} vào bảng visit_logs")
 
     db.session.commit()
 
@@ -3720,6 +3777,221 @@ def restart_server():
         thread = threading.Thread(target=_restart, daemon=True)
         thread.start()
         return redirect(url_for("upload"))
+
+@app.before_request
+def log_visit():
+    print(f"🔍 log_visit called for: {request.path}")
+
+    # Bỏ qua các request không mong muốn
+    if (request.path.startswith('/static') or 
+        request.path.startswith('/admin') or 
+        request.path.startswith('/api') or
+        request.path.startswith('/upload_login') or
+        request.path.startswith('/set_theme') or   # <-- thêm dòng này
+        request.path == '/favicon.ico'):
+        return
+    
+    if request.method != 'GET':
+        print("⏭️ Skipping non-GET request")
+        return
+    
+    try:
+        session_id = get_user_session_id()
+        today = date.today()
+        
+        # Kiểm tra log trong ngày
+        existing = VisitLog.query.filter(
+            VisitLog.session_id == session_id,
+            func.date(VisitLog.created_at) == today
+        ).first()
+        if existing:
+            print(f"⏭️ Already logged for {session_id} today")
+            return
+        
+        # Xác định thiết bị
+        ua = request.headers.get('User-Agent', '').lower()
+        if 'mobile' in ua or 'android' in ua or 'iphone' in ua:
+            device = 'mobile'
+        elif 'ipad' in ua or 'tablet' in ua:
+            device = 'tablet'
+        else:
+            device = 'desktop'
+        
+        theme = session.get('theme', 'dark')
+        
+        # Lấy thông tin địa lý từ IP
+        ip = request.remote_addr
+        geo = get_geo_info(ip)
+        
+        log = VisitLog(
+            session_id=session_id,
+            user_agent=request.headers.get('User-Agent', '')[:500],
+            ip_address=ip,
+            device_type=device,
+            theme=theme,
+            path=request.path[:500],
+            referrer=request.headers.get('Referer', '')[:500],
+            country=geo['country'],
+            city=geo['city'],
+            timezone=geo['timezone']
+        )
+        db.session.add(log)
+        db.session.commit()
+        print(f"✅ Visit logged: session={session_id}, theme={theme}, device={device}")
+    except Exception as e:
+        print(f"❌ Error in log_visit: {e}")
+        db.session.rollback()
+
+@app.route("/admin/analytics")
+def admin_analytics():
+    if not session.get("upload_authenticated"):
+        flash("Vui lòng đăng nhập admin.", "danger")
+        return redirect(url_for('upload_login'))
+    
+    # Sử dụng UTC để đồng bộ với created_at
+    from datetime import datetime
+    end_date = datetime.utcnow().date()
+    start_date = end_date - timedelta(days=6)
+    next_day = end_date + timedelta(days=1)
+    
+    # Tổng số phiên
+    total_sessions = VisitLog.query.filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day
+    ).count()
+    
+    # Phân bố thiết bị
+    device_stats = db.session.query(
+        VisitLog.device_type,
+        func.count(VisitLog.id)
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day
+    ).group_by(VisitLog.device_type).all()
+    
+    # Phân bố theme
+    theme_stats = db.session.query(
+        VisitLog.theme,
+        func.count(VisitLog.id)
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day
+    ).group_by(VisitLog.theme).all()
+    
+    # Thống kê theo quốc gia (top 10)
+    country_stats = db.session.query(
+        VisitLog.country,
+        func.count(VisitLog.id)
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day
+    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+    
+    # Thống kê theo giờ trong ngày (0-23)
+    hour_stats = db.session.query(
+        func.strftime('%H', VisitLog.created_at).label('hour'),
+        func.count(VisitLog.id)
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day
+    ).group_by('hour').order_by('hour').all()
+    
+    hours = [f"{i:02d}:00" for i in range(24)]
+    hour_counts = [0] * 24
+    for h, count in hour_stats:
+        try:
+            idx = int(h)
+            if 0 <= idx <= 23:
+                hour_counts[idx] = count
+        except:
+            pass
+    
+    # Dữ liệu theo ngày
+    daily_stats = db.session.query(
+        func.date(VisitLog.created_at).label('date'),
+        func.count(VisitLog.id).label('count')
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day
+    ).group_by(func.date(VisitLog.created_at)).order_by(func.date(VisitLog.created_at)).all()
+    
+    dates = [(start_date + timedelta(days=i)).strftime('%d/%m') for i in range(7)]
+    counts = []
+    
+    # Xây dựng map từ ngày (chuỗi) sang count
+    date_map = {}
+    for stat in daily_stats:
+        # SQLite trả về chuỗi 'YYYY-MM-DD', PostgreSQL trả về date object
+        if isinstance(stat.date, str):
+            try:
+                date_obj = datetime.strptime(stat.date, '%Y-%m-%d').date()
+            except:
+                continue
+        else:
+            date_obj = stat.date
+        key = date_obj.strftime('%d/%m')
+        date_map[key] = stat.count
+    
+    for d in dates:
+        counts.append(date_map.get(d, 0))
+    
+        # Top đường dẫn (loại bỏ set_theme)
+    path_stats = db.session.query(
+        VisitLog.path,
+        func.count(VisitLog.id)
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day,
+        VisitLog.path.notlike('/set_theme%')  # Không lấy set_theme
+    ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+
+    # Xử lý path để hiển thị tên truyện
+    path_list = []
+    for path, count in path_stats:
+        display_name = path
+        story_link = None
+        if path == '/':
+            display_name = 'Trang chủ'
+            story_link = url_for('index')
+        elif path.startswith('/story/'):
+            try:
+                story_id = int(path.split('/')[2])
+                story = Story.query.get(story_id)
+                if story:
+                    display_name = story.title
+                    story_link = url_for('story_detail', story_id=story.id)
+                else:
+                    display_name = f"Truyện #{story_id} (đã xóa)"
+            except:
+                pass
+        path_list.append({
+            'path': path,
+            'display_name': display_name,
+            'count': count,
+            'link': story_link
+        })
+    
+    return render_template('admin_analytics.html',
+                       total_sessions=total_sessions,
+                       device_stats=device_stats,
+                       theme_stats=theme_stats,
+                       country_stats=country_stats,
+                       hour_stats=hour_stats,
+                       dates=dates,
+                       counts=counts,
+                       hours=hours,
+                       hour_counts=hour_counts,
+                       path_list=path_list,  # <-- thay đổi
+                       start_date=start_date,
+                       end_date=end_date)
+
+@app.route('/set_theme/<theme>')
+def set_theme(theme):
+    """Cập nhật theme trong session khi người dùng toggle."""
+    if theme in ('light', 'dark'):
+        session['theme'] = theme
+        print(f"Theme updated to {theme}")  # Debug
+    return '', 204
 
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
