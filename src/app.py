@@ -43,7 +43,7 @@ load_dotenv()                     # thêm dòng này
 
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text
+from sqlalchemy import func, text, extract
 from sqlalchemy.exc import IntegrityError
 from datetime import date as date_type
 
