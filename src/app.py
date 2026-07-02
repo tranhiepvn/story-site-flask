@@ -3887,15 +3887,25 @@ def admin_analytics():
         VisitLog.created_at < next_day
     ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
     
+    # Lấy thống kê theo giờ, tương thích SQLite và PostgreSQL
     # Thống kê theo giờ trong ngày (0-23)
-    hour_stats = db.session.query(
-        func.strftime('%H', VisitLog.created_at).label('hour'),
-        func.count(VisitLog.id)
-    ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
-    ).group_by('hour').order_by('hour').all()
-    
+    if db.engine.dialect.name == 'postgresql':
+        hour_stats = db.session.query(
+            extract('hour', VisitLog.created_at).label('hour'),
+            func.count(VisitLog.id)
+        ).filter(
+            VisitLog.created_at >= start_date,
+            VisitLog.created_at < next_day
+        ).group_by('hour').order_by('hour').all()
+    else:
+        hour_stats = db.session.query(
+            func.strftime('%H', VisitLog.created_at).label('hour'),
+            func.count(VisitLog.id)
+        ).filter(
+            VisitLog.created_at >= start_date,
+            VisitLog.created_at < next_day
+        ).group_by('hour').order_by('hour').all()
+
     hours = [f"{i:02d}:00" for i in range(24)]
     hour_counts = [0] * 24
     for h, count in hour_stats:
@@ -3942,7 +3952,8 @@ def admin_analytics():
     ).filter(
         VisitLog.created_at >= start_date,
         VisitLog.created_at < next_day,
-        VisitLog.path.notlike('/set_theme%')  # Không lấy set_theme
+        VisitLog.path.notlike('/set_theme%'),
+        VisitLog.path.notlike('/upload%')
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(10).all()
 
     # Xử lý path để hiển thị tên truyện
