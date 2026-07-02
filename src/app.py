@@ -38,6 +38,7 @@ from email.message import EmailMessage
 from dotenv import load_dotenv   # thêm dòng này
 import sys
 import requests
+import ipaddress
 
 load_dotenv()                     # thêm dòng này
 
@@ -51,6 +52,14 @@ def get_geo_info(ip):
     """Lấy thông tin quốc gia, thành phố, múi giờ từ IP."""
     if ip in ['127.0.0.1', '::1', 'localhost']:
         return {'country': 'Local', 'city': 'Local', 'timezone': 'UTC'}
+    
+    # Kiểm tra IP private (10.x, 172.16-31.x, 192.168.x)
+    try:
+        if ipaddress.ip_address(ip).is_private:
+            return {'country': 'Private IP', 'city': 'Private', 'timezone': 'UTC'}
+    except:
+        pass
+
     try:
         response = requests.get(f'http://ip-api.com/json/{ip}', timeout=2)
         if response.status_code == 200:
@@ -62,7 +71,7 @@ def get_geo_info(ip):
                     'timezone': data.get('timezone', 'UTC')
                 }
     except Exception as e:
-        print(f"Geo lookup error: {e}")
+        print(f"Geo lookup error: {e}", flush=True)
     return {'country': 'Unknown', 'city': 'Unknown', 'timezone': 'UTC'}
 
 def get_country_from_ip(ip):
@@ -3780,50 +3789,48 @@ def restart_server():
 
 @app.before_request
 def log_visit():
-    print(f"🔍 log_visit called for: {request.path}")
+    print(f"🔍 log_visit called for: {request.path}", flush=True)
 
-    # Bỏ qua các request không mong muốn
     if (request.path.startswith('/static') or 
         request.path.startswith('/admin') or 
         request.path.startswith('/api') or
         request.path.startswith('/upload_login') or
         request.path.startswith('/set_theme') or
         request.path == '/favicon.ico' or
-        request.path == '/robots.txt'):   # Thêm dòng này
+        request.path == '/robots.txt'):
         return
 
-    
     if request.method != 'GET':
-        print("⏭️ Skipping non-GET request")
         return
-    
+
     try:
         session_id = get_user_session_id()
-        today = date.today()        
+        today = date.today()
         theme = session.get('theme', 'dark')
         
-        existing = VisitLog.query.filter(
-            VisitLog.session_id == session_id,
-            func.date(VisitLog.created_at) == today,
-            VisitLog.theme == theme  # Chỉ bỏ qua nếu cùng theme
-        ).first()
-        if existing:
-            print(f"⏭️ Already logged for {session_id} today with theme {theme}")
+        # Kiểm tra trong session
+        last_date = session.get('last_log_date')
+        last_theme = session.get('last_log_theme')
+        today_str = today.isoformat()
+        
+        if last_date == today_str and last_theme == theme:
+            print(f"⏭️ Already logged today with theme {theme}", flush=True)
             return
+
+        # Cập nhật session
+        session['last_log_date'] = today_str
+        session['last_log_theme'] = theme
 
         # Xác định thiết bị
         ua = request.headers.get('User-Agent', '').lower()
-        if 'mobile' in ua or 'android' in ua or 'iphone' in ua:
-            device = 'mobile'
-        elif 'ipad' in ua or 'tablet' in ua:
-            device = 'tablet'
-        else:
-            device = 'desktop'
-        
-        # Lấy thông tin địa lý từ IP
-        ip = request.remote_addr
+        device = 'mobile' if any(x in ua for x in ('mobile', 'android', 'iphone')) else \
+                  'tablet' if 'ipad' in ua or 'tablet' in ua else 'desktop'
+
+        ip = request.headers.get('X-Real-IP') or request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ip and ',' in ip:
+            ip = ip.split(',')[0].strip()
         geo = get_geo_info(ip)
-        
+
         log = VisitLog(
             session_id=session_id,
             user_agent=request.headers.get('User-Agent', '')[:500],
@@ -3838,9 +3845,9 @@ def log_visit():
         )
         db.session.add(log)
         db.session.commit()
-        print(f"✅ Visit logged: session={session_id}, theme={theme}, device={device}")
+        print(f"✅ Visit logged: session={session_id}, theme={theme}, device={device}", flush=True)
     except Exception as e:
-        print(f"❌ Error in log_visit: {e}")
+        print(f"❌ Error: {e}", flush=True)
         db.session.rollback()
 
 @app.route("/admin/analytics")
