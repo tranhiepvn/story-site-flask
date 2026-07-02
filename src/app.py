@@ -3787,9 +3787,11 @@ def log_visit():
         request.path.startswith('/admin') or 
         request.path.startswith('/api') or
         request.path.startswith('/upload_login') or
-        request.path.startswith('/set_theme') or   # <-- thêm dòng này
-        request.path == '/favicon.ico'):
+        request.path.startswith('/set_theme') or
+        request.path == '/favicon.ico' or
+        request.path == '/robots.txt'):   # Thêm dòng này
         return
+
     
     if request.method != 'GET':
         print("⏭️ Skipping non-GET request")
@@ -3797,17 +3799,18 @@ def log_visit():
     
     try:
         session_id = get_user_session_id()
-        today = date.today()
+        today = date.today()        
+        theme = session.get('theme', 'dark')
         
-        # Kiểm tra log trong ngày
         existing = VisitLog.query.filter(
             VisitLog.session_id == session_id,
-            func.date(VisitLog.created_at) == today
+            func.date(VisitLog.created_at) == today,
+            VisitLog.theme == theme  # Chỉ bỏ qua nếu cùng theme
         ).first()
         if existing:
-            print(f"⏭️ Already logged for {session_id} today")
+            print(f"⏭️ Already logged for {session_id} today with theme {theme}")
             return
-        
+
         # Xác định thiết bị
         ua = request.headers.get('User-Agent', '').lower()
         if 'mobile' in ua or 'android' in ua or 'iphone' in ua:
@@ -3816,8 +3819,6 @@ def log_visit():
             device = 'tablet'
         else:
             device = 'desktop'
-        
-        theme = session.get('theme', 'dark')
         
         # Lấy thông tin địa lý từ IP
         ip = request.remote_addr
