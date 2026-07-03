@@ -189,6 +189,12 @@ def format_part_title(title):
         rest = rest[0].upper() + rest[1:].lower()
     return f"Phần {num}: {rest}".strip()
 
+def clean_part_title(title):
+    # Xóa dấu * đầu cuối nếu có (nếu bạn vẫn muốn giữ nguyên dấu * thì bỏ dòng này)
+    title = re.sub(r'^\*+|\*+$', '', title).strip()
+    # Giữ nguyên toàn bộ, không chuyển hoa/thường
+    return title
+
 def split_and_clean_content(content: str) -> list[tuple[int, str]]:
     lines = content.splitlines()
     sections = []
@@ -201,7 +207,8 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
         if match:
             if current_content and part_num is not None:
                 if current_content:
-                    current_content[0] = format_part_title(current_content[0])
+                    # current_content[0] = format_part_title(current_content[0])
+                    pass
                 sections.append((part_num, '\n'.join(current_content)))
             part_num = int(match.group(1))
             current_content = [cleaned]
@@ -211,14 +218,16 @@ def split_and_clean_content(content: str) -> list[tuple[int, str]]:
 
     if current_content and part_num is not None:
         if current_content:
-            current_content[0] = format_part_title(current_content[0])
+            # current_content[0] = format_part_title(current_content[0])
+            pass
         sections.append((part_num, '\n'.join(current_content)))
 
     if not sections and content.strip():
         full_clean = '\n'.join(clean_line(line) for line in content.splitlines())
         lines_full = full_clean.splitlines()
         if lines_full:
-            lines_full[0] = format_part_title(lines_full[0])
+            # lines_full[0] = format_part_title(lines_full[0])
+            pass
             full_clean = '\n'.join(lines_full)
         sections = [(1, full_clean)]
 
@@ -1618,7 +1627,8 @@ def upload():
                 if part_obj and part_obj.story_id == story.id:
                     cleaned_lines = [clean_line(line) for line in raw_content.splitlines()]
                     if cleaned_lines:
-                        cleaned_lines[0] = format_part_title(cleaned_lines[0])
+                        # cleaned_lines[0] = format_part_title(cleaned_lines[0])
+                        pass
                     cleaned_content = '\n'.join(cleaned_lines)
                     part_obj.content = cleaned_content                    
 
