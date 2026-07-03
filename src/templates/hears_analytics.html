@@ -159,10 +159,12 @@
             {% if item.part_stats %}
                 <div class="part-stats">
                     {% for part_num, total in item.part_stats %}
-                        <span class="part-badge">
-                            <span class="part-num">Phần {{ part_num }}</span>
-                            <span class="part-count">({{ total }})</span>
-                        </span>
+                        <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
+                           class="part-badge" 
+                           style="text-decoration: none; display: inline-block; background: #333; padding: 2px 8px; border-radius: 12px; margin: 0 4px 4px 0; color: #eee; font-weight: normal;">
+                            <span class="part-num" style="color: #4A90E2; font-weight: bold;">Phần {{ part_num }}</span>
+                            <span class="part-count" style="color: #FF8C00;">({{ total }})</span>
+                        </a>
                     {% endfor %}
                 </div>
             {% endif %}

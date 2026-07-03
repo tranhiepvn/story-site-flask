@@ -107,7 +107,13 @@
   }
 </style>
 
-<h2>📊 Thống kê truy cập (7 ngày gần nhất)</h2>
+<div style="margin-bottom: 20px;">
+  <a href="{{ url_for('admin_analytics', range='week') }}" class="filter-btn {% if range_type == 'week' %}active{% endif %}">📅 7 ngày gần nhất</a>
+  <a href="{{ url_for('admin_analytics', range='all') }}" class="filter-btn {% if range_type == 'all' %}active{% endif %}">📊 Tất cả thời gian</a>
+</div>
+
+<h2>📊 Thống kê truy cập {{ title_suffix }}</h2>
+
 <p><strong>Từ {{ start_date.strftime('%d/%m/%Y') }} đến {{ end_date.strftime('%d/%m/%Y') }}</strong></p>
 
 
@@ -141,6 +147,27 @@
     .stats-grid .full-width .stat-card {
       max-width: 100%;
     }
+  }
+
+  .filter-btn {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #333;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      margin-right: 8px;
+  }
+  .filter-btn.active {
+      background: #4A90E2;
+  }
+  body.light-mode .filter-btn {
+      background: #e0e0e0;
+      color: #1a1a1a;
+  }
+  body.light-mode .filter-btn.active {
+      background: #0056b3;
+      color: white;
   }
 </style>
 

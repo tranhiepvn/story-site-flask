@@ -3856,10 +3856,27 @@ def admin_analytics():
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
     
-    # Sử dụng UTC để đồng bộ với created_at
+    # Lấy tham số range từ URL
+    range_type = request.args.get('range', 'week')
     from datetime import datetime
-    end_date = datetime.utcnow().date()
-    start_date = end_date - timedelta(days=6)
+    if range_type == 'all':
+        # Toàn bộ thời gian
+        start_date = db.session.query(func.min(VisitLog.created_at)).scalar()
+        if start_date is None:
+            start_date = datetime.utcnow().date() - timedelta(days=30)
+        else:
+            start_date = start_date.date()
+        end_date = datetime.utcnow().date() + timedelta(days=1)
+        title_suffix = "(toàn bộ thời gian)"
+        range_param = 'all'
+    else:
+        # 7 ngày gần nhất
+        end_date = datetime.utcnow().date()
+        start_date = end_date - timedelta(days=6)
+        end_date = end_date + timedelta(days=1)  # bao gồm cả ngày hôm nay
+        title_suffix = "(7 ngày gần nhất)"
+        range_param = 'week'
+
     next_day = end_date + timedelta(days=1)
     
     # Tổng số phiên
@@ -3991,18 +4008,20 @@ def admin_analytics():
         })
     
     return render_template('admin_analytics.html',
-                       total_sessions=total_sessions,
-                       device_stats=device_stats,
-                       theme_stats=theme_stats,
-                       country_stats=country_stats,
-                       hour_stats=hour_stats,
-                       dates=dates,
-                       counts=counts,
-                       hours=hours,
-                       hour_counts=hour_counts,
-                       path_list=path_list,  # <-- thay đổi
-                       start_date=start_date,
-                       end_date=end_date)
+                           total_sessions=total_sessions,
+                           device_stats=device_stats,
+                           theme_stats=theme_stats,
+                           country_stats=country_stats,
+                           hour_stats=hour_stats,
+                           dates=dates,  # cần điều chỉnh để phù hợp với phạm vi
+                           counts=counts,
+                           hours=hours,
+                           hour_counts=hour_counts,
+                           path_list=path_list,
+                           start_date=start_date,
+                           end_date=end_date,
+                           range_type=range_param,
+                           title_suffix=title_suffix)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):

@@ -826,3 +826,7 @@ body.light-mode .part-badge .part-num {
 body.light-mode .part-badge .part-count {
     color: #e67e22;
 }
+.part-badge:hover {
+    background: #555 !important;
+    text-decoration: underline;
+}
