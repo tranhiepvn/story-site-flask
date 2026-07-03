@@ -48,6 +48,13 @@ from sqlalchemy import func, text, extract
 from sqlalchemy.exc import IntegrityError
 from datetime import date as date_type
 
+def get_server_offset_hours():
+    """Trả về số giờ chênh lệch giữa múi giờ local và UTC (có thể âm)."""
+    offset = datetime.now().astimezone().utcoffset()
+    if offset is not None:
+        return offset.total_seconds() / 3600.0
+    return 0  # fallback (UTC)
+
 def get_geo_info(ip):
     """Lấy thông tin quốc gia, thành phố, múi giờ từ IP."""
     if ip in ['127.0.0.1', '::1', 'localhost']:
@@ -3911,26 +3918,30 @@ def admin_analytics():
         VisitLog.created_at >= start_date,
         VisitLog.created_at < next_day
     ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
-    
-    # Lấy thống kê theo giờ, tương thích SQLite và PostgreSQL
-    # Thống kê theo giờ trong ngày (0-23)
+
+
+    # Lấy offset giờ hiện tại của server
+    offset_hours = get_server_offset_hours()
+
     if db.engine.dialect.name == 'postgresql':
+        # Sử dụng INTERVAL với offset (có thể âm)
         hour_stats = db.session.query(
-            extract('hour', VisitLog.created_at).label('hour'),
+            extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")).label('hour'),
             func.count(VisitLog.id)
         ).filter(
             VisitLog.created_at >= start_date,
             VisitLog.created_at < next_day
         ).group_by('hour').order_by('hour').all()
     else:
+        # SQLite: dùng 'localtime' (lấy múi giờ hệ thống)
         hour_stats = db.session.query(
-            func.strftime('%H', VisitLog.created_at).label('hour'),
+            func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour'),
             func.count(VisitLog.id)
         ).filter(
             VisitLog.created_at >= start_date,
             VisitLog.created_at < next_day
         ).group_by('hour').order_by('hour').all()
-
+    
     hours = [f"{i:02d}:00" for i in range(24)]
     hour_counts = [0] * 24
     for h, count in hour_stats:

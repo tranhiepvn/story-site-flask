@@ -220,11 +220,30 @@
     </ul>
   </div>
   <div class="chart-container">
-    <h3>🕐 Giờ truy cập (UTC)</h3>
+    <h3>🕐 Giờ truy cập</h3>
+    <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 20px; align-items: center; max-width: 400px; margin-bottom: 10px;">
+      <span>Giờ hiện tại (server):</span>
+      <span style="text-align: left; font-family: monospace;">{{ datetime.now().strftime('%I:%M:%S %p') }}</span>
+
+      <span>Giờ hiện tại (trình duyệt):</span>
+      <span id="client-time" style="text-align: left; font-family: monospace;"></span>
+    </div>
     <ul class="stat-list">
       {% for hour, count in hour_stats %}
       <li>
-        <span class="name">{{ hour }}:00 - {{ hour }}:59</span>
+        <span class="name">
+          {% set h = hour|int %}
+          {% if h == 0 %}
+            12:00 - 12:59 AM
+          {% elif h < 12 %}
+            {{ "%02d"|format(h) }}:00 - {{ "%02d"|format(h) }}:59 AM
+          {% elif h == 12 %}
+            12:00 - 12:59 PM
+          {% else %}
+            {% set h12 = h - 12 %}
+            {{ "%02d"|format(h12) }}:00 - {{ "%02d"|format(h12) }}:59 PM
+          {% endif %}
+        </span>
         <span class="count">{{ count }}</span>
       </li>
       {% endfor %}
@@ -279,6 +298,19 @@
         }
       }
     }
+  });
+  document.addEventListener('DOMContentLoaded', function() {
+      function updateClientTime() {
+          var now = new Date();
+          document.getElementById('client-time').textContent = now.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true
+          });
+      }
+      updateClientTime();
+      setInterval(updateClientTime, 1000);
   });
 </script>
 
