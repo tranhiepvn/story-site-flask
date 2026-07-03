@@ -3920,30 +3920,62 @@ def admin_analytics():
     ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
 
 
-    # Lấy offset giờ hiện tại của server
+    # Lấy offset giờ hiện tại của server (đã có hàm get_server_offset_hours)
     offset_hours = get_server_offset_hours()
+
+    # Tên múi giờ cho Los Angeles và Việt Nam (dùng tên chuẩn PostgreSQL)
+    LA_TZ = 'America/Los_Angeles'
+    VN_TZ = 'Asia/Ho_Chi_Minh'
 
     if db.engine.dialect.name == 'postgresql':
         hour_stats = db.session.query(
-            extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")).label('hour'),
+            # Cột 1: giờ server (local)
+            extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")).label('hour_server'),
+            # Cột 2: giờ Los Angeles
+            extract('hour', text(f"visit_logs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '{LA_TZ}'")).label('hour_la'),
+            # Cột 3: giờ Việt Nam
+            extract('hour', text(f"visit_logs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '{VN_TZ}'")).label('hour_vn'),
+            # Số lượt
             func.count(VisitLog.id).label('count')
         ).filter(
             VisitLog.created_at >= start_date,
             VisitLog.created_at < next_day
-        ).group_by('hour').order_by(func.count(VisitLog.id).desc()).all()
+        ).group_by(
+            extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")),
+            extract('hour', text(f"visit_logs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '{LA_TZ}'")),
+            extract('hour', text(f"visit_logs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '{VN_TZ}'"))
+        ).order_by(func.count(VisitLog.id).desc()).all()
     else:
+        # Chỉ lấy giờ server (local) từ UTC bằng 'localtime'
         hour_stats = db.session.query(
-            func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour'),
+            func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour_server'),
             func.count(VisitLog.id).label('count')
         ).filter(
             VisitLog.created_at >= start_date,
             VisitLog.created_at < next_day
-        ).group_by('hour').order_by(func.count(VisitLog.id).desc()).all()
+        ).group_by('hour_server').order_by(func.count(VisitLog.id).desc()).all()
+        
+        # Tạo cấu trúc dữ liệu giống PostgreSQL để template không bị lỗi
+        # Biến hour_stats sẽ là list các object có hour_server, hour_la, hour_vn, count
+        # Với SQLite, ta gán hour_la và hour_vn giống hour_server (hoặc None)
+        hour_stats_processed = []
+        for item in hour_stats:
+            hour_stats_processed.append({
+                'hour_server': int(item.hour_server),
+                'hour_la': int(item.hour_server),  # tạm thời cho giống
+                'hour_vn': int(item.hour_server),
+                'count': item.count
+            })
+        hour_stats = hour_stats_processed
+
 
     hours = [f"{i:02d}:00" for i in range(24)]
     hour_counts = [0] * 24
-    for h, count in hour_stats:
+    for item in hour_stats:
         try:
+            # item có thể là tuple hoặc object; lấy hour_server
+            h = item.hour_server if hasattr(item, 'hour_server') else item[0]
+            count = item.count if hasattr(item, 'count') else item[3]  # hoặc item[3] nếu tuple
             idx = int(h)
             if 0 <= idx <= 23:
                 hour_counts[idx] = count
@@ -4016,13 +4048,17 @@ def admin_analytics():
             'link': story_link
         })
     
+    now_utc = datetime.utcnow()
+    now_la = now_utc - timedelta(hours=7)
+    now_vn = now_utc + timedelta(hours=7)
+
     return render_template('admin_analytics.html',
                            total_sessions=total_sessions,
                            device_stats=device_stats,
                            theme_stats=theme_stats,
                            country_stats=country_stats,
                            hour_stats=hour_stats,
-                           dates=dates,  # cần điều chỉnh để phù hợp với phạm vi
+                           dates=dates,
                            counts=counts,
                            hours=hours,
                            hour_counts=hour_counts,
@@ -4030,7 +4066,10 @@ def admin_analytics():
                            start_date=start_date,
                            end_date=end_date,
                            range_type=range_param,
-                           title_suffix=title_suffix)
+                           title_suffix=title_suffix,
+                           now_server=datetime.now(),
+                           now_la=now_la,
+                           now_vn=now_vn)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):

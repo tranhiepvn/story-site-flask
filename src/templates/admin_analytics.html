@@ -169,6 +169,28 @@
       background: #0056b3;
       color: white;
   }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+  }
+  thead th {
+    border-bottom: 2px solid #4A90E2;
+    color: #aaa;
+    font-weight: normal;
+    padding: 6px 8px;
+    text-align: left;
+  }
+  tbody tr {
+    border-bottom: 1px solid #333;
+  }
+  tbody tr:hover {
+    background: rgba(74, 144, 226, 0.1);
+  }
+  td {
+    padding: 6px 8px;
+  }
 </style>
 
 <div class="stats-grid">
@@ -207,8 +229,8 @@
   {% endfor %}
 </div>
 
-<div class="two-col">
-  <div class="chart-container">
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin: 20px 0;">
+  <div class="chart-container" style="padding: 15px;">
     <h3>🌍 Quốc gia</h3>
     <ul class="stat-list">
       {% for country, count in country_stats %}
@@ -219,37 +241,62 @@
       {% endfor %}
     </ul>
   </div>
-  <div class="chart-container">
+  <div class="chart-container" style="padding: 15px;">
     <h3>🕐 Giờ truy cập</h3>
-    <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 20px; align-items: center; max-width: 400px; margin-bottom: 10px;">
-      <span>Giờ hiện tại (server):</span>
-      <span style="text-align: left; font-family: monospace;">{{ datetime.now().strftime('%I:%M:%S %p') }}</span>
+    <div style="margin-bottom: 10px;">
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 20px; align-items: center; max-width: 400px; margin-bottom: 10px;">
+        <span>Giờ hiện tại (server):</span>
+        <span style="text-align: left; font-family: monospace;">{{ datetime.now().strftime('%I:%M:%S %p') }}</span>
 
-      <span>Giờ hiện tại (trình duyệt):</span>
-      <span id="client-time" style="text-align: left; font-family: monospace;"></span>
+        <span>Giờ hiện tại (trình duyệt):</span>
+        <span id="client-time" style="text-align: left; font-family: monospace;"></span>
+      </div>
     </div>
-    <ul class="stat-list">
-      {% for hour, count in hour_stats %}
-      <li>
-        <span class="name">
-          {% set h = hour|int %}
-          {% if h == 0 %}
-            12:00 - 12:59 AM
-          {% elif h < 12 %}
-            {{ "%02d"|format(h) }}:00 - {{ "%02d"|format(h) }}:59 AM
-          {% elif h == 12 %}
-            12:00 - 12:59 PM
-          {% else %}
-            {% set h12 = h - 12 %}
-            {{ "%02d"|format(h12) }}:00 - {{ "%02d"|format(h12) }}:59 PM
-          {% endif %}
-        </span>
-        <span class="count">{{ count }}</span>
-      </li>
-      {% endfor %}
-    </ul>
+
+    <table style="width:100%; border-collapse: collapse; margin-top:10px;">
+      <thead>
+        <tr style="border-bottom: 2px solid #4A90E2;">
+          <th style="text-align:left; padding:6px 8px;">Giờ server</th>
+          <th style="text-align:left; padding:6px 8px;">Giờ LA</th>
+          <th style="text-align:left; padding:6px 8px;">Giờ VN</th>
+          <th style="text-align:right; padding:6px 8px;">Số lượt</th>
+        </tr>
+      </thead>
+      <tbody>
+  {% for item in hour_stats %}
+  <tr style="border-bottom: 1px solid #333;">
+    <td style="padding:6px 8px;">
+      {% set h = item.hour_server|int %}
+      {% if h == 0 %}{% set display_h = 12 %}{% set ampm = 'AM' %}
+      {% elif h < 12 %}{% set display_h = h %}{% set ampm = 'AM' %}
+      {% elif h == 12 %}{% set display_h = 12 %}{% set ampm = 'PM' %}
+      {% else %}{% set display_h = h - 12 %}{% set ampm = 'PM' %}{% endif %}
+      {{ "%02d"|format(display_h) }}:00 {{ ampm }}
+    </td>
+    <td style="padding:6px 8px;">
+      {% set h = item.hour_la|int %}
+      {% if h == 0 %}{% set display_h = 12 %}{% set ampm = 'AM' %}
+      {% elif h < 12 %}{% set display_h = h %}{% set ampm = 'AM' %}
+      {% elif h == 12 %}{% set display_h = 12 %}{% set ampm = 'PM' %}
+      {% else %}{% set display_h = h - 12 %}{% set ampm = 'PM' %}{% endif %}
+      {{ "%02d"|format(display_h) }}:00 {{ ampm }}
+    </td>
+    <td style="padding:6px 8px;">
+      {% set h = item.hour_vn|int %}
+      {% if h == 0 %}{% set display_h = 12 %}{% set ampm = 'AM' %}
+      {% elif h < 12 %}{% set display_h = h %}{% set ampm = 'AM' %}
+      {% elif h == 12 %}{% set display_h = 12 %}{% set ampm = 'PM' %}
+      {% else %}{% set display_h = h - 12 %}{% set ampm = 'PM' %}{% endif %}
+      {{ "%02d"|format(display_h) }}:00 {{ ampm }}
+    </td>
+    <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.count }}</td>
+  </tr>
+  {% endfor %}
+</tbody>
+    </table>
   </div>
 </div>
+
 
 <div class="chart-container">
   <h3>📈 Lượt truy cập theo ngày</h3>
