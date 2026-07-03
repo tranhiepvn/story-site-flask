@@ -3924,24 +3924,22 @@ def admin_analytics():
     offset_hours = get_server_offset_hours()
 
     if db.engine.dialect.name == 'postgresql':
-        # Sử dụng INTERVAL với offset (có thể âm)
         hour_stats = db.session.query(
             extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")).label('hour'),
-            func.count(VisitLog.id)
+            func.count(VisitLog.id).label('count')
         ).filter(
             VisitLog.created_at >= start_date,
             VisitLog.created_at < next_day
-        ).group_by('hour').order_by('hour').all()
+        ).group_by('hour').order_by(func.count(VisitLog.id).desc()).all()
     else:
-        # SQLite: dùng 'localtime' (lấy múi giờ hệ thống)
         hour_stats = db.session.query(
             func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour'),
-            func.count(VisitLog.id)
+            func.count(VisitLog.id).label('count')
         ).filter(
             VisitLog.created_at >= start_date,
             VisitLog.created_at < next_day
-        ).group_by('hour').order_by('hour').all()
-    
+        ).group_by('hour').order_by(func.count(VisitLog.id).desc()).all()
+
     hours = [f"{i:02d}:00" for i in range(24)]
     hour_counts = [0] * 24
     for h, count in hour_stats:
