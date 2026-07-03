@@ -11,7 +11,7 @@ body {
 
 .container {
   /* tăng chiều rộng tổng thể để chứa sidebar lớn hơn và nội dung */
-  max-width: 1100px;
+  max-width: 100%;
   margin: 20px auto;
   padding: 1em 2em;
   /* hộp nội dung với nền hơi xanh để tách khỏi nền trang */
@@ -799,8 +799,19 @@ body.upload aside.sidebar {
     color: #aaa;
     margin-top: 4px;
 }
+
+.table-wrapper {
+  overflow-x: auto;
+}
+.col-name {
+  width: auto;          /* thay vì cố định 25% */
+  min-width: 280px;     /* đủ rộng cho badge dài */
+  white-space: normal;  /* vẫn cho phép tên truyện xuống dòng nếu quá dài */
+}
+
 .part-badge {
     display: inline-block;
+    white-space: nowrap;
     background: #333;
     padding: 2px 8px;
     border-radius: 12px;
@@ -830,3 +841,4 @@ body.light-mode .part-badge .part-count {
     background: #555 !important;
     text-decoration: underline;
 }
+

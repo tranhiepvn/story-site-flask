@@ -32,7 +32,17 @@
     color: #00BFFF;
   }
   .col-stt { width: 60px; }
-  .col-name { width: 25%; }
+  /* Mở rộng cột tên truyện để badge không xuống dòng */
+  .col-name {
+    width: auto !important;
+    min-width: 280px !important;
+    white-space: normal;  /* tên truyện vẫn xuống dòng nếu dài */
+  }
+  .part-badge {
+    white-space: nowrap !important;
+    display: inline-block !important;
+  }
+
   .col-total, .col-week, .col-desktop, .col-mobile { width: 80px; }
   .col-day { width: 70px; }
   .col-change { width: 100px; }
