@@ -3969,6 +3969,61 @@ def admin_analytics():
         hour_stats = hour_stats_processed
 
 
+    # Lấy top country cho mỗi giờ server
+    top_country_dict = {}
+    if db.engine.dialect.name == 'postgresql':
+        # Subquery: group by hour_server, country
+        subq = db.session.query(
+            extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")).label('hour_server'),
+            VisitLog.country,
+            func.count(VisitLog.id).label('cnt')
+        ).filter(
+            VisitLog.created_at >= start_date,
+            VisitLog.created_at < next_day,
+            VisitLog.country.isnot(None),
+            VisitLog.country != ''
+        ).group_by(
+            extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")),
+            VisitLog.country
+        ).subquery()
+        
+        # Distinct on hour_server, sắp xếp theo cnt desc
+        top_country_query = db.session.query(
+            subq.c.hour_server,
+            subq.c.country
+        ).distinct(
+            subq.c.hour_server
+        ).order_by(
+            subq.c.hour_server,
+            subq.c.cnt.desc()
+        ).all()
+        
+        for hour, country in top_country_query:
+            top_country_dict[int(hour)] = country
+    else:
+        # SQLite: không hỗ trợ DISTINCT ON, có thể bỏ qua hoặc xử lý đơn giản
+        # Ta có thể lấy tất cả và tự xử lý trong Python
+        subq = db.session.query(
+            func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour_server'),
+            VisitLog.country,
+            func.count(VisitLog.id).label('cnt')
+        ).filter(
+            VisitLog.created_at >= start_date,
+            VisitLog.created_at < next_day,
+            VisitLog.country.isnot(None),
+            VisitLog.country != ''
+        ).group_by(
+            'hour_server',
+            VisitLog.country
+        ).all()
+        # Tìm max cnt cho mỗi hour
+        temp = {}
+        for hour, country, cnt in subq:
+            key = int(hour)
+            if key not in temp or cnt > temp[key][1]:
+                temp[key] = (country, cnt)
+        top_country_dict = {k: v[0] for k, v in temp.items()}
+
     hours = [f"{i:02d}:00" for i in range(24)]
     hour_counts = [0] * 24
     for item in hour_stats:
@@ -4069,7 +4124,8 @@ def admin_analytics():
                            title_suffix=title_suffix,
                            now_server=datetime.now(),
                            now_la=now_la,
-                           now_vn=now_vn)
+                           now_vn=now_vn,
+                           top_country_dict=top_country_dict)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):
