@@ -3008,6 +3008,8 @@ def views_analytics():
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
 
+    show_parts = request.args.get('show_parts', '1')  # mặc định là hiển thị
+
     end_date = date.today()
     start_date = end_date - timedelta(days=6)
     dates = [start_date + timedelta(days=i) for i in range(7)]
@@ -3074,7 +3076,8 @@ def views_analytics():
                            story_data=story_data,
                            dates=dates,
                            start_date=start_date,
-                           end_date=end_date)
+                           end_date=end_date,
+                           show_parts=show_parts)
 
 
 @app.route("/admin/hears")
@@ -3083,6 +3086,8 @@ def hears_analytics():
     if 'upload_authenticated' not in session:
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
+
+    show_parts = request.args.get('show_parts', '1')  # mặc định là hiển thị
 
     end_date = date.today()
     start_date = end_date - timedelta(days=6)
@@ -3157,7 +3162,8 @@ def hears_analytics():
                            story_data=story_data,
                            dates=dates,
                            start_date=start_date,
-                           end_date=end_date)
+                           end_date=end_date,
+                           show_parts=show_parts)
 
 @app.route("/api/delete_chunk/<int:story_id>/<int:part_number>/<int:chunk_index>")
 def delete_chunk(story_id: int, part_number: int, chunk_index: int):

@@ -151,6 +151,19 @@
   <a href="{{ url_for('views_analytics', sort='created') }}" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">🆕 Ngày tạo mới nhất</a>
 </div>
 
+<div style="margin: 15px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+  <span>🔘 Hiển thị chi tiết phần:</span>
+  <a href="{{ url_for('views_analytics', sort=request.args.get('sort', 'week'), show_parts='1') }}" 
+     class="filter-btn {% if show_parts == '1' %}active{% endif %}"
+     style="padding: 4px 12px; text-decoration: none; border-radius: 4px;">
+    Hiện
+  </a>
+  <a href="{{ url_for('views_analytics', sort=request.args.get('sort', 'week'), show_parts='0') }}" 
+     class="filter-btn {% if show_parts == '0' %}active{% endif %}"
+     style="padding: 4px 12px; text-decoration: none; border-radius: 4px;">
+    Ẩn
+  </a>
+</div>
 
 <div class="table-wrapper">
   <table>
@@ -175,7 +188,7 @@
         <td class="col-stt">{{ loop.index }}</td>
         <td class="col-name">
             <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
-            {% if item.part_stats %}
+            {% if show_parts == '1' and item.part_stats %}
                 <div class="part-stats">
                     {% for part_num, total in item.part_stats %}
                         <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
