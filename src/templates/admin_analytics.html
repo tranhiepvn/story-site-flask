@@ -309,20 +309,39 @@
 
 <div class="path-container">
   <h3>🔝 Top 10 trang được truy cập nhiều nhất</h3>
-  <ul class="path-list">
-    {% for item in path_list %}
-    <li>
-      <span class="path-name">
-        {% if item.link %}
-          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
-        {% else %}
-          {{ item.display_name }}
-        {% endif %}
-      </span>
-      <span class="path-count">{{ item.count }} lượt</span>
-    </li>
-    {% endfor %}
-  </ul>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="border-bottom: 2px solid #4A90E2;">
+        <th style="text-align:left; padding:6px 8px;">Trang</th>
+        <th style="text-align:left; padding:6px 8px;">Top 3 quốc gia</th>
+        <th style="text-align:right; padding:6px 8px;">Số lượt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in path_list %}
+      <tr style="border-bottom: 1px solid #333;">
+        <td style="padding:6px 8px;">
+          {% if item.link %}
+            <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+          {% else %}
+            {{ item.display_name }}
+          {% endif %}
+        </td>
+        <td style="padding:6px 8px;">
+          {% set countries = top_countries_per_path.get(item.path, []) %}
+          {% if countries %}
+            {% for country, cnt in countries %}
+              {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            <span style="color: #888;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

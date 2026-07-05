@@ -4093,6 +4093,62 @@ def admin_analytics():
         VisitLog.path.notlike('/upload%')
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(10).all()
 
+    # Lấy top 3 quốc gia cho mỗi path trong top 10
+    top_countries_per_path = {}
+    if path_stats:
+        path_list = [p[0] for p in path_stats]  # danh sách các path
+        
+        # Truy vấn group by path, country
+        if db.engine.dialect.name == 'postgresql':
+            # PostgreSQL: dùng extract hoặc date_trunc nếu cần, nhưng ở đây chỉ group path và country
+            country_query = db.session.query(
+                VisitLog.path,
+                VisitLog.country,
+                func.count(VisitLog.id).label('cnt')
+            ).filter(
+                VisitLog.created_at >= start_date,
+                VisitLog.created_at < next_day,
+                VisitLog.path.in_(path_list),
+                VisitLog.country.isnot(None),
+                VisitLog.country != ''
+            ).group_by(
+                VisitLog.path,
+                VisitLog.country
+            ).order_by(
+                VisitLog.path,
+                func.count(VisitLog.id).desc()
+            ).all()
+        else:
+            # SQLite: tương tự
+            country_query = db.session.query(
+                VisitLog.path,
+                VisitLog.country,
+                func.count(VisitLog.id).label('cnt')
+            ).filter(
+                VisitLog.created_at >= start_date,
+                VisitLog.created_at < next_day,
+                VisitLog.path.in_(path_list),
+                VisitLog.country.isnot(None),
+                VisitLog.country != ''
+            ).group_by(
+                VisitLog.path,
+                VisitLog.country
+            ).order_by(
+                VisitLog.path,
+                func.count(VisitLog.id).desc()
+            ).all()
+        
+        # Xử lý kết quả: nhóm theo path và lấy top 3 country
+        temp_dict = {}
+        for path, country, cnt in country_query:
+            if path not in temp_dict:
+                temp_dict[path] = []
+            temp_dict[path].append((country, cnt))
+        
+        # Giữ lại top 3 cho mỗi path
+        for path, items in temp_dict.items():
+            top_countries_per_path[path] = items[:3]  # lấy 3 quốc gia đầu (đã sắp xếp giảm dần)
+
     # Xử lý path để hiển thị tên truyện
     path_list = []
     for path, count in path_stats:
@@ -4141,7 +4197,8 @@ def admin_analytics():
                            now_server=datetime.now(),
                            now_la=now_la,
                            now_vn=now_vn,
-                           top_country_dict=top_country_dict)
+                           top_country_dict=top_country_dict,
+                           top_countries_per_path=top_countries_per_path)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):
