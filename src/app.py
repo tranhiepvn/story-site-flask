@@ -1206,7 +1206,7 @@ def story_detail(story_id: int):
                                current_index=current_index, total_parts=total_parts,
                                parts=parts, comments=[], current_url=request.url)
 
-    # Tách tiêu đề và nội dung
+        # Tách tiêu đề và nội dung
     raw = current_part.content
     if '\n' in raw:
         chapter_title, chapter_body = raw.split('\n', 1)
@@ -1216,15 +1216,28 @@ def story_detail(story_id: int):
 
     chapter_title = chapter_title.strip()
 
-    # Bước 1: Highlight màu xanh/đỏ trên văn bản thô (chưa có bất kỳ thẻ HTML nào)
+    # ===== BƯỚC 1: XỬ LÝ @...@ TRƯỚC =====
+
+    # ===== BƯỚC 2: HIGHLIGHT KHÁC =====
     chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
     chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
+    
+    chapter_body = re.sub(r'~(.*?)~', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
 
-    # Bước 2: Chuyển đổi inline Markdown (không ảnh hưởng đến các thẻ span vừa thêm)
+    # ===== BƯỚC 3: MARKDOWN =====
     chapter_body = simple_markdown_to_html(chapter_body)
 
-    # Bước 3: Giữ nguyên xuống dòng (chuyển \n thành <br>)
-    # Thay \n bằng <br>, nhưng gom các <br> liên tiếp thành một <div class="small-gap">
+    # ===== BƯỚC 4: XỬ LÝ DÒNG "---" =====
+    lines = chapter_body.split('\n')
+    new_lines = []
+    for line in lines:
+        if re.match(r'^\s*---\s*$', line):
+            new_lines.append('<hr>')
+        else:
+            new_lines.append(line)
+    chapter_body = '\n'.join(new_lines)
+
+    # ===== BƯỚC 5: XUỐNG DÒNG =====
     temp = chapter_body.replace('\n', '<br>')
     content_processed = re.sub(r'(<br>\s*){2,}', r'<div class="small-gap"></div>', temp)
 
