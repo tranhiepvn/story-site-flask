@@ -218,6 +218,18 @@
   </div>
 </form>
 
+<h3>Xoá audio của truyện này</h3>
+<p>Số file audio hiện có: <strong>{{ audio_count }}</strong></p>
+<form method="post" action="{{ url_for('delete_story_audio', story_id=story.id) }}" onsubmit="return confirm('Bạn có chắc muốn xoá toàn bộ file audio MP3 của truyện này?');">
+  <div class="form-group">
+    <label for="audio_password">Password:</label><br>
+    <input type="password" id="audio_password_story" name="password" required>
+  </div>
+  <div class="form-group">
+    <button type="submit" style="background:#dc3545; color:white;">Xoá audio</button>
+  </div>
+</form>
+
 <h3>Xoá truyện</h3>
 <form method="post" onsubmit="return confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?');">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">

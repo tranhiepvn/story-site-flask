@@ -1781,6 +1781,11 @@ def upload():
         parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
         edit_part_id = request.args.get("edit_part", type=int)
         edit_part_obj = Part.query.get(edit_part_id) if edit_part_id else None
+
+        # Đếm số file audio của truyện
+        audio_dir = Path("static/audio") / str(story.id)
+        audio_count = len(list(audio_dir.glob("*.mp3"))) if audio_dir.exists() else 0
+        
         return render_template(
             "upload_edit.html",
             story=story,
@@ -1789,6 +1794,7 @@ def upload():
             edit_part=edit_part_obj,
             error_update=None,
             all_authors=all_authors,
+            audio_count=audio_count,  # thêm dòng này
         )
 
     return render_template(
@@ -3286,6 +3292,41 @@ def delete_all_audio():
 
     flash(f"Đã xóa {deleted_count} file MP3.")
     return redirect(url_for("upload"))
+
+@app.route("/delete_story_audio/<int:story_id>", methods=["POST"])
+def delete_story_audio(story_id: int):
+    """Xóa tất cả file audio MP3 của một truyện cụ thể."""
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload", story_id=story_id))
+    
+    story = Story.query.get_or_404(story_id)
+    audio_dir = Path("static/audio") / str(story_id)
+    
+    deleted_count = 0
+    if audio_dir.exists():
+        # Đếm số file MP3 trước khi xóa
+        mp3_files = list(audio_dir.glob("*.mp3"))
+        deleted_count = len(mp3_files)
+        for mp3_file in mp3_files:
+            try:
+                mp3_file.unlink()
+            except Exception as e:
+                print(f"Lỗi xóa {mp3_file}: {e}")
+        # Nếu thư mục trống, xóa luôn thư mục
+        try:
+            if not any(audio_dir.iterdir()):
+                audio_dir.rmdir()
+        except:
+            pass
+    
+    flash(f"Đã xóa {deleted_count} file MP3 của truyện '{story.title}'.")
+    return redirect(url_for("upload", story_id=story_id))
 
 @app.route("/api/suggest")
 def suggest():
