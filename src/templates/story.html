@@ -128,6 +128,24 @@
       </div>
       <audio id="audio-element" style="display:none;"></audio>
 
+      <!-- Controls font size và highlight -->
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 15px 0; padding: 5px 0; max-width: 100%;">
+        <!-- Hàng 1: Font size -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;">
+          <span style="font-weight: bold; color: var(--text-color, #ddd);">Cỡ chữ:</span>
+          <button id="font-decrease" class="ctrl-btn" style="background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer;">A-</button>
+          <button id="font-reset" class="ctrl-btn" style="background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer;">Reset</button>
+          <button id="font-increase" class="ctrl-btn" style="background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer;">A+</button>
+          <span id="current-font-size" style="font-weight: normal; color: #FFD700; min-width: 36px; text-align: center; background: #555; padding: 2px 8px; border-radius: 4px;">18px</span>
+        </div>
+        <!-- Hàng 2: Highlight -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;">
+          <span style="font-weight: bold; color: var(--text-color, #ddd);">Highlight:</span>
+          <input type="color" id="highlight-color" value="#1E90FF" style="width: 32px; height: 32px; border: 2px solid #888; border-radius: 4px; padding: 0; background: transparent; cursor: pointer;">
+          <button id="highlight-reset" class="ctrl-btn" style="background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer;">Reset</button>
+        </div>
+      </div>
+
       <p>{{ content_processed | safe }}</p>
     </div>
 
@@ -448,10 +466,40 @@
   body.light-mode #autoplay-next {
     accent-color: #0056b3;
   }
+
+  /* Controls: không khung nền, tương thích sáng tối */
+  .ctrl-btn {
+    background: #444;
+    color: #fff;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+  }
+  .ctrl-btn:hover {
+    background: #666;
+  }
+  body.light-mode .ctrl-btn {
+    background: #ccc;
+    color: #000;
+  }
+  body.light-mode .ctrl-btn:hover {
+    background: #aaa;
+  }
+  body.light-mode #current-font-size {
+    background: #ddd;
+    color: #FFD700 !important; /* giữ màu vàng trong chế độ sáng */
+  }
+  body.light-mode span {
+    color: #333 !important;
+  }
 </style>
 
 <script>
-// ==================== AUDIO PLAYER với loading spinner & đúng icon khi pause ====================
+// ==================== AUDIO PLAYER (giữ nguyên) ====================
+// ==================== AUDIO PLAYER (giữ nguyên) ====================
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -469,28 +517,23 @@ const playBtn = document.getElementById('play-btn');
 const speedSelect = document.getElementById('speed-select');
 const audioElem = document.getElementById('audio-element');
 
-// ==================== BIẾN TOÀN CỤC ====================
 const currentIndex = {{ current_index }};
 const totalParts = {{ total_parts }};
 const autoPlay = {{ 'true' if auto_play else 'false' }};
 
-// ==================== CHECKBOX AUTO-PLAY NEXT PART ====================
 const autoplayCheckbox = document.getElementById('autoplay-next');
 
-// Đọc trạng thái từ localStorage khi load
 document.addEventListener('DOMContentLoaded', function() {
   const saved = localStorage.getItem('autoplay_next_part');
   if (saved !== null) {
     autoplayCheckbox.checked = saved === 'true';
   }
-  // Nếu autoPlay từ URL là true, tự động tích checkbox (người dùng có thể bỏ chọn sau)
   if (autoPlay) {
     autoplayCheckbox.checked = true;
     localStorage.setItem('autoplay_next_part', 'true');
   }
 });
 
-// Lưu trạng thái khi checkbox thay đổi
 autoplayCheckbox.addEventListener('change', function() {
   localStorage.setItem('autoplay_next_part', String(this.checked));
 });
@@ -698,9 +741,7 @@ async function toggleAudio(partId) {
 
 audioElem.addEventListener('ended', async function() {
   if (currentChunkIndex >= totalChunks) {
-      // Kiểm tra còn phần tiếp theo không và checkbox được bật
       if (currentIndex < totalParts && autoplayCheckbox.checked) {
-          // Chuyển sang phần tiếp theo với auto_play=1
           const nextPart = currentIndex + 1;
           window.location.href = `/story/{{ story.id }}?part=${nextPart}&auto_play=1`;
           return;
@@ -737,10 +778,8 @@ audioElem.addEventListener('ended', async function() {
   updatePlayButtonIcon();
 });
 
-// ==================== TỰ ĐỘNG PLAY KHI CÓ auto_play ====================
 if (autoPlay) {
     document.addEventListener('DOMContentLoaded', function() {
-        // Chờ một chút để DOM load xong
         setTimeout(() => {
             toggleAudio({{ current_part.id }});
         }, 500);
@@ -803,7 +842,6 @@ speedSelect.addEventListener('change', applyPlaybackRate);
 setProgressBarEnabled(false);
 isAudioStarted = false;
 
-// ==================== XỬ LÝ LỖI AUDIO KHI FILE BỊ XÓA ====================
 audioElem.addEventListener('error', async function(e) {
   const src = audioElem.src;
   if (src && src.includes('/static/audio/') && src.endsWith('.mp3')) {
@@ -895,6 +933,98 @@ document.addEventListener('DOMContentLoaded', function() {
       fallbackShare(platform);
     });
   });
+});
+
+// ==================== FONT SIZE & HIGHLIGHT CONTROLS ====================
+document.addEventListener('DOMContentLoaded', function() {
+  const storyPart = document.querySelector('.story-part');
+  if (!storyPart) {
+    console.warn('⚠️ Không tìm thấy .story-part');
+    return;
+  }
+
+  // --- Font size controls ---
+  const decreaseBtn = document.getElementById('font-decrease');
+  const resetBtn = document.getElementById('font-reset');
+  const increaseBtn = document.getElementById('font-increase');
+  const sizeDisplay = document.getElementById('current-font-size');
+
+  const DEFAULT_FONT_SIZE = 18;
+  const MIN_FONT_SIZE = 12;
+  const MAX_FONT_SIZE = 40;
+
+  let currentFontSize = parseInt(localStorage.getItem('reading_font_size')) || DEFAULT_FONT_SIZE;
+  if (currentFontSize < MIN_FONT_SIZE) currentFontSize = MIN_FONT_SIZE;
+  if (currentFontSize > MAX_FONT_SIZE) currentFontSize = MAX_FONT_SIZE;
+
+  function applyFontSize(size) {
+    // Áp dụng cho story-part và tất cả phần tử con
+    storyPart.style.fontSize = size + 'px';
+    storyPart.querySelectorAll('*').forEach(el => {
+      el.style.fontSize = size + 'px';
+    });
+    localStorage.setItem('reading_font_size', size);
+    currentFontSize = size;
+    if (sizeDisplay) {
+      sizeDisplay.textContent = size + 'px';
+    }
+  }
+
+  applyFontSize(currentFontSize);
+
+  if (decreaseBtn) {
+    decreaseBtn.addEventListener('click', function() {
+      let newSize = currentFontSize - 2;
+      if (newSize < MIN_FONT_SIZE) newSize = MIN_FONT_SIZE;
+      applyFontSize(newSize);
+    });
+  }
+  if (increaseBtn) {
+    increaseBtn.addEventListener('click', function() {
+      let newSize = currentFontSize + 2;
+      if (newSize > MAX_FONT_SIZE) newSize = MAX_FONT_SIZE;
+      applyFontSize(newSize);
+    });
+  }
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function() {
+      applyFontSize(DEFAULT_FONT_SIZE);
+    });
+  }
+
+  // --- Highlight controls (không checkbox, luôn bật, có nút Reset) ---
+  const colorPicker = document.getElementById('highlight-color');
+  const highlightResetBtn = document.getElementById('highlight-reset');
+  const defaultColor = '#1E90FF'; // xanh dương nhạt
+  const savedColor = localStorage.getItem('highlight_color') || defaultColor;
+
+  if (colorPicker) {
+    colorPicker.value = savedColor;
+  }
+
+  function applyHighlight(color) {
+    const highlights = storyPart.querySelectorAll('.highlight-green, .highlight-red');
+    highlights.forEach(el => {
+      el.style.setProperty('color', color, 'important');
+    });
+    localStorage.setItem('highlight_color', color);
+  }
+
+  // Áp dụng màu hiện tại
+  applyHighlight(savedColor);
+
+  if (colorPicker) {
+    colorPicker.addEventListener('input', function() {
+      applyHighlight(this.value);
+    });
+  }
+
+  if (highlightResetBtn) {
+    highlightResetBtn.addEventListener('click', function() {
+      colorPicker.value = defaultColor;
+      applyHighlight(defaultColor);
+    });
+  }
 });
 </script>
 {% endblock %}
