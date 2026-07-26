@@ -141,12 +141,15 @@
         <!-- Hàng 2: Highlight -->
         <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;">
           <span style="font-weight: bold; color: var(--text-color, #ddd);">Highlight:</span>
-          <input type="color" id="highlight-color" value="#1E90FF" style="width: 32px; height: 32px; border: 2px solid #888; border-radius: 4px; padding: 0; background: transparent; cursor: pointer;">
+          <input type="color" id="highlight-color" value="#FF8C00" style="width: 32px; height: 32px; border: 2px solid #888; border-radius: 4px; padding: 0; background: transparent; cursor: pointer;">
           <button id="highlight-reset" class="ctrl-btn" style="background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer;">Reset</button>
         </div>
       </div>
 
-      <p>{{ content_processed | safe }}</p>
+      <!-- Nội dung truyện bọc trong div riêng để áp dụng màu chữ -->
+      <div class="story-content">
+        <p>{{ content_processed | safe }}</p>
+      </div>
     </div>
 
     {% if current_part and current_part.videos %}
@@ -254,6 +257,7 @@
 </article>
 
 <style>
+  /* ===== CÁC STYLE CÓ SẴN (giữ nguyên) ===== */
   .highlight-green { color: #006400; }
   .highlight-red { color: #8B0000; }
 
@@ -490,15 +494,34 @@
   }
   body.light-mode #current-font-size {
     background: #ddd;
-    color: #FFD700 !important; /* giữ màu vàng trong chế độ sáng */
+    color: #FFD700 !important;
   }
   body.light-mode span {
     color: #333 !important;
   }
+
+  /* ===== QUAN TRỌNG: MÀU CHỮ TRẮNG CHO NỘI DUNG TRUYỆN (không ảnh hưởng controls) ===== */
+  .story-content,
+  .story-content * {
+    color: #e6e6e6 !important;
+  }
+  body.light-mode .story-content,
+  body.light-mode .story-content * {
+    color: #1a1a1a !important;
+  }
+  /* Highlight sẽ được script điều khiển, vẫn áp dụng */
+  .story-content .highlight-green,
+  .story-content .highlight-red {
+    color: inherit !important; /* script sẽ ghi đè */
+  }
+  /* Đảm bảo các thẻ p, div, span trong story-content không bị override bởi style khác */
+  .story-content p {
+    margin: 0 0 -0.25em 0;
+    line-height: 1.5;
+  }
 </style>
 
 <script>
-// ==================== AUDIO PLAYER (giữ nguyên) ====================
 // ==================== AUDIO PLAYER (giữ nguyên) ====================
 let currentAudio = null;
 let currentPartId = null;
@@ -937,94 +960,136 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ==================== FONT SIZE & HIGHLIGHT CONTROLS ====================
 document.addEventListener('DOMContentLoaded', function() {
-  const storyPart = document.querySelector('.story-part');
-  if (!storyPart) {
-    console.warn('⚠️ Không tìm thấy .story-part');
-    return;
-  }
-
-  // --- Font size controls ---
-  const decreaseBtn = document.getElementById('font-decrease');
-  const resetBtn = document.getElementById('font-reset');
-  const increaseBtn = document.getElementById('font-increase');
-  const sizeDisplay = document.getElementById('current-font-size');
-
-  const DEFAULT_FONT_SIZE = 18;
-  const MIN_FONT_SIZE = 12;
-  const MAX_FONT_SIZE = 40;
-
-  let currentFontSize = parseInt(localStorage.getItem('reading_font_size')) || DEFAULT_FONT_SIZE;
-  if (currentFontSize < MIN_FONT_SIZE) currentFontSize = MIN_FONT_SIZE;
-  if (currentFontSize > MAX_FONT_SIZE) currentFontSize = MAX_FONT_SIZE;
-
-  function applyFontSize(size) {
-    // Áp dụng cho story-part và tất cả phần tử con
-    storyPart.style.fontSize = size + 'px';
-    storyPart.querySelectorAll('*').forEach(el => {
-      el.style.fontSize = size + 'px';
-    });
-    localStorage.setItem('reading_font_size', size);
-    currentFontSize = size;
-    if (sizeDisplay) {
-      sizeDisplay.textContent = size + 'px';
+    const storyContent = document.querySelector('.story-content');
+    if (!storyContent) {
+      console.warn('⚠️ Không tìm thấy .story-content');
+      return;
     }
-  }
 
-  applyFontSize(currentFontSize);
+    // --- Font size controls (giữ nguyên) ---
+    const decreaseBtn = document.getElementById('font-decrease');
+    const resetBtn = document.getElementById('font-reset');
+    const increaseBtn = document.getElementById('font-increase');
+    const sizeDisplay = document.getElementById('current-font-size');
 
-  if (decreaseBtn) {
-    decreaseBtn.addEventListener('click', function() {
-      let newSize = currentFontSize - 2;
-      if (newSize < MIN_FONT_SIZE) newSize = MIN_FONT_SIZE;
-      applyFontSize(newSize);
+    const DEFAULT_FONT_SIZE = 18;
+    const MIN_FONT_SIZE = 12;
+    const MAX_FONT_SIZE = 40;
+
+    let currentFontSize = parseInt(localStorage.getItem('reading_font_size')) || DEFAULT_FONT_SIZE;
+    if (currentFontSize < MIN_FONT_SIZE) currentFontSize = MIN_FONT_SIZE;
+    if (currentFontSize > MAX_FONT_SIZE) currentFontSize = MAX_FONT_SIZE;
+
+    function applyFontSize(size) {
+      storyContent.style.fontSize = size + 'px';
+      storyContent.querySelectorAll('*').forEach(el => {
+        el.style.fontSize = size + 'px';
+      });
+      localStorage.setItem('reading_font_size', size);
+      currentFontSize = size;
+      if (sizeDisplay) {
+        sizeDisplay.textContent = size + 'px';
+      }
+    }
+
+    applyFontSize(currentFontSize);
+
+    if (decreaseBtn) {
+      decreaseBtn.addEventListener('click', function() {
+        let newSize = currentFontSize - 2;
+        if (newSize < MIN_FONT_SIZE) newSize = MIN_FONT_SIZE;
+        applyFontSize(newSize);
+      });
+    }
+    if (increaseBtn) {
+      increaseBtn.addEventListener('click', function() {
+        let newSize = currentFontSize + 2;
+        if (newSize > MAX_FONT_SIZE) newSize = MAX_FONT_SIZE;
+        applyFontSize(newSize);
+      });
+    }
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function() {
+        applyFontSize(DEFAULT_FONT_SIZE);
+      });
+    }
+
+    // --- Highlight controls (nâng cấp) ---
+    const colorPicker = document.getElementById('highlight-color');
+    const highlightResetBtn = document.getElementById('highlight-reset');
+
+    // Hàm lấy màu mặc định theo theme hiện tại
+    function getDefaultHighlightColor() {
+      const isLight = document.body.classList.contains('light-mode');
+      return isLight ? '#008000' : '#FF8C00';
+    }
+
+    // Trạng thái: user đã chọn màu chưa?
+    const userChosen = localStorage.getItem('highlight_user_chosen') === 'true';
+    let currentColor = localStorage.getItem('highlight_color');
+
+    // Nếu chưa chọn màu, dùng màu mặc định theo theme
+    if (!userChosen || !currentColor) {
+      currentColor = getDefaultHighlightColor();
+      localStorage.setItem('highlight_color', currentColor);
+      localStorage.setItem('highlight_user_chosen', 'false');
+    }
+
+    // Set color picker
+    if (colorPicker) {
+      colorPicker.value = currentColor;
+    }
+
+    function applyHighlight(color) {
+      const highlights = storyContent.querySelectorAll('.highlight-green, .highlight-red');
+      highlights.forEach(el => {
+        el.style.setProperty('color', color, 'important');
+      });
+      // Lưu màu vào localStorage
+      localStorage.setItem('highlight_color', color);
+    }
+
+    // Áp dụng lần đầu
+    applyHighlight(currentColor);
+
+    // Xử lý khi user chọn màu
+    if (colorPicker) {
+      colorPicker.addEventListener('input', function() {
+        const selectedColor = this.value;
+        // Đánh dấu user đã chọn
+        localStorage.setItem('highlight_user_chosen', 'true');
+        applyHighlight(selectedColor);
+      });
+    }
+
+    // Xử lý nút Reset
+    if (highlightResetBtn) {
+      highlightResetBtn.addEventListener('click', function() {
+        // Xóa trạng thái đã chọn
+        localStorage.removeItem('highlight_user_chosen');
+        // Lấy màu mặc định theo theme hiện tại
+        const defaultColor = getDefaultHighlightColor();
+        if (colorPicker) {
+          colorPicker.value = defaultColor;
+        }
+        applyHighlight(defaultColor);
+      });
+    }
+
+    // --- Theo dõi theme thay đổi để tự động đổi màu highlight nếu chưa chọn ---
+    const bodyObserver = new MutationObserver(function() {
+      // Kiểm tra xem user đã chọn màu chưa
+      const userHasChosen = localStorage.getItem('highlight_user_chosen') === 'true';
+      if (!userHasChosen) {
+        // Nếu chưa chọn, áp dụng màu mặc định theo theme mới
+        const defaultColor = getDefaultHighlightColor();
+        if (colorPicker) {
+          colorPicker.value = defaultColor;
+        }
+        applyHighlight(defaultColor);
+      }
     });
-  }
-  if (increaseBtn) {
-    increaseBtn.addEventListener('click', function() {
-      let newSize = currentFontSize + 2;
-      if (newSize > MAX_FONT_SIZE) newSize = MAX_FONT_SIZE;
-      applyFontSize(newSize);
-    });
-  }
-  if (resetBtn) {
-    resetBtn.addEventListener('click', function() {
-      applyFontSize(DEFAULT_FONT_SIZE);
-    });
-  }
-
-  // --- Highlight controls (không checkbox, luôn bật, có nút Reset) ---
-  const colorPicker = document.getElementById('highlight-color');
-  const highlightResetBtn = document.getElementById('highlight-reset');
-  const defaultColor = '#1E90FF'; // xanh dương nhạt
-  const savedColor = localStorage.getItem('highlight_color') || defaultColor;
-
-  if (colorPicker) {
-    colorPicker.value = savedColor;
-  }
-
-  function applyHighlight(color) {
-    const highlights = storyPart.querySelectorAll('.highlight-green, .highlight-red');
-    highlights.forEach(el => {
-      el.style.setProperty('color', color, 'important');
-    });
-    localStorage.setItem('highlight_color', color);
-  }
-
-  // Áp dụng màu hiện tại
-  applyHighlight(savedColor);
-
-  if (colorPicker) {
-    colorPicker.addEventListener('input', function() {
-      applyHighlight(this.value);
-    });
-  }
-
-  if (highlightResetBtn) {
-    highlightResetBtn.addEventListener('click', function() {
-      colorPicker.value = defaultColor;
-      applyHighlight(defaultColor);
-    });
-  }
-});
+    bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  });
 </script>
 {% endblock %}
