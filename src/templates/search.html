@@ -17,7 +17,7 @@
               {% else %}
                 Tác giả: Ẩn danh
               {% endif %}
-              | Ngày: {{ story.created_at.strftime('%d/%m/%Y') }}
+              | Ngày: <span class="meta-date">{{ story.created_at.strftime('%d/%m/%Y') }}</span>
               | Loại: <a href="{{ url_for('type_view', story_type=story.story_type) }}">{{ 'Truyện Ngắn' if story.story_type == 'short' else 'Truyện Dài' }}</a>
             </p>
             {% if story.categories %}

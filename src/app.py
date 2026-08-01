@@ -1122,11 +1122,19 @@ def index():
         )
     ).order_by(ReadingHistory.updated_at.desc()).limit(10).all()
     
-    # Nếu bạn muốn đơn giản hơn và tin rằng mỗi story chỉ có một bản ghi (do unique constraint),
-    # thì chỉ cần:
-    # history_list = ReadingHistory.query.filter_by(session_id=session_id)\
-    #     .order_by(ReadingHistory.updated_at.desc()).limit(10).all()
-    # Tuy nhiên, đoạn trên vẫn an toàn hơn.
+    # Lấy thời gian cập nhật sau cùng (phần mới nhất) cho tất cả truyện trong các danh sách
+    all_story_ids = set()
+    for story_list in [best, trending, short_stories, long_stories, recent_stories]:
+        for s in story_list:
+            all_story_ids.add(s.id)
+    
+    last_updated_subq = db.session.query(
+        Part.story_id,
+        func.max(Part.created_at).label('last_updated')
+    ).filter(Part.story_id.in_(all_story_ids)).group_by(Part.story_id).subquery()
+    
+    last_updated_rows = db.session.query(last_updated_subq).all()
+    last_updated_map = {row.story_id: row.last_updated for row in last_updated_rows}
 
     return render_template(
         "index.html",
@@ -1142,6 +1150,7 @@ def index():
         categories_group1=categories_group1,
         categories_group2=categories_group2,
         categories_group3=categories_group3,
+        last_updated_map=last_updated_map,   # <-- thêm dòng này
     )
 
 @app.route("/story/<int:story_id>")

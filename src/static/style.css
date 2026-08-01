@@ -849,7 +849,10 @@ body.light-mode .part-badge .part-count {
     height: 0;
 }
 
-/* Chế độ sáng */
-body.light-mode .story-part hr {
-    border-top-color: #ccc;
+/* Màu sắc cho ngày giờ - ưu tiên cao */
+.meta-date {
+  color: #32CD32 !important; /* chế độ tối */
+}
+body.light-mode .meta-date {
+  color: #28a745 !important; /* chế độ sáng */
 }

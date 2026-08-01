@@ -27,7 +27,7 @@
       Ẩn danh
     {% endif %}
     |
-    Ngày: {{ story.created_at.strftime('%d/%m/%Y %H:%M') }}
+    Ngày: <span class="meta-date">{{ story.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
     |
     Loại:
     <a href="{{ url_for('type_view', story_type=story.story_type) }}">
