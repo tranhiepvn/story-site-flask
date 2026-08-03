@@ -48,6 +48,11 @@ from sqlalchemy import func, text, extract
 from sqlalchemy.exc import IntegrityError
 from datetime import date as date_type
 
+def get_voice_suffix(voice):
+    if 'NamMinh' in voice:
+        return '_male'
+    return '_female'
+
 def get_server_offset_hours():
     """Trả về số giờ chênh lệch giữa múi giờ local và UTC (có thể âm)."""
     offset = datetime.now().astimezone().utcoffset()
@@ -152,7 +157,6 @@ def clean_line(line: str) -> str:
 
     # Thay thế từ ngữ nhạy cảm (nếu cần)
     line = line.replace("cái cặc", "con cặc").replace("Cái cặc", "Con cặc")
-    line = line.replace("quần lót", "xì-líp").replace("Quần lót", "Xì-líp")
     line = line.replace("địt", "đụ").replace("Địt", "Đụ")
 
     # Dọn dẹp một số trường hợp dấu ngoặc kép thừa
@@ -1327,7 +1331,11 @@ def start_audio(part_id: int):
     part_number = part.part_number
     task_key = (story_id, part_number)
 
-    print(f"[AUDIO] 🚀 Yêu cầu nghe phần {part_number} - truyện {story_id}")
+    # Lấy giọng đọc từ query string, mặc định nữ
+    voice = request.args.get('voice', 'vi-VN-HoaiMyNeural')
+    suffix = get_voice_suffix(voice)
+    
+    print(f"[AUDIO] 🚀 Yêu cầu nghe phần {part_number} - truyện {story_id} - giọng {voice}")
 
     audio_dir = Path("static/audio") / str(story_id)
     audio_dir.mkdir(parents=True, exist_ok=True)
@@ -1372,20 +1380,17 @@ def start_audio(part_id: int):
     db.session.commit()
     # ================================
 
-
-
-
     chunks = split_to_chunks(text, max_chars=800)
     total_chunks = len(chunks)
 
     # === CHUNK 1 ===
-    chunk1_path = audio_dir / f"{part_number}_chunk_0001.mp3"
+    chunk1_path = audio_dir / f"{part_number}_chunk_0001{suffix}.mp3"
     tmp1 = chunk1_path.with_name(chunk1_path.stem + "__tmp" + chunk1_path.suffix)
 
     if not chunk1_path.exists():
-        print(f"[AUDIO] 🔨 Đang tạo CHUNK 1/{total_chunks}...")
+        print(f"[AUDIO] 🔨 Đang tạo CHUNK 1/{total_chunks} với giọng {voice}...")
         try:
-            communicate = edge_tts.Communicate(text=chunks[0], voice="vi-VN-HoaiMyNeural")
+            communicate = edge_tts.Communicate(text=chunks[0], voice=voice)
             run_async_save(communicate, str(tmp1))
             if tmp1.exists():
                 os.replace(tmp1, chunk1_path)
@@ -1394,22 +1399,22 @@ def start_audio(part_id: int):
             print(f"[AUDIO] ❌ Lỗi chunk 1: {e}")
             return jsonify({"status": "error", "message": str(e)}), 500
 
-    url_chunk1 = f"/static/audio/{story_id}/{part_number}_chunk_0001.mp3"
+    url_chunk1 = f"/static/audio/{story_id}/{part_number}_chunk_0001{suffix}.mp3"
 
-    # === BACKGROUND: Chỉ khởi động nếu chưa có thread nào đang chạy ===
+    # === BACKGROUND: Tạo các chunk còn lại với cùng giọng ===
     if task_key not in background_tasks or not background_tasks[task_key].is_alive():
         def background_create():
-            print(f"[BACKGROUND] 🔄 Bắt đầu tạo {total_chunks-1} chunk còn lại cho phần {part_number}...")
+            print(f"[BACKGROUND] 🔄 Bắt đầu tạo {total_chunks-1} chunk còn lại cho phần {part_number} với giọng {voice}...")
             for i in range(1, total_chunks):
-                chunk_path = audio_dir / f"{part_number}_chunk_{i+1:04d}.mp3"
+                chunk_path = audio_dir / f"{part_number}_chunk_{i+1:04d}{suffix}.mp3"
                 tmp_path = chunk_path.with_name(chunk_path.stem + "__tmp" + chunk_path.suffix)
 
                 if chunk_path.exists():
                     continue
 
-                print(f"[BACKGROUND] 🔨 Đang tạo chunk {i+1}/{total_chunks}...")
+                print(f"[BACKGROUND] 🔨 Đang tạo chunk {i+1}/{total_chunks} với giọng {voice}...")
                 try:
-                    communicate = edge_tts.Communicate(text=chunks[i], voice="vi-VN-HoaiMyNeural")
+                    communicate = edge_tts.Communicate(text=chunks[i], voice=voice)
                     run_async_save(communicate, str(tmp_path))
                     if tmp_path.exists():
                         os.replace(tmp_path, chunk_path)
@@ -1418,7 +1423,6 @@ def start_audio(part_id: int):
                     print(f"[BACKGROUND] ❌ Lỗi chunk {i+1}: {e}")
 
             print(f"[BACKGROUND] 🎉 Hoàn thành tất cả chunk của phần {part_number}")
-            # Xóa thread khỏi dict khi xong
             if task_key in background_tasks:
                 del background_tasks[task_key]
 
@@ -1440,24 +1444,22 @@ def start_audio(part_id: int):
 
 @app.route("/api/get_chunk/<int:story_id>/<int:part_number>/<int:chunk_index>")
 def get_chunk(story_id: int, part_number: int, chunk_index: int):
-    """Trả về chunk - Nếu chunk bị xóa thì tạo lại ngay"""
-    print(f"[GET_CHUNK] 📥 Yêu cầu chunk {chunk_index} của phần {part_number} (truyện {story_id})")
+    """Trả về chunk - Nếu chunk bị xóa thì tạo lại ngay với giọng được chỉ định."""
+    voice = request.args.get('voice', 'vi-VN-HoaiMyNeural')
+    suffix = get_voice_suffix(voice)
+    
+    print(f"[GET_CHUNK] 📥 Yêu cầu chunk {chunk_index} - giọng {voice}")
 
     audio_dir = Path("static/audio") / str(story_id)
-    chunk_path = audio_dir / f"{part_number}_chunk_{chunk_index:04d}.mp3"
+    chunk_path = audio_dir / f"{part_number}_chunk_{chunk_index:04d}{suffix}.mp3"
 
-    # Nếu chunk còn tồn tại → trả về ngay
     if chunk_path.exists() and chunk_path.stat().st_size > 500:
         url = f"/static/audio/{story_id}/{chunk_path.name}"
         print(f"[GET_CHUNK] ✅ Chunk {chunk_index} SẴN SÀNG")
         return jsonify({"status": "success", "url": url})
 
-    # Chunk bị xóa hoặc chưa có → tạo lại ngay
-    print(f"[GET_CHUNK] 🔄 Chunk {chunk_index} bị xóa → tạo lại ngay")
-
-    # Lấy Part theo story_id + part_number
+    print(f"[GET_CHUNK] 🔄 Chunk {chunk_index} bị xóa → tạo lại với giọng {voice}")
     part = Part.query.filter_by(story_id=story_id, part_number=part_number).first_or_404()
-
     text = part.content.strip()
     chunks = split_to_chunks(text, max_chars=800)
 
@@ -1467,20 +1469,17 @@ def get_chunk(story_id: int, part_number: int, chunk_index: int):
     tmp_path = chunk_path.with_name(chunk_path.stem + "__tmp" + chunk_path.suffix)
 
     try:
-        communicate = edge_tts.Communicate(text=chunks[chunk_index-1], voice="vi-VN-HoaiMyNeural")
+        communicate = edge_tts.Communicate(text=chunks[chunk_index-1], voice=voice)
         run_async_save(communicate, str(tmp_path))
-
         if tmp_path.exists():
             os.replace(tmp_path, chunk_path)
-            print(f"[GET_CHUNK] ✅ ĐÃ TẠO LẠI chunk {chunk_index}")
-
             url = f"/static/audio/{story_id}/{chunk_path.name}"
+            print(f"[GET_CHUNK] ✅ ĐÃ TẠO LẠI chunk {chunk_index}")
             return jsonify({"status": "success", "url": url})
         else:
             return jsonify({"status": "error", "message": "Tạo chunk thất bại"}), 500
-
     except Exception as e:
-        print(f"[GET_CHUNK] ❌ Lỗi tạo lại chunk {chunk_index}: {e}")
+        print(f"[GET_CHUNK] ❌ Lỗi tạo lại chunk: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/upload", methods=["GET", "POST"])
@@ -2028,6 +2027,129 @@ def export_data():
     filename = f"stories_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
     return send_file(buf, as_attachment=True, download_name=filename, mimetype="application/json")
 
+@app.route("/export_single/<int:story_id>", methods=["POST"])
+def export_single_story(story_id):
+    """Export dữ liệu của một truyện cụ thể (chỉ story_id)."""
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload", story_id=story_id))
+    
+    story = Story.query.get_or_404(story_id)
+    
+    # Lấy danh sách category liên quan đến story này
+    categories = story.categories  # nhiều-nhiều
+    
+    # Lấy parts, comments, videos, daily_views, daily_listens, reading_histories, follows
+    parts = Part.query.filter_by(story_id=story.id).all()
+    comments = Comment.query.filter_by(story_id=story.id).all()
+    videos = PartVideo.query.join(Part).filter(Part.story_id == story.id).all()
+    daily_views = DailyView.query.filter_by(story_id=story.id).all()
+    daily_listens = DailyListen.query.filter_by(story_id=story.id).all()
+    reading_histories = ReadingHistory.query.filter_by(story_id=story.id).all()
+    follows = Follow.query.filter_by(story_id=story.id).all()
+    
+    # Không export new_story_subscriptions (toàn cục) để tránh xung đột
+    
+    data = {
+        "categories": [{"id": c.id, "name": c.name} for c in categories],
+        "stories": [
+            {
+                "id": story.id,
+                "title": story.title,
+                "author": story.author,
+                "story_type": story.story_type,
+                "created_at": story.created_at.isoformat() if story.created_at else None,
+                "views": story.views,
+                "is_hidden": story.is_hidden,
+                "is_completed": story.is_completed,
+                "rating_sum": story.rating_sum,
+                "rating_count": story.rating_count,
+                "category_id": story.category_id,
+                "categories": [c.id for c in story.categories],
+            }
+        ],
+        "parts": [
+            {
+                "id": p.id,
+                "story_id": p.story_id,
+                "part_number": p.part_number,
+                "content": p.content,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in parts
+        ],
+        "comments": [
+            {
+                "id": c.id,
+                "story_id": c.story_id,
+                "url": c.url,
+                "name": c.name,
+                "email": c.email,
+                "content": c.content,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in comments
+        ],
+        "videos": [
+            {"id": v.id, "part_id": v.part_id, "url": v.url}
+            for v in videos
+        ],
+        "daily_views": [
+            {
+                "id": dv.id,
+                "story_id": dv.story_id,
+                "part_number": dv.part_number,
+                "date": dv.date.isoformat(),
+                "views": dv.views,
+                "views_desktop": dv.views_desktop,
+                "views_mobile": dv.views_mobile,
+            }
+            for dv in daily_views
+        ],
+        "daily_listens": [
+            {
+                "id": dl.id,
+                "story_id": dl.story_id,
+                "part_number": dl.part_number,
+                "date": dl.date.isoformat(),
+                "listens": dl.listens,
+                "listens_desktop": dl.listens_desktop,
+                "listens_mobile": dl.listens_mobile,
+            }
+            for dl in daily_listens
+        ],
+        "reading_histories": [
+            {
+                "id": rh.id,
+                "session_id": rh.session_id,
+                "email": rh.email,
+                "story_id": rh.story_id,
+                "part_number": rh.part_number,
+                "updated_at": rh.updated_at.isoformat() if rh.updated_at else None,
+            }
+            for rh in reading_histories
+        ],
+        "follows": [
+            {
+                "id": f.id,
+                "story_id": f.story_id,
+                "email": f.email,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+            }
+            for f in follows
+        ],
+        # Không export new_story_subscriptions để tránh xung đột khi import
+    }
+    
+    json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    buf = io.BytesIO(json_bytes)
+    filename = f"story_{story.id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    return send_file(buf, as_attachment=True, download_name=filename, mimetype="application/json")
 
 @app.route("/import_data", methods=["POST"])
 def import_data():

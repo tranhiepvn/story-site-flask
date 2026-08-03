@@ -268,15 +268,21 @@
 <h3>Xoá toàn bộ truyện</h3>
 <form method="post" action="{{ url_for('delete_all_stories') }}" class="delete-all-form" onsubmit="return confirmDeleteAll();">
   <div class="form-group">
-    <label for="password1">Password:</label><br>
-    <input type="password" id="password1" name="password1" required>
+    <label>
+      <input type="checkbox" id="confirm_delete_all" onchange="toggleDeleteAll()">
+      Tôi xác nhận muốn xoá toàn bộ truyện
+    </label>
   </div>
   <div class="form-group">
-    <label for="password2">Nhập lại Password:</label><br>
-    <input type="password" id="password2" name="password2" required>
+    <label for="password1_all">Password:</label><br>
+    <input type="password" id="password1_all" name="password1" disabled>
   </div>
   <div class="form-group">
-    <button type="submit">Xoá toàn bộ truyện</button>
+    <label for="password2_all">Nhập lại Password:</label><br>
+    <input type="password" id="password2_all" name="password2" disabled>
+  </div>
+  <div class="form-group">
+    <button type="submit" id="delete_all_btn" disabled style="background-color: #ccc; color: #666; border: none; padding: 8px 16px; border-radius: 4px; cursor: not-allowed;">Xoá toàn bộ truyện</button>
   </div>
 </form>
 
@@ -330,6 +336,21 @@ function confirmDeleteAll() {
   return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
 }
 
+function confirmDeleteAll() {
+  if (!document.getElementById('confirm_delete_all').checked) {
+    alert('Vui lòng xác nhận bằng cách tick vào ô trước khi xoá.');
+    return false;
+  }
+  var pw1 = document.getElementById('password1_all').value;
+  var pw2 = document.getElementById('password2_all').value;
+  if (pw1 !== pw2) {
+    alert('Hai mật khẩu phải giống nhau.');
+    return false;
+  }
+  if (!confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện?')) return false;
+  return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
+}
+
 // Xem trước video
 document.addEventListener('DOMContentLoaded', function() {
   var inputs = document.querySelectorAll('.video-input');
@@ -351,6 +372,23 @@ document.getElementById('clear-author')?.addEventListener('click', function() {
   input.value = '';
   input.focus();
 });
+
+function toggleDeleteAll() {
+  const checked = document.getElementById('confirm_delete_all').checked;
+  document.getElementById('password1_all').disabled = !checked;
+  document.getElementById('password2_all').disabled = !checked;
+  const btn = document.getElementById('delete_all_btn');
+  btn.disabled = !checked;
+  if (checked) {
+    btn.style.backgroundColor = '#FF8C00'; // cam
+    btn.style.color = '#fff';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.style.backgroundColor = '#ccc';
+    btn.style.color = '#666';
+    btn.style.cursor = 'not-allowed';
+  }
+}
 </script>
 
 <style>

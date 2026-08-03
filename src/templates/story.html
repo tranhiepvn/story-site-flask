@@ -103,8 +103,8 @@
 
       <!-- AUDIO PLAYER với loading spinner -->
       <div style="margin: 15px 0;">
-        <!-- Hàng trên: Play, thanh trượt, tốc độ -->
-        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+        <!-- Hàng trên: Play, thanh trượt, tốc độ, giọng -->
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
           <button id="play-btn" class="play-btn" onclick="toggleAudio({{ current_part.id }})" style="background: none; border: none; font-size: 28px; cursor: pointer; width: 48px; height: 48px; padding: 0; margin: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;">▶️</button>
           <div style="flex: 1; min-width: 0;">
             <input type="range" id="progress-bar" min="1" max="100" value="1" style="width: 100%; pointer-events: none; opacity: 0.4; margin: 0; display: block;">
@@ -115,6 +115,10 @@
             <option value="1.25">1.25x</option>
             <option value="1.5">1.5x</option>
             <option value="2">2x</option>
+          </select>
+          <select id="voice-select" style="background: #333; color: #00BFFF; border: 1px solid #00BFFF; border-radius: 4px; padding: 4px 8px; cursor: pointer; flex-shrink: 0;">
+            <option value="vi-VN-HoaiMyNeural">Giọng nữ</option>
+            <option value="vi-VN-NamMinhNeural">Giọng nam</option>
           </select>
         </div>
         <!-- Hàng dưới: checkbox căn trái, trạng thái -->
@@ -525,7 +529,7 @@
 </style>
 
 <script>
-// ==================== AUDIO PLAYER (giữ nguyên) ====================
+// ==================== AUDIO PLAYER với hỗ trợ chọn giọng ====================
 let currentAudio = null;
 let currentPartId = null;
 let currentStoryId = null;
@@ -536,6 +540,21 @@ let nextChunkUrl = null;
 let isPreloading = false;
 let isAudioStarted = false;
 let activeFetchController = null;
+
+// --- Biến giọng đọc ---
+const voiceSelect = document.getElementById('voice-select');
+let currentVoice = localStorage.getItem('voice_preference') || 'vi-VN-HoaiMyNeural';
+if (voiceSelect) {
+  voiceSelect.value = currentVoice;
+  voiceSelect.addEventListener('change', function() {
+    currentVoice = this.value;
+    localStorage.setItem('voice_preference', currentVoice);
+    // Nếu đang phát, reset player để áp dụng giọng mới cho lần phát tiếp theo
+    if (currentAudio) {
+      resetAudioPlayer();
+    }
+  });
+}
 
 const progressBar = document.getElementById('progress-bar');
 const playText = document.getElementById('play-text');
@@ -647,13 +666,14 @@ function setProgressBarEnabled(enabled) {
   }
 }
 
+// --- fetchChunkWithRetry đã được sửa để thêm voice ---
 async function fetchChunkWithRetry(storyId, partNumber, chunkIndex, maxRetries = 5, delay = 500) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (activeFetchController) activeFetchController.abort();
       const controller = new AbortController();
       activeFetchController = controller;
-      const url = `/api/get_chunk/${storyId}/${partNumber}/${chunkIndex}`;
+      const url = `/api/get_chunk/${storyId}/${partNumber}/${chunkIndex}?voice=${currentVoice}`;
       const res = await fetch(url, { signal: controller.signal });
       if (res.ok) {
         const data = await res.json();
@@ -699,6 +719,7 @@ async function loadChunk(storyId, partNumber, chunkIndex, audioElement, shouldPl
   return true;
 }
 
+// --- toggleAudio đã được sửa để thêm voice vào API call ---
 async function toggleAudio(partId) {
   if (currentAudio && currentAudio.partId === partId) {
     if (currentAudio.paused) {
@@ -725,7 +746,7 @@ async function toggleAudio(partId) {
   isPreloading = false;
 
   try {
-    const res = await fetch(`/api/start_audio/${partId}`);
+    const res = await fetch(`/api/start_audio/${partId}?voice=${currentVoice}`);
     const data = await res.json();
     if (data.status === "success") {
       currentPartId = data.part_id;
@@ -876,10 +897,10 @@ audioElem.addEventListener('error', async function(e) {
       const storyId = match[1];
       const partNumber = match[2];
       const chunkIndex = parseInt(match[3], 10);
-      console.log(`Audio error, trying to recreate chunk ${chunkIndex}`);
+      console.log(`Audio error, trying to recreate chunk ${chunkIndex} with voice ${currentVoice}`);
       playText.textContent = "Đang khôi phục audio...";
       try {
-        const res = await fetch(`/api/get_chunk/${storyId}/${partNumber}/${chunkIndex}`);
+        const res = await fetch(`/api/get_chunk/${storyId}/${partNumber}/${chunkIndex}?voice=${currentVoice}`);
         const data = await res.json();
         if (data.status === 'success') {
           audioElem.src = data.url;

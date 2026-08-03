@@ -230,15 +230,32 @@
   </div>
 </form>
 
-<h3>Xoá truyện</h3>
-<form method="post" onsubmit="return confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?');">
-  <input type="hidden" name="existing_story_id" value="{{ story.id }}">
+<h3>Export truyện này</h3>
+<form method="post" action="{{ url_for('export_single_story', story_id=story.id) }}">
   <div class="form-group">
-    <label for="password_delete">Password:</label><br>
-    <input type="password" id="password_delete" name="password" required>
+    <label for="export_pw">Password:</label><br>
+    <input type="password" id="export_pw" name="password" required>
   </div>
   <div class="form-group">
-    <button type="submit" name="action" value="delete_story">Xoá truyện</button>
+    <button type="submit">Export truyện</button>
+  </div>
+</form>
+
+<h3>Xoá truyện</h3>
+<form method="post" onsubmit="return confirmDeleteStory();">
+  <input type="hidden" name="existing_story_id" value="{{ story.id }}">
+  <div class="form-group">
+    <label>
+      <input type="checkbox" id="confirm_delete_story" onchange="toggleDeleteStory()">
+      Tôi xác nhận muốn xoá truyện này
+    </label>
+  </div>
+  <div class="form-group">
+    <label for="password_delete">Password:</label><br>
+    <input type="password" id="password_delete" name="password" disabled>
+  </div>
+  <div class="form-group">
+    <button type="submit" id="delete_story_btn" disabled style="background-color: #ccc; color: #666; border: none; padding: 8px 16px; border-radius: 4px; cursor: not-allowed;">Xoá truyện</button>
   </div>
 </form>
 
@@ -268,6 +285,31 @@ document.getElementById('clear-author')?.addEventListener('click', function() {
   input.value = '';
   input.focus();
 });
+
+function toggleDeleteStory() {
+  const checked = document.getElementById('confirm_delete_story').checked;
+  document.getElementById('password_delete').disabled = !checked;
+  const btn = document.getElementById('delete_story_btn');
+  btn.disabled = !checked;
+  if (checked) {
+    btn.style.backgroundColor = '#FF8C00';
+    btn.style.color = '#fff';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.style.backgroundColor = '#ccc';
+    btn.style.color = '#666';
+    btn.style.cursor = 'not-allowed';
+  }
+}
+
+function confirmDeleteStory() {
+  if (!document.getElementById('confirm_delete_story').checked) {
+    alert('Vui lòng xác nhận bằng cách tick vào ô trước khi xoá.');
+    return false;
+  }
+  if (!confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?')) return false;
+  return true;
+}
 </script>
 
 <style>
