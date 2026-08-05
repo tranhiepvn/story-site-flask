@@ -241,21 +241,28 @@
   </div>
 </form>
 
+{% if request.args.get('delete') %}
+<div style="background: #FF8C00; color: #fff; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-weight: bold;">
+  ⚠️ Bạn đang yêu cầu xóa truyện này. Vui lòng nhập mật khẩu và xác nhận bên dưới.
+</div>
+{% endif %}
 <h3>Xoá truyện</h3>
-<form method="post" onsubmit="return confirmDeleteStory();">
+<form method="post" onsubmit="return confirmDelete();">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
   <div class="form-group">
+    <label for="password_delete">Password:</label><br>
+    <input type="password" id="password_delete" name="password" disabled required>
+  </div>
+  <div class="form-group">
     <label>
-      <input type="checkbox" id="confirm_delete_story" onchange="toggleDeleteStory()">
+      <input type="checkbox" id="confirm_delete" onchange="toggleDeleteButton()">
       Tôi xác nhận muốn xoá truyện này
     </label>
   </div>
   <div class="form-group">
-    <label for="password_delete">Password:</label><br>
-    <input type="password" id="password_delete" name="password" disabled>
-  </div>
-  <div class="form-group">
-    <button type="submit" id="delete_story_btn" disabled style="background-color: #ccc; color: #666; border: none; padding: 8px 16px; border-radius: 4px; cursor: not-allowed;">Xoá truyện</button>
+    <button type="submit" id="delete_story_btn" name="action" value="delete_story" disabled style="background: #FF8C00; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+      Xoá truyện
+    </button>
   </div>
 </form>
 
@@ -286,29 +293,30 @@ document.getElementById('clear-author')?.addEventListener('click', function() {
   input.focus();
 });
 
-function toggleDeleteStory() {
-  const checked = document.getElementById('confirm_delete_story').checked;
-  document.getElementById('password_delete').disabled = !checked;
+function toggleDeleteButton() {
+  const checkbox = document.getElementById('confirm_delete');
+  const passwordInput = document.getElementById('password_delete');
   const btn = document.getElementById('delete_story_btn');
-  btn.disabled = !checked;
-  if (checked) {
-    btn.style.backgroundColor = '#FF8C00';
-    btn.style.color = '#fff';
-    btn.style.cursor = 'pointer';
+  const isChecked = checkbox.checked;
+  btn.disabled = !isChecked;
+  passwordInput.disabled = !isChecked;
+  if (isChecked) {
+    passwordInput.required = true;
   } else {
-    btn.style.backgroundColor = '#ccc';
-    btn.style.color = '#666';
-    btn.style.cursor = 'not-allowed';
+    passwordInput.required = false;
   }
 }
 
-function confirmDeleteStory() {
-  if (!document.getElementById('confirm_delete_story').checked) {
-    alert('Vui lòng xác nhận bằng cách tick vào ô trước khi xoá.');
+function confirmDelete() {
+  if (!document.getElementById('confirm_delete').checked) {
+    alert('Bạn phải xác nhận bằng cách check vào ô "Tôi xác nhận muốn xoá truyện này"');
     return false;
   }
-  if (!confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?')) return false;
-  return true;
+  if (!document.getElementById('password_delete').value) {
+    alert('Vui lòng nhập mật khẩu');
+    return false;
+  }
+  return confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?');
 }
 </script>
 

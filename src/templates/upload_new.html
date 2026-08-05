@@ -122,11 +122,7 @@
       <td style="padding:8px;">{{ story.created_at.strftime('%d/%m/%Y') }}</td>
       <td style="padding:8px;">
         <a href="{{ url_for('upload', story_id=story.id) }}" style="color:#00BFFF;">Sửa</a>
-        <form method="post" style="display:inline;" onsubmit="return confirm('Xoá truyện này?');">
-          <input type="hidden" name="existing_story_id" value="{{ story.id }}">
-          <input type="hidden" name="password" value="{{ request.form.get('password', '') }}" />
-          <button type="submit" name="action" value="delete_story" style="background:none; border:none; color:#FF4444; cursor:pointer;">Xoá</button>
-        </form>
+        <a href="{{ url_for('upload', story_id=story.id, delete=1) }}" style="color:#FF4444; margin-left:8px;">Xoá</a>
       </td>
     </tr>
     {% endfor %}
@@ -268,21 +264,23 @@
 <h3>Xoá toàn bộ truyện</h3>
 <form method="post" action="{{ url_for('delete_all_stories') }}" class="delete-all-form" onsubmit="return confirmDeleteAll();">
   <div class="form-group">
+    <label for="password1">Password:</label><br>
+    <input type="password" id="password1" name="password1" disabled required>
+  </div>
+  <div class="form-group">
+    <label for="password2">Nhập lại Password:</label><br>
+    <input type="password" id="password2" name="password2" disabled required>
+  </div>
+  <div class="form-group">
     <label>
-      <input type="checkbox" id="confirm_delete_all" onchange="toggleDeleteAll()">
+      <input type="checkbox" id="confirm_delete_all" onchange="toggleDeleteAllButton()">
       Tôi xác nhận muốn xoá toàn bộ truyện
     </label>
   </div>
   <div class="form-group">
-    <label for="password1_all">Password:</label><br>
-    <input type="password" id="password1_all" name="password1" disabled>
-  </div>
-  <div class="form-group">
-    <label for="password2_all">Nhập lại Password:</label><br>
-    <input type="password" id="password2_all" name="password2" disabled>
-  </div>
-  <div class="form-group">
-    <button type="submit" id="delete_all_btn" disabled style="background-color: #ccc; color: #666; border: none; padding: 8px 16px; border-radius: 4px; cursor: not-allowed;">Xoá toàn bộ truyện</button>
+    <button type="submit" id="delete_all_btn" disabled style="background: #FF8C00; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+      Xoá toàn bộ truyện
+    </button>
   </div>
 </form>
 
@@ -373,21 +371,40 @@ document.getElementById('clear-author')?.addEventListener('click', function() {
   input.focus();
 });
 
-function toggleDeleteAll() {
-  const checked = document.getElementById('confirm_delete_all').checked;
-  document.getElementById('password1_all').disabled = !checked;
-  document.getElementById('password2_all').disabled = !checked;
+function toggleDeleteAllButton() {
+  const checkbox = document.getElementById('confirm_delete_all');
+  const pw1 = document.getElementById('password1');
+  const pw2 = document.getElementById('password2');
   const btn = document.getElementById('delete_all_btn');
-  btn.disabled = !checked;
-  if (checked) {
-    btn.style.backgroundColor = '#FF8C00'; // cam
-    btn.style.color = '#fff';
-    btn.style.cursor = 'pointer';
+  const isChecked = checkbox.checked;
+  btn.disabled = !isChecked;
+  pw1.disabled = !isChecked;
+  pw2.disabled = !isChecked;
+  if (isChecked) {
+    pw1.required = true;
+    pw2.required = true;
   } else {
-    btn.style.backgroundColor = '#ccc';
-    btn.style.color = '#666';
-    btn.style.cursor = 'not-allowed';
+    pw1.required = false;
+    pw2.required = false;
   }
+}
+
+function confirmDeleteAll() {
+  if (!document.getElementById('confirm_delete_all').checked) {
+    alert('Bạn phải xác nhận bằng cách check vào ô "Tôi xác nhận muốn xoá toàn bộ truyện"');
+    return false;
+  }
+  var pw1 = document.getElementById('password1').value;
+  var pw2 = document.getElementById('password2').value;
+  if (!pw1 || !pw2) {
+    alert('Vui lòng nhập đầy đủ mật khẩu');
+    return false;
+  }
+  if (pw1 !== pw2) {
+    alert('Hai mật khẩu phải giống nhau.');
+    return false;
+  }
+  return confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện? Thao tác này không thể hoàn tác!');
 }
 </script>
 

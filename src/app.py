@@ -1687,28 +1687,33 @@ def upload():
                 return redirect(url_for("upload", story_id=story.id))
 
             elif action == "delete_story":
-                # Xóa tất cả bản ghi có khóa ngoại trỏ tới story
-                Comment.query.filter_by(story_id=story.id).delete()
-                Follow.query.filter_by(story_id=story.id).delete()
-                ReadingHistory.query.filter_by(story_id=story.id).delete()
-                DailyView.query.filter_by(story_id=story.id).delete()
-                DailyListen.query.filter_by(story_id=story.id).delete()
-                
-                # Xóa video của các phần (trước khi xóa phần)
-                for part in story.parts:
-                    PartVideo.query.filter_by(part_id=part.id).delete()
-                # Xóa các phần
-                Part.query.filter_by(story_id=story.id).delete()
-                
-                # Xóa liên kết nhiều-nhiều với thể loại
-                story.categories = []
-                db.session.flush()  # Đảm bảo các thay đổi được ghi nhận
-                
-                # Xóa truyện
-                db.session.delete(story)
-                db.session.commit()
-                flash("Đã xóa truyện thành công.")
-                return redirect(url_for("upload"))
+                try:
+                    # 1. Xóa các bảng có khóa ngoại trỏ tới story
+                    Comment.query.filter_by(story_id=story.id).delete()
+                    Follow.query.filter_by(story_id=story.id).delete()
+                    ReadingHistory.query.filter_by(story_id=story.id).delete()
+                    DailyView.query.filter_by(story_id=story.id).delete()
+                    DailyListen.query.filter_by(story_id=story.id).delete()
+                    
+                    # 2. Xóa video của các phần (trước khi xóa phần)
+                    for part in story.parts:
+                        PartVideo.query.filter_by(part_id=part.id).delete()
+                    
+                    # 3. Xóa các phần
+                    Part.query.filter_by(story_id=story.id).delete()
+                    
+                    # 4. Xóa liên kết nhiều-nhiều với thể loại
+                    story.categories = []
+                    
+                    # 5. Xóa truyện
+                    db.session.delete(story)
+                    db.session.commit()
+                    flash("Đã xóa truyện thành công.", "success")
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f"Lỗi khi xóa truyện: {str(e)}", "error")
+                    print(f"[ERROR] Xóa truyện thất bại: {e}")
+                return redirect(url_for("upload", story_id=story.id) if request.args.get('story_id') else url_for("upload"))
 
 
             elif action == "replace_text":
@@ -2341,6 +2346,7 @@ def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple
     imported_count = 0
     overwritten_count = 0
     skipped_count = 0
+    new_stories_imported = []  # <-- THÊM DÒNG NÀY
 
     # Tạo hoặc lấy các thể loại dựa trên tên (không phân biệt chữ hoa/thường).
     # Thay vì flush từng bản ghi và bắt lỗi, chúng ta thu thập trước các tên thể loại
@@ -2440,6 +2446,7 @@ def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple
         db.session.flush()
         story_map[old_id] = new_story.id
         imported_count += 1
+        new_stories_imported.append(new_story)  # <-- THÊM DÒNG NÀY
         # Thiết lập danh sách thể loại
         cat_ids = st.get("categories", [])
         selected_cats = [category_objs[cid] for cid in cat_ids if cid in category_objs]
@@ -2650,6 +2657,19 @@ def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple
             conn.execute(text("SELECT setval(pg_get_serial_sequence('parts','id'), COALESCE((SELECT MAX(id) FROM parts), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('comments','id'), COALESCE((SELECT MAX(id) FROM comments), 1), true)"))
             conn.execute(text("SELECT setval(pg_get_serial_sequence('part_videos','id'), COALESCE((SELECT MAX(id) FROM part_videos), 1), true)"))
+
+
+
+    # ===== GỬI THÔNG BÁO CHO TRUYỆN MỚI =====
+    if new_stories_imported:
+        subscribers = NewStorySubscription.query.all()
+        if subscribers:
+            recipient_emails = [sub.email for sub in subscribers]
+            for story in new_stories_imported:
+                send_new_story_notification(story, recipient_emails)
+            # In ra log hoặc flash (không flash vì hàm không có request context)
+            print(f"[IMPORT] Đã gửi thông báo truyện mới đến {len(recipient_emails)} độc giả cho {len(new_stories_imported)} truyện mới.")
+            
     return imported_count, overwritten_count, skipped_count
 
 
