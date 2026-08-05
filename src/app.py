@@ -1610,12 +1610,16 @@ def upload():
 
                 parts_data = split_and_clean_content(raw_content)
 
+                last_new_part_id = None
+
                 for part_num, cleaned_content in parts_data:
                     last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
                     next_number = (last_part.part_number + 1) if last_part else 1
                     new_part = Part(story_id=story.id, part_number=next_number, content=cleaned_content)
                     db.session.add(new_part)
                     db.session.flush()
+                    
+                    last_new_part_id = new_part.id
 
                     for url in video_urls[:9]:
                         url = (url or "").strip()
@@ -1629,12 +1633,11 @@ def upload():
                 # Gửi thông báo cho người theo dõi
                 if story.followers:
                     recipient_emails = [f.email for f in story.followers]
-                    # Lấy tiêu đề phần mới (dòng đầu tiên của nội dung)
                     part_title = cleaned_content.split('\n', 1)[0].strip()
                     send_new_chapter_notification(story, next_number, part_title, recipient_emails)
                     flash(f"Đã gửi thông báo đến {len(recipient_emails)} người theo dõi.")
 
-                return redirect(url_for("upload", story_id=story.id))
+                return redirect(url_for("upload", story_id=story.id, edit_part=last_new_part_id))
 
             elif action == "update_part":
                 part_id = request.form.get("part_id")
@@ -1661,7 +1664,7 @@ def upload():
 
                     db.session.commit()
                     flash("Đã cập nhật phần (đã dọn dẹp và cập nhật video).", "success")
-                return redirect(url_for("upload", story_id=story.id))
+                return redirect(url_for("upload", story_id=story.id, edit_part=part_id))
 
             elif action == "update_story":
                 story.title = request.form.get("title", "").strip()
@@ -1765,10 +1768,14 @@ def upload():
 
             parts_data = split_and_clean_content(raw_content)
 
+            last_new_part_id = None
+
             for part_num, cleaned_content in parts_data:
                 part = Part(story_id=story.id, part_number=part_num, content=cleaned_content)
                 db.session.add(part)
                 db.session.flush()
+
+                last_new_part_id = part.id
 
                 for url in video_urls[:9]:
                     url = (url or "").strip()
@@ -1785,7 +1792,7 @@ def upload():
                 send_new_story_notification(story, recipient_emails)
                 flash(f"Đã gửi thông báo truyện mới đến {len(recipient_emails)} độc giả.")
 
-            return redirect(url_for("upload", story_id=story.id))
+            return redirect(url_for("upload", story_id=story.id, edit_part=last_new_part_id))
 
     # === PHẦN GET - hiển thị form ===
     story_id = request.args.get("story_id")
@@ -2669,7 +2676,7 @@ def perform_import(data: dict, decisions: dict[str, str] | None = None) -> tuple
                 send_new_story_notification(story, recipient_emails)
             # In ra log hoặc flash (không flash vì hàm không có request context)
             print(f"[IMPORT] Đã gửi thông báo truyện mới đến {len(recipient_emails)} độc giả cho {len(new_stories_imported)} truyện mới.")
-            
+
     return imported_count, overwritten_count, skipped_count
 
 
