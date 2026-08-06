@@ -1663,6 +1663,23 @@ def upload():
                             db.session.add(PartVideo(part_id=part_obj.id, url=url))
 
                     db.session.commit()
+
+                    # ===== XÓA AUDIO CỦA PHẦN NÀY =====
+                    audio_dir = Path("static/audio") / str(part_obj.story_id)
+                    if audio_dir.exists():
+                        # Xóa tất cả file chunk của phần này (cả female và male)
+                        pattern = f"{part_obj.part_number}_chunk_*.mp3"
+                        deleted_files = 0
+                        for mp3_file in audio_dir.glob(pattern):
+                            try:
+                                mp3_file.unlink()
+                                deleted_files += 1
+                            except Exception as e:
+                                print(f"[DELETE AUDIO] Lỗi xóa {mp3_file.name}: {e}")
+                        if deleted_files > 0:
+                            flash(f"Đã xóa {deleted_files} file audio cũ của phần này.", "info")
+                            print(f"[DELETE AUDIO] Đã xóa {deleted_files} file cho phần {part_obj.part_number}")
+                            
                     flash("Đã cập nhật phần (đã dọn dẹp và cập nhật video).", "success")
                 return redirect(url_for("upload", story_id=story.id, edit_part=part_id))
 
