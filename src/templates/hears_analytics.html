@@ -205,9 +205,9 @@
     </thead>
     <tbody>
       {% for item in story_data %}
-      <tr data-story-id="{{ item.story.id }}">
+      <tr data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
         <td class="col-stt">{{ loop.index }}</td>
-        <td class="col-name" data-story-id="{{ item.story.id }}">
+        <td class="col-name" data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
             <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
             {% if show_parts == '1' and item.part_stats %}
                 <div class="part-stats">
@@ -288,10 +288,10 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.body.appendChild(tooltip);
 
-    function showTooltip(e, storyId, type) {
+    function showTooltip(e, storyId, storyTitle, type) {
         const key = `${storyId}_${type}`;
         if (cache[key]) {
-            renderTooltip(e, cache[key]);
+            renderTooltip(e, cache[key], storyTitle);
             return;
         }
 
@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(res => res.json())
             .then(data => {
                 cache[key] = data;
-                renderTooltip(e, data);
+                renderTooltip(e, data, storyTitle);
             })
             .catch(err => {
                 console.error('Lỗi lấy dữ liệu quốc gia:', err);
@@ -308,20 +308,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function renderTooltip(e, data) {
+    function renderTooltip(e, data, storyTitle) {
+        let html = `<div style="font-weight:bold; font-size:1rem; margin-bottom:6px; color:#4A90E2;">${storyTitle}</div>`;
         if (!data || data.length === 0) {
-            tooltip.innerHTML = '<span style="color: #888;">Chưa có dữ liệu quốc gia</span>';
+            html += '<span style="color: #888;">Chưa có dữ liệu quốc gia</span>';
         } else {
-            let html = '<div style="font-weight:bold; margin-bottom:6px;">Top quốc gia:</div>';
+            html += '<div style="font-weight:bold; margin-bottom:4px;">Top quốc gia:</div>';
             data.forEach(item => {
                 html += `<div style="display:flex; justify-content:space-between; gap:20px;">
                             <span>${item.country || 'Unknown'}</span>
                             <span style="color:#FF8C00;">${item.count}</span>
                         </div>`;
             });
-            tooltip.innerHTML = html;
         }
-        // Đặt vị trí tooltip
+        tooltip.innerHTML = html;
+
         let left = e.clientX + 15;
         let top = e.clientY - 10;
         if (left + 320 > window.innerWidth) left = e.clientX - 320;
@@ -332,21 +333,18 @@ document.addEventListener('DOMContentLoaded', function() {
         tooltip.style.display = 'block';
     }
 
-    // Xác định loại thống kê: trang này là hears → type='listens'
-    const type = 'listens';
+    const isHears = window.location.pathname.includes('/admin/hears');
+    const type = isHears ? 'listens' : 'views';
 
-    // Gắn sự kiện cho cả <tr> và <td.col-name>
-    document.querySelectorAll('tr[data-story-id], td.col-name[data-story-id]').forEach(el => {
+    document.querySelectorAll('[data-story-id]').forEach(el => {
         const storyId = el.dataset.storyId;
+        const storyTitle = el.dataset.storyTitle || '';
         if (!storyId) return;
 
-        const handler = function(e) {
-            const target = e.currentTarget;
-            const id = target.dataset.storyId || target.closest('[data-story-id]')?.dataset.storyId;
-            if (id) showTooltip(e, id, type);
-        };
+        el.addEventListener('mouseenter', function(e) {
+            showTooltip(e, storyId, storyTitle, type);
+        });
 
-        el.addEventListener('mouseenter', handler);
         el.addEventListener('mousemove', function(e) {
             const rect = tooltip.getBoundingClientRect();
             let left = e.clientX + 15;
