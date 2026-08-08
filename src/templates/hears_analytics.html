@@ -205,9 +205,9 @@
     </thead>
     <tbody>
       {% for item in story_data %}
-      <tr>
+      <tr data-story-id="{{ item.story.id }}">
         <td class="col-stt">{{ loop.index }}</td>
-        <td class="col-name">
+        <td class="col-name" data-story-id="{{ item.story.id }}">
             <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
             {% if show_parts == '1' and item.part_stats %}
                 <div class="part-stats">
@@ -263,4 +263,105 @@
   <strong>Top 3 truyện được nghe nhiều nhất tuần:</strong> 
   {% for item in story_data[:3] %}{{ item.story.title }} ({{ item.total_week }} lượt){% if not loop.last %}, {% endif %}{% endfor %}
 </p>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cache = {};
+
+    const tooltip = document.createElement('div');
+    tooltip.id = 'country-tooltip';
+    tooltip.style.cssText = `
+        position: fixed;
+        background: #222;
+        color: #fff;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #444;
+        font-size: 0.85rem;
+        max-width: 300px;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        z-index: 9999;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    `;
+    document.body.appendChild(tooltip);
+
+    function showTooltip(e, storyId, type) {
+        const key = `${storyId}_${type}`;
+        if (cache[key]) {
+            renderTooltip(e, cache[key]);
+            return;
+        }
+
+        fetch(`/api/story_countries/${storyId}?type=${type}`)
+            .then(res => res.json())
+            .then(data => {
+                cache[key] = data;
+                renderTooltip(e, data);
+            })
+            .catch(err => {
+                console.error('Lỗi lấy dữ liệu quốc gia:', err);
+                tooltip.innerHTML = '<span style="color: #888;">Lỗi tải dữ liệu</span>';
+                tooltip.style.display = 'block';
+            });
+    }
+
+    function renderTooltip(e, data) {
+        if (!data || data.length === 0) {
+            tooltip.innerHTML = '<span style="color: #888;">Chưa có dữ liệu quốc gia</span>';
+        } else {
+            let html = '<div style="font-weight:bold; margin-bottom:6px;">Top quốc gia:</div>';
+            data.forEach(item => {
+                html += `<div style="display:flex; justify-content:space-between; gap:20px;">
+                            <span>${item.country || 'Unknown'}</span>
+                            <span style="color:#FF8C00;">${item.count}</span>
+                        </div>`;
+            });
+            tooltip.innerHTML = html;
+        }
+        // Đặt vị trí tooltip
+        let left = e.clientX + 15;
+        let top = e.clientY - 10;
+        if (left + 320 > window.innerWidth) left = e.clientX - 320;
+        if (top + 200 > window.innerHeight) top = window.innerHeight - 210;
+        if (top < 10) top = 10;
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+        tooltip.style.display = 'block';
+    }
+
+    // Xác định loại thống kê: trang này là hears → type='listens'
+    const type = 'listens';
+
+    // Gắn sự kiện cho cả <tr> và <td.col-name>
+    document.querySelectorAll('tr[data-story-id], td.col-name[data-story-id]').forEach(el => {
+        const storyId = el.dataset.storyId;
+        if (!storyId) return;
+
+        const handler = function(e) {
+            const target = e.currentTarget;
+            const id = target.dataset.storyId || target.closest('[data-story-id]')?.dataset.storyId;
+            if (id) showTooltip(e, id, type);
+        };
+
+        el.addEventListener('mouseenter', handler);
+        el.addEventListener('mousemove', function(e) {
+            const rect = tooltip.getBoundingClientRect();
+            let left = e.clientX + 15;
+            let top = e.clientY - 10;
+            if (left + rect.width > window.innerWidth) left = e.clientX - rect.width - 15;
+            if (top + rect.height > window.innerHeight) top = window.innerHeight - rect.height - 10;
+            if (top < 10) top = 10;
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        });
+
+        el.addEventListener('mouseleave', function() {
+            tooltip.style.display = 'none';
+        });
+    });
+});
+</script>
 {% endblock %}
