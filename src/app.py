@@ -4483,47 +4483,45 @@ def set_theme(theme):
 
 @app.route("/api/story_countries/<int:story_id>")
 def api_story_countries(story_id):
-    """Trả về top 10 quốc gia đã xem/nghe truyện này (theo daily_view hoặc daily_listen)."""
-    # Mặc định lấy views, có thể truyền ?type=listens
+    """Trả về top 10 quốc gia đã xem/nghe truyện này."""
     stat_type = request.args.get('type', 'views')
     
+    # Chọn bảng thống kê phù hợp
     if stat_type == 'listens':
-        model = DailyListen
-        count_field = model.listens
+        stat_model = DailyListen
+        count_field = stat_model.listens
     else:
-        model = DailyView
-        count_field = model.views
+        stat_model = DailyView
+        count_field = stat_model.views
     
-    # Lấy top quốc gia từ VisitLog: join với DailyView/Listen qua story_id và date
-    # Vì VisitLog có country, ta group by country và sum lượt xem/nghe
-    from sqlalchemy import func
+    # Subquery: lấy tổng views/listens theo ngày và story_id
+    # Sau đó join với VisitLog theo ngày (chuyển date thành datetime range)
+    # Vì DailyView.date là date, VisitLog.created_at là datetime
+    # Ta sẽ group by country và sum số lượt
     
-    # Subquery: tổng views/listens theo ngày cho story này
-    # Join với VisitLog theo ngày và story_id
-    # Lưu ý: VisitLog có created_at (datetime) và DailyView có date (date)
-    # Cần chuyển đổi ngày để join
+    # Cách 1: Join trực tiếp qua date (chuyển VisitLog.created_at thành date)
+    from sqlalchemy import func, cast, Date
     
-    # Cách đơn giản: lấy tất cả VisitLog của story này thông qua các bảng thống kê
-    # Nhưng VisitLog không có story_id trực tiếp, nên ta join qua DailyView/DailyListen
-    # Cách khác: nếu bạn có bảng VisitLog có path = '/story/<id>', có thể parse.
-    # Đề xuất: dùng VisitLog.path để lọc theo story_id (path chứa /story/<id>)
-    # Đây là cách nhanh nhất mà không cần join phức tạp
-    
-    # Lấy top 10 quốc gia từ VisitLog của story này
-    # Lọc path = f'/story/{story_id}' và các path có query string
-    # Sử dụng LIKE để bắt cả query
-    path_pattern = f'/story/{story_id}%'
-    
-    top_countries = db.session.query(
+    query = db.session.query(
         VisitLog.country,
-        func.count(VisitLog.id).label('total')
+        func.sum(count_field).label('total')
+    ).join(
+        stat_model,
+        (stat_model.story_id == story_id) &
+        (stat_model.date == cast(VisitLog.created_at, Date)) &
+        (stat_model.part_number == 0)  # chỉ lấy tổng truyện
     ).filter(
-        VisitLog.path.like(path_pattern),
         VisitLog.country.isnot(None),
         VisitLog.country != ''
-    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+    ).group_by(
+        VisitLog.country
+    ).order_by(
+        func.sum(count_field).desc()
+    ).limit(10)
     
-    result = [{'country': c, 'count': cnt} for c, cnt in top_countries]
+    top_countries = query.all()
+    
+    result = [{'country': c, 'count': int(total)} for c, total in top_countries]
     return jsonify(result)
     
 if __name__ == "__main__":
