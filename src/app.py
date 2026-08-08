@@ -866,6 +866,7 @@ class VisitLog(db.Model):
     country = db.Column(db.String(100))     # <-- thêm
     city = db.Column(db.String(100))        # <-- thêm
     timezone = db.Column(db.String(50))     # <-- thêm
+    action = db.Column(db.String(20), default='view')  # <-- THÊM DÒNG NÀY
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
@@ -950,7 +951,30 @@ with app.app_context():
             db.session.execute(text(f"ALTER TABLE daily_listen ADD COLUMN {col} INTEGER DEFAULT 0"))
             print(f"Đã thêm cột {col} vào bảng daily_listen")
 
+    # === THÊM CỘT CHO VISIT_LOGS ===
+    for col in ['city', 'timezone']:
+        if not column_exists('visit_logs', col):
+            db.session.execute(text(f"ALTER TABLE visit_logs ADD COLUMN {col} VARCHAR(100)"))
+            print(f"Đã thêm cột {col} vào bảng visit_logs")
+    
+    # ===== THÊM MỚI: CỘT ACTION =====
+    if not column_exists('visit_logs', 'action'):
+        if db.engine.dialect.name == 'postgresql':
+            db.session.execute(text("ALTER TABLE visit_logs ADD COLUMN action VARCHAR(20) DEFAULT 'view'"))
+        else:
+            db.session.execute(text("ALTER TABLE visit_logs ADD COLUMN action VARCHAR(20) DEFAULT 'view'"))
+        print("Đã thêm cột action vào bảng visit_logs")
+    
+    # Cập nhật dữ liệu cũ
+    result = db.session.execute(text("SELECT COUNT(*) FROM visit_logs WHERE action IS NULL")).scalar()
+    if result > 0:
+        db.session.execute(text("UPDATE visit_logs SET action = 'view' WHERE action IS NULL"))
+        print(f"Đã cập nhật {result} bản ghi cũ với action = 'view'")
+    else:
+        print("Không có bản ghi nào cần cập nhật action")
+    
     db.session.commit()
+
 
 def create_tables() -> None:
     """Tạo cơ sở dữ liệu và bảng nếu chưa tồn tại.
@@ -4104,7 +4128,6 @@ def log_visit():
         today = date.today()
         theme = session.get('theme', 'dark')
         
-        # Kiểm tra trong session
         last_date = session.get('last_log_date')
         last_theme = session.get('last_log_theme')
         today_str = today.isoformat()
@@ -4113,11 +4136,9 @@ def log_visit():
             print(f"⏭️ Already logged today with theme {theme}", flush=True)
             return
 
-        # Cập nhật session
         session['last_log_date'] = today_str
         session['last_log_theme'] = theme
 
-        # Xác định thiết bị
         ua = request.headers.get('User-Agent', '').lower()
         device = 'mobile' if any(x in ua for x in ('mobile', 'android', 'iphone')) else \
                   'tablet' if 'ipad' in ua or 'tablet' in ua else 'desktop'
@@ -4126,6 +4147,14 @@ def log_visit():
         if ip and ',' in ip:
             ip = ip.split(',')[0].strip()
         geo = get_geo_info(ip)
+
+        # ===== XÁC ĐỊNH ACTION (view hoặc listen) =====
+        action = 'view'  # mặc định
+        # Nếu request path bắt đầu bằng /api/start_audio hoặc /api/get_chunk -> action = listen
+        if request.path.startswith('/api/start_audio') or request.path.startswith('/api/get_chunk'):
+            action = 'listen'
+        # Hoặc có thể kiểm tra header/query string nếu cần
+        # Ví dụ: if request.args.get('action') == 'listen': action = 'listen'
 
         log = VisitLog(
             session_id=session_id,
@@ -4137,11 +4166,12 @@ def log_visit():
             referrer=request.headers.get('Referer', '')[:500],
             country=geo['country'],
             city=geo['city'],
-            timezone=geo['timezone']
+            timezone=geo['timezone'],
+            action=action  # <-- THÊM DÒNG NÀY
         )
         db.session.add(log)
         db.session.commit()
-        print(f"✅ Visit logged: session={session_id}, theme={theme}, device={device}", flush=True)
+        print(f"✅ Visit logged: session={session_id}, action={action}, theme={theme}, device={device}", flush=True)
     except Exception as e:
         print(f"❌ Error: {e}", flush=True)
         db.session.rollback()
@@ -4485,45 +4515,22 @@ def set_theme(theme):
 def api_story_countries(story_id):
     """Trả về top 10 quốc gia đã xem/nghe truyện này."""
     stat_type = request.args.get('type', 'views')
+    action = 'view' if stat_type == 'views' else 'listen'
+    path_pattern = f'/story/{story_id}%'
     
-    # Chọn bảng thống kê phù hợp
-    if stat_type == 'listens':
-        stat_model = DailyListen
-        count_field = stat_model.listens
-    else:
-        stat_model = DailyView
-        count_field = stat_model.views
-    
-    # Subquery: lấy tổng views/listens theo ngày và story_id
-    # Sau đó join với VisitLog theo ngày (chuyển date thành datetime range)
-    # Vì DailyView.date là date, VisitLog.created_at là datetime
-    # Ta sẽ group by country và sum số lượt
-    
-    # Cách 1: Join trực tiếp qua date (chuyển VisitLog.created_at thành date)
-    from sqlalchemy import func, cast, Date
-    
-    query = db.session.query(
+    top_countries = db.session.query(
         VisitLog.country,
-        func.sum(count_field).label('total')
-    ).join(
-        stat_model,
-        (stat_model.story_id == story_id) &
-        (stat_model.date == cast(VisitLog.created_at, Date)) &
-        (stat_model.part_number == 0)  # chỉ lấy tổng truyện
+        func.count(VisitLog.id).label('total')
     ).filter(
+        VisitLog.path.like(path_pattern),
         VisitLog.country.isnot(None),
-        VisitLog.country != ''
-    ).group_by(
-        VisitLog.country
-    ).order_by(
-        func.sum(count_field).desc()
-    ).limit(10)
+        VisitLog.country != '',
+        VisitLog.action == action  # <-- THÊM ĐIỀU KIỆN NÀY
+    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
     
-    top_countries = query.all()
-    
-    result = [{'country': c, 'count': int(total)} for c, total in top_countries]
+    result = [{'country': c, 'count': cnt} for c, cnt in top_countries]
     return jsonify(result)
-    
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
