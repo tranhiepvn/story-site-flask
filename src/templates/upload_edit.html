@@ -233,6 +233,12 @@
 <h3>Export truyện này</h3>
 <form method="post" action="{{ url_for('export_single_story', story_id=story.id) }}">
   <div class="form-group">
+    <label>
+      <input type="checkbox" name="include_stats">
+      Bao gồm dữ liệu thống kê (lượt xem, lượt nghe, lịch sử đọc, theo dõi)
+    </label>
+  </div>
+  <div class="form-group">
     <label for="export_pw">Password:</label><br>
     <input type="password" id="export_pw" name="password" required>
   </div>

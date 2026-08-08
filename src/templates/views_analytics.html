@@ -3,23 +3,45 @@
 
 {% block content %}
 <style>
+  /* Triệt tiêu mọi giới hạn chiều rộng */
+  .container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+  .container .content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
   .sidebar, aside.sidebar { display: none !important; }
-  .content-wrapper, main { margin-left: 0 !important; width: 100% !important; }
+  .content-wrapper, main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 
   .table-wrapper {
     overflow-x: auto;
+    width: 100%;
+    padding: 0 5px;
+    box-sizing: border-box;
   }
   table {
     width: 100%;
     border-collapse: collapse;
     background: #1C1C1C;
     color: #FFFFFF;
-    table-layout: fixed;
+    table-layout: auto;
   }
   th, td {
-    padding: 12px 8px;
+    padding: 10px 6px;
     border-bottom: 1px solid #333;
     text-align: center;
+    white-space: nowrap;
   }
   th {
     background: #4A90E2;
@@ -27,30 +49,27 @@
   }
   td.col-name {
     text-align: left;
+    white-space: normal;
+    min-width: 150px;
   }
   td.col-name a {
     color: #00BFFF;
   }
-  .col-stt { width: 60px; }
-  /* Mở rộng cột tên truyện để badge không xuống dòng */
-  .col-name {
-    width: auto !important;
-    min-width: 280px !important;
-    white-space: normal;  /* tên truyện vẫn xuống dòng nếu dài */
+  .col-stt { width: 50px; }
+  .col-total, .col-week, .col-desktop, .col-mobile {
+    min-width: 70px;
   }
+  .col-day { min-width: 55px; }
+  .col-change { min-width: 80px; }
+  .col-trend { min-width: 60px; }
+
   .part-badge {
     white-space: nowrap !important;
     display: inline-block !important;
   }
 
-  .col-total, .col-week, .col-desktop, .col-mobile { width: 80px; }
-  .col-day { width: 70px; }
-  .col-change { width: 100px; }
-  .col-trend { width: 80px; }
-
   td.col-total { color: #FF8C00; font-weight: bold; }
 
-  /* Desktop màu hồng khi > 0 */
   td.col-desktop.pink {
     color: #FF69B4 !important;
     font-weight: bold;
@@ -58,7 +77,6 @@
   td.col-desktop.zero {
     color: #FFFFFF;
   }
-  /* Mobile màu đỏ khi > 0 */
   td.col-mobile.red {
     color: #FF4444 !important;
     font-weight: bold;
@@ -66,31 +84,27 @@
   td.col-mobile.zero {
     color: #FFFFFF;
   }
-
-  /* Màu cho số desktop/mobile trong ô ngày */
   .desktop-pink { color: #FF69B4 !important; }
   .mobile-red { color: #FF4444 !important; }
   .zero { color: #FFFFFF; }
 
   .filter-buttons {
-    margin: 20px 0 30px 0;
+    margin: 15px 0 20px 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
+    padding: 0 10px;
   }
   .filter-btn {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 4px;
     text-decoration: none;
     display: inline-block;
-  }
-  .filter-btn {
     background: #555;
     color: white;
   }
   .filter-btn.active {
     background: #4A90E2;
-    color: white;
   }
   body.light-mode .filter-btn {
     background: #e0e0e0;
@@ -132,12 +146,13 @@
   body.light-mode .zero {
     color: #1a1a1a !important;
   }
-  body.light-mode .pagination a {
-    background: #e0e0e0;
-    color: #0056b3;
+
+  h2, p {
+    padding: 0 10px;
   }
-  body.light-mode .pagination a:hover {
-    background: #ccc;
+  /* Triệt tiêu margin thừa từ layout */
+  .container, .content-wrapper, main {
+    margin: 0 !important;
   }
 </style>
 
@@ -151,7 +166,7 @@
   <a href="{{ url_for('views_analytics', sort='created') }}" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">🆕 Ngày tạo mới nhất</a>
 </div>
 
-<div style="margin: 15px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+<div style="margin: 15px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 10px;">
   <span>🔘 Hiển thị chi tiết phần:</span>
   <a href="{{ url_for('views_analytics', sort=request.args.get('sort', 'week'), show_parts='1') }}" 
      class="filter-btn {% if show_parts == '1' %}active{% endif %}"

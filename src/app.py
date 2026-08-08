@@ -836,9 +836,10 @@ class DailyListen(db.Model):
     listens = db.Column(db.Integer, default=0, nullable=False)
     listens_desktop = db.Column(db.Integer, default=0, nullable=False)
     listens_mobile = db.Column(db.Integer, default=0, nullable=False)
+    listens_female = db.Column(db.Integer, default=0, nullable=False)   # thêm
+    listens_male = db.Column(db.Integer, default=0, nullable=False)     # thêm
     __table_args__ = (db.UniqueConstraint('story_id', 'part_number', 'date', name='uq_listen_story_part_date'),)
     story = db.relationship('Story', backref=db.backref('daily_listens', lazy=True))
-
 
 class Announcement(db.Model):
     __tablename__ = "announcements"
@@ -942,6 +943,12 @@ with app.app_context():
         if not column_exists('visit_logs', col):
             db.session.execute(text(f"ALTER TABLE visit_logs ADD COLUMN {col} VARCHAR(100)"))
             print(f"Đã thêm cột {col} vào bảng visit_logs")
+
+    # Thêm cột listens_female và listens_male vào bảng daily_listen
+    for col in ['listens_female', 'listens_male']:
+        if not column_exists('daily_listen', col):
+            db.session.execute(text(f"ALTER TABLE daily_listen ADD COLUMN {col} INTEGER DEFAULT 0"))
+            print(f"Đã thêm cột {col} vào bảng daily_listen")
 
     db.session.commit()
 
@@ -1352,14 +1359,24 @@ def start_audio(part_id: int):
     listen_record = DailyListen.query.filter_by(story_id=story_id, date=today).first()
     if listen_record:
         listen_record.listens += 1
+        if voice == 'vi-VN-NamMinhNeural':
+            listen_record.listens_male = (listen_record.listens_male or 0) + 1
+        else:
+            listen_record.listens_female = (listen_record.listens_female or 0) + 1
         if mobile:
             listen_record.listens_mobile = (listen_record.listens_mobile or 0) + 1
         else:
             listen_record.listens_desktop = (listen_record.listens_desktop or 0) + 1
     else:
-        listen_record = DailyListen(story_id=story_id, date=today, listens=1,
-                                    listens_desktop=0 if mobile else 1,
-                                    listens_mobile=1 if mobile else 0)
+        listen_record = DailyListen(
+            story_id=story_id,
+            date=today,
+            listens=1,
+            listens_desktop=0 if mobile else 1,
+            listens_mobile=1 if mobile else 0,
+            listens_female=1 if voice != 'vi-VN-NamMinhNeural' else 0,
+            listens_male=1 if voice == 'vi-VN-NamMinhNeural' else 0
+        )
         db.session.add(listen_record)
 
     # Tăng listen cho phần hiện tại
@@ -1367,14 +1384,22 @@ def start_audio(part_id: int):
         listen_part = DailyListen.query.filter_by(story_id=story_id, part_number=part_number, date=today).first()
         if listen_part:
             listen_part.listens += 1
+            if voice == 'vi-VN-NamMinhNeural':
+                listen_part.listens_male = (listen_part.listens_male or 0) + 1
+            else:
+                listen_part.listens_female = (listen_part.listens_female or 0) + 1
             if mobile:
                 listen_part.listens_mobile = (listen_part.listens_mobile or 0) + 1
             else:
                 listen_part.listens_desktop = (listen_part.listens_desktop or 0) + 1
         else:
-            listen_part = DailyListen(story_id=story_id, part_number=part_number, date=today, listens=1,
-                                      listens_desktop=0 if mobile else 1,
-                                      listens_mobile=1 if mobile else 0)
+            listen_part = DailyListen(
+                story_id=story_id, part_number=part_number, date=today, listens=1,
+                listens_desktop=0 if mobile else 1,
+                listens_mobile=1 if mobile else 0,
+                listens_female=1 if voice != 'vi-VN-NamMinhNeural' else 0,
+                listens_male=1 if voice == 'vi-VN-NamMinhNeural' else 0
+            )
             db.session.add(listen_part)
 
     db.session.commit()
@@ -1679,7 +1704,7 @@ def upload():
                         if deleted_files > 0:
                             flash(f"Đã xóa {deleted_files} file audio cũ của phần này.", "info")
                             print(f"[DELETE AUDIO] Đã xóa {deleted_files} file cho phần {part_obj.part_number}")
-                            
+
                     flash("Đã cập nhật phần (đã dọn dẹp và cập nhật video).", "success")
                 return redirect(url_for("upload", story_id=story.id, edit_part=part_id))
 
@@ -2068,6 +2093,8 @@ def export_single_story(story_id):
         flash("Mật khẩu không hợp lệ.")
         return redirect(url_for("upload", story_id=story_id))
     
+    include_stats = request.form.get('include_stats') == 'on'  # mặc định không chọn
+    
     story = Story.query.get_or_404(story_id)
     
     # Lấy danh sách category liên quan đến story này
@@ -2082,8 +2109,7 @@ def export_single_story(story_id):
     reading_histories = ReadingHistory.query.filter_by(story_id=story.id).all()
     follows = Follow.query.filter_by(story_id=story.id).all()
     
-    # Không export new_story_subscriptions (toàn cục) để tránh xung đột
-    
+    # Xây dựng dict data
     data = {
         "categories": [{"id": c.id, "name": c.name} for c in categories],
         "stories": [
@@ -2172,8 +2198,14 @@ def export_single_story(story_id):
             }
             for f in follows
         ],
-        # Không export new_story_subscriptions để tránh xung đột khi import
     }
+    
+    # Nếu không bao gồm thống kê, xóa các key tương ứng
+    if not include_stats:
+        data.pop('daily_views', None)
+        data.pop('daily_listens', None)
+        data.pop('reading_histories', None)
+        data.pop('follows', None)
     
     json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     buf = io.BytesIO(json_bytes)
@@ -3321,6 +3353,16 @@ def hears_analytics():
             DailyListen.part_number == 0
         ).scalar() or 0
 
+        total_female = db.session.query(func.sum(DailyListen.listens_female)).filter(
+            DailyListen.story_id == story.id,
+            DailyListen.part_number == 0
+        ).scalar() or 0
+
+        total_male = db.session.query(func.sum(DailyListen.listens_male)).filter(
+            DailyListen.story_id == story.id,
+            DailyListen.part_number == 0
+        ).scalar() or 0
+
         prev_start = start_date - timedelta(days=7)
         prev_listens = DailyListen.query.filter(
             DailyListen.story_id == story.id,
@@ -3336,10 +3378,12 @@ def hears_analytics():
             'total_week': total_week,
             'total_desktop': total_desktop,
             'total_mobile': total_mobile,
-            'total_listens_alltime': total_listens_alltime,  # <- thêm dòng này
+            'total_listens_alltime': total_listens_alltime,
+            'listens_female': total_female,
+            'listens_male': total_male,
             'change_pct': change_pct,
             'created_at': story.created_at,
-            'part_stats': part_stats,  # thêm dòng này
+            'part_stats': part_stats,
         })
 
     sort = request.args.get('sort', 'week')

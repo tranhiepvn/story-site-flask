@@ -3,20 +3,45 @@
 
 {% block content %}
 <style>
+  /* Triệt tiêu mọi giới hạn chiều rộng */
+  .container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+  .container .content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
   .sidebar, aside.sidebar { display: none !important; }
-  .content-wrapper, main { margin-left: 0 !important; width: 100% !important; }
-  .table-wrapper { overflow-x: auto; }
+  .content-wrapper, main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+    padding: 0 5px;
+    box-sizing: border-box;
+  }
   table {
     width: 100%;
     border-collapse: collapse;
     background: #1C1C1C;
     color: #FFFFFF;
-    table-layout: fixed;
+    table-layout: auto;
   }
   th, td {
-    padding: 12px 8px;
+    padding: 10px 6px;
     border-bottom: 1px solid #333;
     text-align: center;
+    white-space: nowrap;
   }
   th {
     background: #4A90E2;
@@ -24,23 +49,24 @@
   }
   td.col-name {
     text-align: left;
+    white-space: normal;
+    min-width: 150px;
   }
-  td.col-name a { color: #00BFFF; }
-  .col-stt { width: 60px; }
-  /* Mở rộng cột tên truyện để badge không xuống dòng */
-  .col-name {
-    width: auto !important;
-    min-width: 280px !important;
-    white-space: normal;  /* tên truyện vẫn xuống dòng nếu dài */
+  td.col-name a {
+    color: #00BFFF;
   }
+  .col-stt { width: 50px; }
+  .col-total, .col-week, .col-desktop, .col-mobile, .col-gender {
+    min-width: 70px;
+  }
+  .col-day { min-width: 55px; }
+  .col-change { min-width: 80px; }
+  .col-trend { min-width: 60px; }
+
   .part-badge {
     white-space: nowrap !important;
     display: inline-block !important;
   }
-  .col-total, .col-week, .col-desktop, .col-mobile { width: 80px; }
-  .col-day { width: 70px; }
-  .col-change { width: 100px; }
-  .col-trend { width: 80px; }
 
   td.col-total { color: #FF8C00; font-weight: bold; }
 
@@ -62,25 +88,26 @@
   .mobile-red { color: #FF4444 !important; }
   .zero { color: #FFFFFF; }
 
+  .gender-female { color: #FF69B4; font-weight: bold; }
+  .gender-male { color: #4A90E2; font-weight: bold; }
+
   .filter-buttons {
-    margin: 20px 0 30px 0;
+    margin: 15px 0 20px 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
+    padding: 0 10px;
   }
   .filter-btn {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 4px;
     text-decoration: none;
     display: inline-block;
-  }
-  .filter-btn {
     background: #555;
     color: white;
   }
   .filter-btn.active {
     background: #4A90E2;
-    color: white;
   }
   body.light-mode .filter-btn {
     background: #e0e0e0;
@@ -122,12 +149,15 @@
   body.light-mode .zero {
     color: #1a1a1a !important;
   }
-  body.light-mode .pagination a {
-    background: #e0e0e0;
-    color: #0056b3;
+  body.light-mode .gender-female { color: #c71585; }
+  body.light-mode .gender-male { color: #0056b3; }
+
+  h2, p {
+    padding: 0 10px;
   }
-  body.light-mode .pagination a:hover {
-    background: #ccc;
+  /* Triệt tiêu margin thừa từ layout */
+  .container, .content-wrapper, main {
+    margin: 0 !important;
   }
 </style>
 
@@ -141,7 +171,7 @@
   <a href="{{ url_for('hears_analytics', sort='created') }}" class="filter-btn {% if request.args.get('sort') == 'created' %}active{% endif %}">🆕 Ngày tạo mới nhất</a>
 </div>
 
-<div style="margin: 15px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+<div style="margin: 15px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 10px;">
   <span>🔘 Hiển thị chi tiết phần:</span>
   <a href="{{ url_for('hears_analytics', sort=request.args.get('sort', 'week'), show_parts='1') }}" 
      class="filter-btn {% if show_parts == '1' %}active{% endif %}"
@@ -163,6 +193,7 @@
         <th class="col-name">Tên truyện</th>
         <th class="col-total">Tổng nghe</th>
         <th class="col-week">Tổng 7 ngày</th>
+        <th class="col-gender">Nữ/Nam</th>
         <th class="col-desktop">Desktop</th>
         <th class="col-mobile">Mobile</th>
         {% for d in dates %}
@@ -176,7 +207,6 @@
       {% for item in story_data %}
       <tr>
         <td class="col-stt">{{ loop.index }}</td>
-
         <td class="col-name">
             <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
             {% if show_parts == '1' and item.part_stats %}
@@ -195,6 +225,13 @@
 
         <td class="col-total">{{ item.total_listens_alltime }}</td>
         <td class="col-week" style="color:#32CD32; font-weight:bold;">{{ item.total_week }}</td>
+
+        <!-- Cột Nữ/Nam -->
+        <td class="col-gender">
+          <span class="gender-female">{{ item.listens_female|default(0) }}</span> /
+          <span class="gender-male">{{ item.listens_male|default(0) }}</span>
+        </td>
+
         <td class="col-desktop {% if item.total_desktop > 0 %}pink{% else %}zero{% endif %}">{{ item.total_desktop }}</td>
         <td class="col-mobile {% if item.total_mobile > 0 %}red{% else %}zero{% endif %}">{{ item.total_mobile }}</td>
         {% for d in dates %}
