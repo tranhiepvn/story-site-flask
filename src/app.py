@@ -119,26 +119,96 @@ def parse_datetime(value):
     return datetime.utcnow()
 
 def simple_markdown_to_html(text: str) -> str:
-    """Chuyển đổi inline Markdown (đậm, nghiêng, gạch ngang, gạch dưới) sang HTML.
-    Không xử lý block (danh sách, heading) để giữ nguyên xuống dòng và không phá vỡ cấu trúc highlight.
     """
-    # Đậm nghiêng
-    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text, flags=re.DOTALL)
-    # Đậm
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
-    # Nghiêng
-    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text, flags=re.DOTALL)
-    # Gạch ngang
-    text = re.sub(r'\~\~(.+?)\~\~', r'<del>\1</del>', text, flags=re.DOTALL)
-    # Gạch dưới
-    text = re.sub(r'__(.+?)__', r'<u>\1</u>', text, flags=re.DOTALL)
-    return text
+    Chuyển đổi inline Markdown (đậm, nghiêng, gạch ngang, gạch dưới) sang HTML.
+    Xử lý từng dòng riêng lẻ để tránh lỗi tràn dòng.
+    """
+    lines = text.split('\n')
+    processed_lines = []
+    for line in lines:
+        # Đậm nghiêng
+        line = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', line)
+        # Đậm
+        line = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', line)
+        # Nghiêng - chỉ match nếu có cặp đóng trên cùng dòng
+        line = re.sub(r'\*(.+?)\*', r'<em>\1</em>', line)
+        # Gạch ngang
+        line = re.sub(r'\~\~(.+?)\~\~', r'<del>\1</del>', line)
+        # Gạch dưới
+        line = re.sub(r'__(.+?)__', r'<u>\1</u>', line)
+        processed_lines.append(line)
+    return '\n'.join(processed_lines)
+
+def process_markdown_tables(text: str) -> str:
+    """
+    Chuyển đổi bảng Markdown (có dòng phân cách `|---|---|`) thành HTML table.
+    Ví dụ:
+    | Người | Ham muốn |
+    |-------|----------|
+    | Minh  | ...      |
+    """
+    lines = text.split('\n')
+    result = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Phát hiện dòng bắt đầu và kết thúc bằng '|' (bảng)
+        if line.strip().startswith('|') and line.strip().endswith('|'):
+            # Lấy tất cả các dòng của bảng
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith('|') and lines[i].strip().endswith('|'):
+                table_lines.append(lines[i].strip())
+                i += 1
+            # Parse bảng
+            html_table = _parse_markdown_table(table_lines)
+            result.append(html_table)
+        else:
+            result.append(line)
+            i += 1
+    return '\n'.join(result)
+
+def _parse_markdown_table(table_lines: list) -> str:
+    """Parse các dòng bảng Markdown thành HTML."""
+    if len(table_lines) < 2:
+        return '\n'.join(table_lines)  # không đủ dòng, giữ nguyên
+    
+    # Tách các cột từ dòng header
+    headers = [cell.strip() for cell in table_lines[0].split('|')[1:-1]]
+    
+    # Kiểm tra dòng phân cách (dòng thứ 2 phải có dấu gạch ngang)
+    # Nếu không có, coi như bảng không hợp lệ
+    if len(table_lines) >= 2 and '---' in table_lines[1]:
+        # Bỏ qua dòng phân cách
+        data_lines = table_lines[2:]
+    else:
+        data_lines = table_lines[1:]  # nếu không có phân cách, coi dòng thứ 2 là dữ liệu
+    
+    # Xây dựng HTML table
+    html = '<table class="markdown-table">'
+    # Header
+    html += '<thead><tr>'
+    for h in headers:
+        html += f'<th>{h}</th>'
+    html += '</tr></thead>'
+    
+    # Body
+    html += '<tbody>'
+    for line in data_lines:
+        cells = [cell.strip() for cell in line.split('|')[1:-1]]
+        if len(cells) == len(headers):
+            html += '<tr>'
+            for c in cells:
+                html += f'<td>{c}</td>'
+            html += '</tr>'
+    html += '</tbody></table>'
+    
+    return html
 
 # ====================== HÀM DỌN DẸP + TÁCH PHẦN (theo script anh đưa) ======================
 def clean_line(line: str) -> str:
     line = line.rstrip('\n')
     # Xóa các dấu # ở đầu dòng (nếu có)
-    line = re.sub(r'^#+\s*', '', line)
+    #line = re.sub(r'^#+\s*', '', line)
 
     # KHÔNG xử lý dấu * nữa, giữ nguyên cho Markdown (nghiêng, đậm, ...)
     # Đoạn cũ xóa * đã được bỏ qua
@@ -160,7 +230,7 @@ def clean_line(line: str) -> str:
     line = line.replace("địt", "đụ").replace("Địt", "Đụ")
 
     # Dọn dẹp một số trường hợp dấu ngoặc kép thừa
-    line = line.replace('"*', '"')
+    #line = line.replace('"*', '"')
     line = line.replace('""', '"')
 
     return line
@@ -1260,13 +1330,31 @@ def story_detail(story_id: int):
 
     chapter_title = chapter_title.strip()
 
+    # --- XỬ LÝ HEADING ## ---
+    def process_headings(text):
+        lines = text.split('\n')
+        processed = []
+        for line in lines:
+            stripped = line.lstrip()
+            if stripped.startswith('## '):
+                # Lấy nội dung sau '## '
+                content = stripped[3:].strip()
+                processed.append(f'<div class="story-heading">{content}</div>')
+            else:
+                processed.append(line)
+        return '\n'.join(processed)
+
+
     # ===== BƯỚC 1: XỬ LÝ @...@ TRƯỚC =====
 
     # ===== BƯỚC 2: HIGHLIGHT KHÁC =====
     chapter_body = re.sub(r'("(.*?)")', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
-    chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)
-    
+    chapter_body = re.sub(r"('(.*?)')", r'<span class="highlight-red">\1</span>', chapter_body, flags=re.DOTALL)    
     chapter_body = re.sub(r'~(.*?)~', r'<span class="highlight-green">\1</span>', chapter_body, flags=re.DOTALL)
+
+    chapter_body = process_markdown_tables(chapter_body)
+
+    chapter_body = process_headings(chapter_body)
 
     # ===== BƯỚC 3: MARKDOWN =====
     chapter_body = simple_markdown_to_html(chapter_body)
