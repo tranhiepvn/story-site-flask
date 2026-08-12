@@ -48,6 +48,33 @@ from sqlalchemy import func, text, extract
 from sqlalchemy.exc import IntegrityError
 from datetime import date as date_type
 
+def process_bulk_categories(bulk_text: str, existing_category_ids: set) -> list:
+    """
+    Nhận chuỗi bulk categories (mỗi dòng một tên), tạo các thể loại chưa có,
+    trả về danh sách id của tất cả thể loại (cả từ bulk và existing).
+    Bỏ qua dòng trống và khoảng trắng đầu cuối.
+    """
+    if not bulk_text:
+        return list(existing_category_ids)
+    
+    # Tách các dòng, loại bỏ khoảng trắng đầu cuối, bỏ dòng trống
+    names = [line.strip() for line in bulk_text.splitlines() if line.strip()]
+    if not names:
+        return list(existing_category_ids)
+    
+    all_ids = set(existing_category_ids)
+    
+    for name in names:
+        category = Category.query.filter(func.lower(Category.name) == func.lower(name)).first()
+        if not category:
+            category = Category(name=name)
+            db.session.add(category)
+            db.session.flush()
+        all_ids.add(category.id)
+    
+    db.session.commit()
+    return list(all_ids)
+    
 def get_voice_suffix(voice):
     if 'NamMinh' in voice:
         return '_male'
@@ -1825,9 +1852,15 @@ def upload():
                 story.author = request.form.get("author", "").strip()
                 story.story_type = request.form.get("story_type", "short")
                 story.is_completed = bool(request.form.get("is_completed"))
-                cat_ids = [int(x) for x in request.form.getlist("category_ids") if x]
-                story.categories = Category.query.filter(Category.id.in_(cat_ids)).all() if cat_ids else []
-                story.category_id = cat_ids[0] if cat_ids else None
+                
+                # ===== XỬ LÝ CATEGORIES TỪ CHECKBOX + BULK =====
+                bulk_text = request.form.get('bulk_categories', '').strip()
+                cat_ids_from_checkboxes = [int(x) for x in request.form.getlist("category_ids") if x]
+                all_category_ids = process_bulk_categories(bulk_text, set(cat_ids_from_checkboxes))
+                
+                story.categories = Category.query.filter(Category.id.in_(all_category_ids)).all()
+                story.category_id = all_category_ids[0] if all_category_ids else None
+                
                 db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
 
@@ -1909,14 +1942,13 @@ def upload():
             db.session.add(story)
             db.session.flush()  # Lấy ID nhưng chưa commit
 
-            # Xử lý thể loại
-            cat_ids = [int(x) for x in request.form.getlist("category_ids") if x]
-            if cat_ids:
-                story.categories = Category.query.filter(Category.id.in_(cat_ids)).all()
-                story.category_id = cat_ids[0]
-            else:
-                story.categories = []
-                story.category_id = None
+            # ===== XỬ LÝ CATEGORIES TỪ CHECKBOX + BULK =====
+            bulk_text = request.form.get('bulk_categories', '').strip()
+            cat_ids_from_checkboxes = [int(x) for x in request.form.getlist("category_ids") if x]
+            all_category_ids = process_bulk_categories(bulk_text, set(cat_ids_from_checkboxes))
+            
+            story.categories = Category.query.filter(Category.id.in_(all_category_ids)).all()
+            story.category_id = all_category_ids[0] if all_category_ids else None
 
             db.session.commit()  # Lưu story cùng categories
 
@@ -1968,7 +2000,7 @@ def upload():
             edit_part=edit_part_obj,
             error_update=None,
             all_authors=all_authors,
-            audio_count=audio_count,  # thêm dòng này
+            audio_count=audio_count,
         )
 
     return render_template(
