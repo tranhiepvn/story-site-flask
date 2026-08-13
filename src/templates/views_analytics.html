@@ -67,6 +67,30 @@
     white-space: nowrap !important;
     display: inline-block !important;
   }
+  .part-stats {
+    margin-top: 6px;
+  }
+  .toggle-parts-btn {
+    background: #555;
+    color: #fff;
+    border: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    margin-left: 6px;
+    transition: background 0.2s;
+  }
+  .toggle-parts-btn:hover {
+    background: #777;
+  }
+  body.light-mode .toggle-parts-btn {
+    background: #ccc;
+    color: #000;
+  }
+  body.light-mode .toggle-parts-btn:hover {
+    background: #aaa;
+  }
 
   td.col-total { color: #FF8C00; font-weight: bold; }
 
@@ -150,7 +174,6 @@
   h2, p {
     padding: 0 10px;
   }
-  /* Triệt tiêu margin thừa từ layout */
   .container, .content-wrapper, main {
     margin: 0 !important;
   }
@@ -167,7 +190,7 @@
 </div>
 
 <div style="margin: 15px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 10px;">
-  <span>🔘 Hiển thị chi tiết phần:</span>
+  <span>🔘 Hiển thị chi tiết phần (toàn bộ):</span>
   <a href="{{ url_for('views_analytics', sort=request.args.get('sort', 'week'), show_parts='1') }}" 
      class="filter-btn {% if show_parts == '1' %}active{% endif %}"
      style="padding: 4px 12px; text-decoration: none; border-radius: 4px;">
@@ -202,19 +225,26 @@
       <tr data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
         <td class="col-stt">{{ loop.index }}</td>
         <td class="col-name" data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
-            <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
-            {% if show_parts == '1' and item.part_stats %}
-                <div class="part-stats">
-                    {% for part_num, total in item.part_stats %}
-                        <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
-                           class="part-badge" 
-                           style="text-decoration: none; display: inline-block; background: #333; padding: 2px 8px; border-radius: 12px; margin: 0 4px 4px 0; color: #eee; font-weight: normal;">
-                            <span class="part-num" style="color: #4A90E2; font-weight: bold;">Phần {{ part_num }}</span>
-                            <span class="part-count" style="color: #FF8C00;">({{ total }})</span>
-                        </a>
-                    {% endfor %}
-                </div>
-            {% endif %}
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+              <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
+              <button class="toggle-parts-btn" data-story-id="{{ item.story.id }}" data-target="parts-{{ item.story.id }}">
+                {% if show_parts == '1' %}✕ Đóng phần{% else %}📊 Phần{% endif %}
+              </button>
+            </div>
+            <div id="parts-{{ item.story.id }}" class="part-stats" style="{% if show_parts != '1' %}display: none;{% endif %}">
+              {% if item.part_stats %}
+                {% for part_num, total in item.part_stats %}
+                  <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
+                     class="part-badge" 
+                     style="text-decoration: none; display: inline-block; background: #333; padding: 2px 8px; border-radius: 12px; margin: 0 4px 4px 0; color: #eee; font-weight: normal;">
+                    <span class="part-num" style="color: #4A90E2; font-weight: bold;">Phần {{ part_num }}</span>
+                    <span class="part-count" style="color: #FF8C00;">({{ total }})</span>
+                  </a>
+                {% endfor %}
+              {% else %}
+                <span style="color: #888; font-size: 0.85rem;">Không có dữ liệu phần</span>
+              {% endif %}
+            </div>
         </td>
 
         <td class="col-total">{{ item.story.views }}</td>
@@ -253,10 +283,29 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Cache để tránh gọi API nhiều lần
+    // ===== TOGGLE PART STATS CHO TỪNG TRUYỆN =====
+    document.querySelectorAll('.toggle-parts-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // ngăn sự kiện lan ra
+            const storyId = this.dataset.storyId;
+            const targetId = this.dataset.target;
+            const partsContainer = document.getElementById(targetId);
+            if (!partsContainer) return;
+            
+            const isHidden = partsContainer.style.display === 'none';
+            if (isHidden) {
+                partsContainer.style.display = 'block';
+                this.textContent = '✕ Đóng phần';
+            } else {
+                partsContainer.style.display = 'none';
+                this.textContent = '📊 Phần';
+            }
+        });
+    });
+
+    // ===== TOOLTIP QUỐC GIA (giữ nguyên) =====
     const cache = {};
 
-    // Tạo tooltip element
     const tooltip = document.createElement('div');
     tooltip.id = 'country-tooltip';
     tooltip.style.cssText = `
@@ -277,20 +326,18 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.body.appendChild(tooltip);
 
-    // Hàm hiển thị tooltip
     function showTooltip(e, storyId, storyTitle, type) {
         const key = `${storyId}_${type}`;
         if (cache[key]) {
-            renderTooltip(e, cache[key], storyTitle);
+            renderTooltip(e, cache[key], storyTitle, type);
             return;
         }
 
-        // Gọi API
         fetch(`/api/story_countries/${storyId}?type=${type}`)
             .then(res => res.json())
             .then(data => {
                 cache[key] = data;
-                renderTooltip(e, data, storyTitle);
+                renderTooltip(e, data, storyTitle, type);
             })
             .catch(err => {
                 console.error('Lỗi lấy dữ liệu quốc gia:', err);
@@ -299,12 +346,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function renderTooltip(e, data, storyTitle) {
+    function renderTooltip(e, data, storyTitle, type) {
+        const label = type === 'listens' ? 'nghe' : 'xem';
         let html = `<div style="font-weight:bold; font-size:1rem; margin-bottom:6px; color:#4A90E2;">${storyTitle}</div>`;
         if (!data || data.length === 0) {
-            html += '<span style="color: #888;">Chưa có dữ liệu quốc gia</span>';
+            html += `<span style="color: #888;">Chưa có dữ liệu quốc gia đã ${label}</span>`;
         } else {
-            html += '<div style="font-weight:bold; margin-bottom:4px;">Top quốc gia đã đọc:</div>';
+            html += `<div style="font-weight:bold; margin-bottom:4px;">Top quốc gia đã ${label}:</div>`;
             data.forEach(item => {
                 html += `<div style="display:flex; justify-content:space-between; gap:20px;">
                             <span>${item.country || 'Unknown'}</span>
@@ -314,7 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         tooltip.innerHTML = html;
 
-        // Đặt vị trí tooltip
         let left = e.clientX + 15;
         let top = e.clientY - 10;
         if (left + 320 > window.innerWidth) left = e.clientX - 320;
@@ -325,21 +372,18 @@ document.addEventListener('DOMContentLoaded', function() {
         tooltip.style.display = 'block';
     }
 
-    // Xác định loại thống kê
     const isHears = window.location.pathname.includes('/admin/hears');
     const type = isHears ? 'listens' : 'views';
 
-    // Gắn sự kiện cho tất cả phần tử có data-story-id (tr và td.col-name)
     document.querySelectorAll('[data-story-id]').forEach(el => {
         const storyId = el.dataset.storyId;
         const storyTitle = el.dataset.storyTitle || '';
         if (!storyId) return;
 
-        const handler = function(e) {
+        el.addEventListener('mouseenter', function(e) {
             showTooltip(e, storyId, storyTitle, type);
-        };
+        });
 
-        el.addEventListener('mouseenter', handler);
         el.addEventListener('mousemove', function(e) {
             const rect = tooltip.getBoundingClientRect();
             let left = e.clientX + 15;

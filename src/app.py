@@ -74,7 +74,7 @@ def process_bulk_categories(bulk_text: str, existing_category_ids: set) -> list:
     
     db.session.commit()
     return list(all_ids)
-    
+
 def get_voice_suffix(voice):
     if 'NamMinh' in voice:
         return '_male'
@@ -3378,7 +3378,7 @@ def views_analytics():
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
 
-    show_parts = request.args.get('show_parts', '1')  # mặc định là hiển thị
+    show_parts = request.args.get('show_parts', '0')  # mặc định là hiển thị
 
     end_date = date.today()
     start_date = end_date - timedelta(days=6)
@@ -3457,7 +3457,7 @@ def hears_analytics():
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
 
-    show_parts = request.args.get('show_parts', '1')  # mặc định là hiển thị
+    show_parts = request.args.get('show_parts', '0')  # mặc định là hiển thị
 
     end_date = date.today()
     start_date = end_date - timedelta(days=6)
