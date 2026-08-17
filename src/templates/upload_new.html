@@ -2,6 +2,9 @@
 {% block title %}Quản trị truyện{% endblock %}
 {% block content %}
 <h2>Quản trị truyện</h2>
+<p style="margin-top: -5px; font-size: 1.2rem; color: #aaa;">
+  Tổng số truyện: <strong style="color: #00BFFF;">{{ total_stories }}</strong>
+</p>
 
 {% set show_comments, commented_stories = get_comment_notifications() %}
 {% if show_comments and commented_stories %}

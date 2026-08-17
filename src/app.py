@@ -1982,6 +1982,9 @@ def upload():
 
     # === PHẦN GET - hiển thị form ===
     story_id = request.args.get("story_id")
+    
+    total_stories = Story.query.count()
+
     if story_id:
         story = Story.query.get_or_404(int(story_id))
         parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
@@ -2001,6 +2004,7 @@ def upload():
             error_update=None,
             all_authors=all_authors,
             audio_count=audio_count,
+            total_stories=total_stories,
         )
 
     return render_template(
@@ -2018,6 +2022,7 @@ def upload():
         filter_date_to=filter_date_to,
         all_categories=all_categories,
         all_authors=all_authors,
+        total_stories=total_stories,
     )
 
 @app.route("/admin/dashboard")

@@ -2,6 +2,9 @@
 {% block title %}Chỉnh sửa truyện{% endblock %}
 {% block content %}
 <h2>Chỉnh sửa truyện</h2>
+<p style="margin-top: -5px; font-size: 1.2rem; color: #aaa;">
+  Tổng số truyện: <strong style="color: #00BFFF;">{{ total_stories }}</strong>
+</p>
 
 {% if error %}
   <p class="error">{{ error }}</p>
