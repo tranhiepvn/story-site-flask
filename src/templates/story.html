@@ -38,9 +38,16 @@
   {% if story.categories %}
   <p class="meta">
     Thể loại:
-    {% for cat in story.categories %}
-      <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
-    {% endfor %}
+    <span class="category-items">
+      {% for cat in story.categories %}
+        <span class="category-item">
+          <a href="{{ url_for('category_view', category_id=cat.id) }}">{{ cat.name }}</a>{% if not loop.last %}, {% endif %}
+        </span>
+      {% endfor %}
+    </span>
+    {% if story.categories|length > 5 %}
+      <button class="category-toggle-btn" style="background:none; border:none; color:#00BFFF; cursor:pointer; font-size:0.9rem;">… xem thêm</button>
+    {% endif %}
   </p>
   {% endif %}
 

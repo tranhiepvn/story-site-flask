@@ -578,6 +578,25 @@
     body.light-mode .special-cat-link {
         color: #0056b3 !important;
     }
+
+
+    .category-toggle-btn {
+        background: none;
+        border: none;
+        color: #00BFFF;
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 0 4px;
+    }
+    .category-toggle-btn:hover {
+        text-decoration: underline;
+    }
+    body.light-mode .category-toggle-btn {
+        color: #0056b3;
+    }
+    .category-item {
+        display: inline;
+    }
   </style>
 </head>
 <body class="{{ request.endpoint }}">
@@ -841,6 +860,34 @@
       footerDiv.style.setProperty('color', randomColor, 'important');
     }
   });
+    // === HIỂN THỊ THU GỌN THỂ LOẠI ===
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.category-toggle-btn').forEach(function(btn) {
+            const container = btn.previousElementSibling; // .category-items
+            if (!container || !container.classList.contains('category-items')) return;
+            
+            const items = container.querySelectorAll('.category-item');
+            const total = items.length;
+            if (total <= 5) return;
+            
+            // Ẩn các thể loại từ vị trí thứ 6 trở đi
+            items.forEach(function(item, index) {
+                if (index >= 5) {
+                    item.style.display = 'none';
+                }
+            });
+            
+            btn.addEventListener('click', function() {
+                const isExpanded = this.textContent.includes('thu gọn');
+                items.forEach(function(item, index) {
+                    if (index >= 5) {
+                        item.style.display = isExpanded ? 'none' : 'inline';
+                    }
+                });
+                this.textContent = isExpanded ? '… xem thêm' : 'thu gọn';
+            });
+        });
+    });
 </script>
 </body>
 </html>
