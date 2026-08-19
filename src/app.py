@@ -4297,7 +4297,10 @@ def log_visit():
         request.path.startswith('/upload_login') or
         request.path.startswith('/set_theme') or
         request.path == '/favicon.ico' or
-        request.path == '/robots.txt'):
+        request.path == '/robots.txt' or
+        request.path.startswith('/.well-known') or 
+        request.path.startswith('/my_follows') or
+        request.path.startswith('/wp-json')):
         return
 
     if request.method != 'GET':
