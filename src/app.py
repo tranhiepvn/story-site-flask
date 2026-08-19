@@ -4581,11 +4581,12 @@ def admin_analytics():
         VisitLog.path.notlike('/api%'),                # loại bỏ api
         VisitLog.path.notlike('/static%'),             # loại bỏ static
         VisitLog.path.notlike('/favicon.ico'),         # loại bỏ favicon
+        VisitLog.path.notlike('/'),         
         VisitLog.path.notlike('/robots.txt'),          # loại bỏ robots
         VisitLog.path.notlike('/my_follows%'),
         VisitLog.path.notlike('/.well-known%'),        
         VisitLog.path.notlike('/wp-json%')             
-    ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+    ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(15).all()
 
     # Lấy top 3 quốc gia cho mỗi path trong top 10
     top_countries_per_path = {}
