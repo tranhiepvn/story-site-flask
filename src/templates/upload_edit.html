@@ -194,15 +194,38 @@
   </div>
 </form>
 
-<h3>Xoá phần cuối</h3>
-<form method="post" onsubmit="return confirm('Bạn có chắc muốn xoá phần cuối không?');">
+<h3>Xoá phần từ vị trí chọn đến hết</h3>
+<form method="post" onsubmit="return confirmDeleteParts();">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
+  
   <div class="form-group">
-    <label for="password3">Password:</label><br>
-    <input type="password" id="password3" name="password" required>
+    <label for="delete_from_part">Xoá từ phần:</label>
+    <select id="delete_from_part" name="delete_from_part" required>
+      {% for p in parts %}
+        <option value="{{ p.part_number }}">Phần {{ p.part_number }}</option>
+      {% endfor %}
+    </select>
+    <span style="font-style:italic; color:#888; margin-left:8px;">
+      (chọn <strong>1</strong> để xoá toàn bộ truyện)
+    </span>
   </div>
+  
   <div class="form-group">
-    <button type="submit" name="action" value="delete_last">Xoá phần cuối</button>
+    <label for="password_delete_parts">Password:</label><br>
+    <input type="password" id="password_delete_parts" name="password" required>
+  </div>
+  
+  <div class="form-group">
+    <label>
+      <input type="checkbox" name="confirm_delete_parts" required>
+      Tôi xác nhận muốn xoá các phần đã chọn
+    </label>
+  </div>
+  
+  <div class="form-group">
+    <button type="submit" name="action" value="delete_parts" style="background: #FF8C00; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+      Xoá các phần
+    </button>
   </div>
 </form>
 
@@ -260,6 +283,7 @@
   ⚠️ Bạn đang yêu cầu xóa truyện này. Vui lòng nhập mật khẩu và xác nhận bên dưới.
 </div>
 {% endif %}
+
 <h3>Xoá truyện</h3>
 <form method="post" onsubmit="return confirmDelete();">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
@@ -331,6 +355,28 @@ function confirmDelete() {
     return false;
   }
   return confirm('Bạn có chắc muốn xoá truyện này vĩnh viễn không?');
+}
+
+function confirmDeleteParts() {
+  var from = document.getElementById('delete_from_part').value;
+  var total = {{ parts|length }};
+  var password = document.getElementById('password_delete_parts').value;
+  var confirmCheck = document.querySelector('input[name="confirm_delete_parts"]').checked;
+  
+  if (!password) {
+    alert('Vui lòng nhập mật khẩu.');
+    return false;
+  }
+  if (!confirmCheck) {
+    alert('Bạn phải xác nhận bằng cách check vào ô "Tôi xác nhận..."');
+    return false;
+  }
+  
+  if (from == 1) {
+    return confirm('⚠️ Bạn có chắc muốn xoá TOÀN BỘ truyện này? Hành động này không thể hoàn tác!');
+  } else {
+    return confirm('Bạn có chắc muốn xoá các phần từ ' + from + ' đến ' + total + '?');
+  }
 }
 </script>
 

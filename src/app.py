@@ -1864,11 +1864,66 @@ def upload():
                 db.session.commit()
                 return redirect(url_for("upload", story_id=story.id))
 
-            elif action == "delete_last":
-                last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
-                if last_part:
-                    db.session.delete(last_part)
+            elif action == "delete_parts":
+                from_part = request.form.get("delete_from_part", type=int)
+                if not from_part or from_part < 1:
+                    flash("Vui lòng chọn phần bắt đầu xoá.", "error")
+                    return redirect(url_for("upload", story_id=story.id))
+                
+                # Lấy tất cả phần từ from_part trở đi
+                parts_to_delete = Part.query.filter(
+                    Part.story_id == story.id,
+                    Part.part_number >= from_part
+                ).order_by(Part.part_number.asc()).all()
+                
+                if not parts_to_delete:
+                    flash("Không có phần nào để xoá.", "error")
+                    return redirect(url_for("upload", story_id=story.id))
+                
+                if from_part == 1:
+                    # Xoá toàn bộ truyện (đã xác nhận)
+                    try:
+                        # 1. Xóa các bảng có khóa ngoại
+                        Comment.query.filter_by(story_id=story.id).delete()
+                        Follow.query.filter_by(story_id=story.id).delete()
+                        ReadingHistory.query.filter_by(story_id=story.id).delete()
+                        DailyView.query.filter_by(story_id=story.id).delete()
+                        DailyListen.query.filter_by(story_id=story.id).delete()
+                        
+                        # 2. Xóa video của các phần
+                        for part in story.parts:
+                            PartVideo.query.filter_by(part_id=part.id).delete()
+                        
+                        # 3. Xóa các phần
+                        Part.query.filter_by(story_id=story.id).delete()
+                        
+                        # 4. Xóa liên kết thể loại
+                        story.categories = []
+                        
+                        # 5. Xóa truyện
+                        db.session.delete(story)
+                        db.session.commit()
+                        flash(f"Đã xoá toàn bộ truyện '{story.title}'.", "success")
+                    except Exception as e:
+                        db.session.rollback()
+                        flash(f"Lỗi khi xoá truyện: {str(e)}", "error")
+                    return redirect(url_for("upload"))
+                else:
+                    # Xoá các phần từ from_part đến hết
+                    count = len(parts_to_delete)
+                    
+                    # Xoá video của các phần này
+                    for part in parts_to_delete:
+                        PartVideo.query.filter_by(part_id=part.id).delete()
+                    
+                    # Xoá các phần
+                    Part.query.filter(
+                        Part.story_id == story.id,
+                        Part.part_number >= from_part
+                    ).delete(synchronize_session=False)
+                    
                     db.session.commit()
+                    flash(f"Đã xoá {count} phần từ phần {from_part} đến hết.", "success")
                 return redirect(url_for("upload", story_id=story.id))
 
             elif action == "toggle_hidden":
