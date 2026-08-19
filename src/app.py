@@ -4576,7 +4576,15 @@ def admin_analytics():
         VisitLog.created_at >= start_date,
         VisitLog.created_at < next_day,
         VisitLog.path.notlike('/set_theme%'),
-        VisitLog.path.notlike('/upload%')
+        VisitLog.path.notlike('/upload%'),
+        VisitLog.path.notlike('/admin%'),              # loại bỏ các path admin
+        VisitLog.path.notlike('/api%'),                # loại bỏ api
+        VisitLog.path.notlike('/static%'),             # loại bỏ static
+        VisitLog.path.notlike('/favicon.ico'),         # loại bỏ favicon
+        VisitLog.path.notlike('/robots.txt'),          # loại bỏ robots
+        VisitLog.path.notlike('/my_follows%'),
+        VisitLog.path.notlike('/.well-known%'),        
+        VisitLog.path.notlike('/wp-json%')             
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(10).all()
 
     # Lấy top 3 quốc gia cho mỗi path trong top 10
