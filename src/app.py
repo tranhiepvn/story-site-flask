@@ -4304,7 +4304,10 @@ def log_visit():
         request.path.startswith('/.env') or                
         request.path.startswith('/wp-content') or          
         request.path.startswith('/fetch') or               
-        request.path.startswith('/this_is_a_new_hello_world')): 
+        request.path.startswith('/this_is_a_new_hello_world') or               
+        request.path.startswith('/apple') or               
+        request.path.startswith('/search')
+        ): 
         return
 
     if request.method != 'GET':
@@ -4593,7 +4596,9 @@ def admin_analytics():
         VisitLog.path.notlike('/.env%'),                  
         VisitLog.path.notlike('/wp-content%'),            
         VisitLog.path.notlike('/fetch%'),                 
-        VisitLog.path.notlike('/this_is_a_new_hello_world%')             
+        VisitLog.path.notlike('/this_is_a_new_hello_world%'),
+        VisitLog.path.notlike('/apple%'),
+        VisitLog.path.notlike('/search%')
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(15).all()
 
     # Lấy top 3 quốc gia cho mỗi path trong top 10
