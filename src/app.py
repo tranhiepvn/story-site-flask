@@ -4300,7 +4300,11 @@ def log_visit():
         request.path == '/robots.txt' or
         request.path.startswith('/.well-known') or 
         request.path.startswith('/my_follows') or
-        request.path.startswith('/wp-json')):
+        request.path.startswith('/wp-json') or
+        request.path.startswith('/.env') or                
+        request.path.startswith('/wp-content') or          
+        request.path.startswith('/fetch') or               
+        request.path.startswith('/this_is_a_new_hello_world')): 
         return
 
     if request.method != 'GET':
@@ -4585,7 +4589,11 @@ def admin_analytics():
         VisitLog.path.notlike('/robots.txt'),          # loại bỏ robots
         VisitLog.path.notlike('/my_follows%'),
         VisitLog.path.notlike('/.well-known%'),        
-        VisitLog.path.notlike('/wp-json%')             
+        VisitLog.path.notlike('/wp-json%'),
+        VisitLog.path.notlike('/.env%'),                  
+        VisitLog.path.notlike('/wp-content%'),            
+        VisitLog.path.notlike('/fetch%'),                 
+        VisitLog.path.notlike('/this_is_a_new_hello_world%')             
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(15).all()
 
     # Lấy top 3 quốc gia cho mỗi path trong top 10
@@ -4644,11 +4652,12 @@ def admin_analytics():
         for path, items in temp_dict.items():
             top_countries_per_path[path] = items[:3]  # lấy 3 quốc gia đầu (đã sắp xếp giảm dần)
 
-    # Xử lý path để hiển thị tên truyện
+    # Xử lý path để hiển thị tên truyện/thể loại/type
     path_list = []
     for path, count in path_stats:
         display_name = path
         story_link = None
+        
         if path == '/':
             display_name = 'Trang chủ'
             story_link = url_for('index')
@@ -4663,6 +4672,34 @@ def admin_analytics():
                     display_name = f"Truyện #{story_id} (đã xóa)"
             except:
                 pass
+        elif path.startswith('/category/'):
+            try:
+                category_id = int(path.split('/')[2])
+                category = Category.query.get(category_id)
+                if category:
+                    display_name = f"Thể loại: {category.name}"
+                    story_link = url_for('category_view', category_id=category.id)
+                else:
+                    display_name = f"Thể loại #{category_id} (đã xóa)"
+            except:
+                pass
+        elif path.startswith('/type/long'):
+            display_name = 'Truyện Dài'
+            story_link = url_for('type_view', story_type='long')
+        elif path.startswith('/type/short'):
+            display_name = 'Truyện Ngắn'
+            story_link = url_for('type_view', story_type='short')
+        elif path.startswith('/author/'):
+            try:
+                author = path.split('/')[2]
+                if author:
+                    display_name = f"Tác giả: {author}"
+                    story_link = url_for('author_view', author=author)
+            except:
+                pass
+        # Nếu là các path lạ (.env, /wp-*...), giữ nguyên tên và không link
+        # Bạn có thể thêm các điều kiện lọc thêm tại đây
+        
         path_list.append({
             'path': path,
             'display_name': display_name,
