@@ -4294,6 +4294,7 @@ def log_visit():
     # Chỉ log các path cần thiết
     allowed_paths = (
         request.path.startswith('/story/') or
+        request.path.startswith('/author/') or
         request.path.startswith('/category/') or
         request.path.startswith('/type/') or
         request.path.startswith('/api/start_audio/')  # chỉ log start_audio, không log get_chunk
