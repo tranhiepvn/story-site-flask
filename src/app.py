@@ -4289,45 +4289,21 @@ def restart_server():
 
 @app.before_request
 def log_visit():
-    print(f"🔍 log_visit called for: {request.path}", flush=True)
+    print(f"🔍 log_visit called for: {request.path}, method: {request.method}", flush=True)
 
-    if (request.path.startswith('/static') or 
-        request.path.startswith('/admin') or 
-        request.path.startswith('/api') or
-        request.path.startswith('/upload_login') or
-        request.path.startswith('/set_theme') or
-        request.path == '/favicon.ico' or
-        request.path == '/robots.txt' or
-        request.path.startswith('/.well-known') or 
-        request.path.startswith('/my_follows') or
-        request.path.startswith('/wp-json') or
-        request.path.startswith('/.env') or                
-        request.path.startswith('/wp-content') or          
-        request.path.startswith('/fetch') or               
-        request.path.startswith('/this_is_a_new_hello_world') or               
-        request.path.startswith('/apple') or               
-        request.path.startswith('/search')
-        ): 
-        return
-
-    if request.method != 'GET':
+    # Chỉ log các path cần thiết
+    allowed_paths = (
+        request.path.startswith('/story/') or
+        request.path.startswith('/category/') or
+        request.path.startswith('/type/') or
+        request.path.startswith('/api/start_audio/')  # chỉ log start_audio, không log get_chunk
+    )
+    if not allowed_paths:
         return
 
     try:
         session_id = get_user_session_id()
-        today = date.today()
         theme = session.get('theme', 'dark')
-        
-        last_date = session.get('last_log_date')
-        last_theme = session.get('last_log_theme')
-        today_str = today.isoformat()
-        
-        if last_date == today_str and last_theme == theme:
-            print(f"⏭️ Already logged today with theme {theme}", flush=True)
-            return
-
-        session['last_log_date'] = today_str
-        session['last_log_theme'] = theme
 
         ua = request.headers.get('User-Agent', '').lower()
         device = 'mobile' if any(x in ua for x in ('mobile', 'android', 'iphone')) else \
@@ -4338,13 +4314,23 @@ def log_visit():
             ip = ip.split(',')[0].strip()
         geo = get_geo_info(ip)
 
-        # ===== XÁC ĐỊNH ACTION (view hoặc listen) =====
-        action = 'view'  # mặc định
-        # Nếu request path bắt đầu bằng /api/start_audio hoặc /api/get_chunk -> action = listen
-        if request.path.startswith('/api/start_audio') or request.path.startswith('/api/get_chunk'):
+        # Xác định action và path chuẩn
+        if request.path.startswith('/api/start_audio/'):
             action = 'listen'
-        # Hoặc có thể kiểm tra header/query string nếu cần
-        # Ví dụ: if request.args.get('action') == 'listen': action = 'listen'
+            # Lấy part_id và story_id để ghi path chuẩn
+            try:
+                part_id = int(request.path.split('/')[-1])
+                part = Part.query.get(part_id)
+                if part:
+                    path = f'/story/{part.story_id}/audio'
+                else:
+                    # Nếu không tìm thấy part, vẫn ghi path gốc nhưng không lọc được
+                    path = request.path[:500]
+            except:
+                path = request.path[:500]
+        else:
+            action = 'view'
+            path = request.path[:500]
 
         log = VisitLog(
             session_id=session_id,
@@ -4352,16 +4338,16 @@ def log_visit():
             ip_address=ip,
             device_type=device,
             theme=theme,
-            path=request.path[:500],
+            path=path,
             referrer=request.headers.get('Referer', '')[:500],
             country=geo['country'],
             city=geo['city'],
             timezone=geo['timezone'],
-            action=action  # <-- THÊM DÒNG NÀY
+            action=action
         )
         db.session.add(log)
         db.session.commit()
-        print(f"✅ Visit logged: session={session_id}, action={action}, theme={theme}, device={device}", flush=True)
+        print(f"✅ Visit logged: {path}, action={action}", flush=True)
     except Exception as e:
         print(f"❌ Error: {e}", flush=True)
         db.session.rollback()
