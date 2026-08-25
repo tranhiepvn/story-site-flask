@@ -4752,6 +4752,56 @@ def api_story_countries(story_id):
     result = [{'country': c, 'count': cnt} for c, cnt in top_countries]
     return jsonify(result)
 
+@app.route("/export_story_text/<int:story_id>", methods=["POST"])
+def export_story_text(story_id):
+    """Export nội dung truyện ra file .txt (có mật khẩu)"""
+    if not session.get("upload_authenticated"):
+        return redirect(url_for("upload_login"))
+    
+    UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "secret")
+    pw = request.form.get("password", "")
+    if pw != UPLOAD_PASSWORD:
+        flash("Mật khẩu không hợp lệ.")
+        return redirect(url_for("upload", story_id=story_id))
+    
+    story = Story.query.get_or_404(story_id)
+    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+    
+    # Tạo nội dung text
+    lines = []
+    lines.append(story.title)
+    lines.append("")  # dòng trống sau tên truyện
+    
+    for part in parts:
+        content = part.content
+        # Tách tiêu đề và nội dung (dòng đầu là tiêu đề)
+        if '\n' in content:
+            title, body = content.split('\n', 1)
+        else:
+            title = content
+            body = ""
+        lines.append(f"Phần {part.part_number}: {title.strip()}")
+        if body.strip():
+            lines.append(body.strip())
+        lines.append("")  # dòng trống ngăn cách
+    
+    # Bỏ dòng trống cuối cùng
+    if lines and lines[-1] == "":
+        lines.pop()
+    
+    text_content = "\n".join(lines)
+    
+    # Gửi file
+    from io import BytesIO
+    buf = BytesIO(text_content.encode('utf-8'))
+    filename = f"{story.title}.txt"
+    return send_file(
+        buf, 
+        as_attachment=True, 
+        download_name=filename, 
+        mimetype="text/plain"
+    )
+    
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
