@@ -307,7 +307,7 @@
     </thead>
     <tbody>
       {% for item in path_list %}
-      <tr style="border-bottom: 1px solid #333;">
+      <tr style="border-bottom: 1px solid #333;" data-path="{{ item.path }}">
         <td style="padding:6px 8px;">
           {% if item.link %}
             <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
@@ -332,17 +332,18 @@
   </table>
 </div>
 
+<!-- Tooltip cho Top 15 trang -->
+<div id="path-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // ===== BIỂU ĐỒ =====
   const canvas = document.getElementById('visitChart');
   const ctx = canvas.getContext('2d');
-  const tooltip = document.getElementById('chart-tooltip');
-
-  // Dữ liệu top quốc gia theo ngày từ view (phải được truyền từ app.py)
+  const chartTooltip = document.getElementById('chart-tooltip');
   const topCountries = {{ top_countries_by_date|tojson }};
 
-  // Tạo biểu đồ
   const chart = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -359,38 +360,27 @@ document.addEventListener('DOMContentLoaded', function() {
     options: {
       responsive: true,
       scales: {
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'Số phiên' }
-        }
+        y: { beginAtZero: true, title: { display: true, text: 'Số phiên' } }
       },
-      plugins: {
-        tooltip: {
-          enabled: false // Tắt tooltip mặc định
-        }
-      }
+      plugins: { tooltip: { enabled: false } }
     }
   });
 
-  // Sự kiện mousemove trên canvas
   canvas.addEventListener('mousemove', function(e) {
     const elements = chart.getElementsAtEventForMode(
       { clientX: e.clientX, clientY: e.clientY },
       'index',
       { intersect: true }
     );
-
     if (elements.length === 0) {
-      tooltip.style.display = 'none';
+      chartTooltip.style.display = 'none';
       return;
     }
-
     const idx = elements[0].index;
     const label = chart.data.labels[idx];
     const value = chart.data.datasets[0].data[idx];
     const countries = topCountries[label] || [];
 
-    // Xây dựng nội dung tooltip
     let html = `<div><strong>${label}</strong><br>Số phiên: <span style="color:#FF8C00;">${value}</span></div>`;
     if (countries.length > 0) {
       html += '<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px;"><strong>Top quốc gia:</strong>';
@@ -404,31 +394,78 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
     }
-    tooltip.innerHTML = html;
-    tooltip.style.display = 'block';
+    chartTooltip.innerHTML = html;
+    chartTooltip.style.display = 'block';
 
-    // Đặt vị trí tooltip ngay cạnh chuột
     let left = e.clientX + 15;
     let top = e.clientY - 10;
-
-    // Kiểm tra không tràn màn hình
-    const tooltipWidth = 350;
-    const tooltipHeight = 300;
-    if (left + tooltipWidth > window.innerWidth) left = e.clientX - tooltipWidth - 15;
-    if (top + tooltipHeight > window.innerHeight) top = window.innerHeight - tooltipHeight - 10;
+    if (left + 350 > window.innerWidth) left = e.clientX - 350 - 15;
+    if (top + 300 > window.innerHeight) top = window.innerHeight - 300 - 10;
     if (top < 10) top = 10;
     if (left < 10) left = 10;
-
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
+    chartTooltip.style.left = left + 'px';
+    chartTooltip.style.top = top + 'px';
   });
 
-  // Ẩn tooltip khi rời canvas
   canvas.addEventListener('mouseleave', function() {
-    tooltip.style.display = 'none';
+    chartTooltip.style.display = 'none';
   });
 
-  // Client time
+  // ===== TOOLTIP CHO TOP 15 TRANG =====
+  const pathTooltip = document.getElementById('path-tooltip');
+  const topCountriesPerPath = {{ top_countries_per_path|tojson }};
+  const pathRows = document.querySelectorAll('.path-container tbody tr');
+
+  pathRows.forEach(row => {
+    const path = row.dataset.path;
+    if (!path) return;
+    const countries = topCountriesPerPath[path] || [];
+    const nameCell = row.querySelector('td:first-child');
+    const countCell = row.querySelector('td:last-child');
+    if (!nameCell || !countCell) return;
+    const name = nameCell.textContent.trim();
+    const count = countCell.textContent.trim();
+
+    row.addEventListener('mouseenter', function(e) {
+      let html = `<div><strong>${name}</strong><br>Số lượt: <span style="color:#FF8C00;">${count}</span></div>`;
+      if (countries.length > 0) {
+        html += '<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px;"><strong>Top quốc gia:</strong>';
+        countries.forEach(item => {
+          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0;">
+                      <span>${item[0]}</span>
+                      <span style="color:#FF8C00;">${item[1]}</span>
+                    </div>`;
+        });
+        html += '</div>';
+      } else {
+        html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
+      }
+      pathTooltip.innerHTML = html;
+      pathTooltip.style.display = 'block';
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mousemove', function(e) {
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mouseleave', function() {
+      pathTooltip.style.display = 'none';
+    });
+
+    function positionTooltip(e) {
+      let left = e.clientX + 15;
+      let top = e.clientY - 10;
+      if (left + 350 > window.innerWidth) left = e.clientX - 350 - 15;
+      if (top + 300 > window.innerHeight) top = window.innerHeight - 300 - 10;
+      if (top < 10) top = 10;
+      if (left < 10) left = 10;
+      pathTooltip.style.left = left + 'px';
+      pathTooltip.style.top = top + 'px';
+    }
+  });
+
+  // ===== GIỜ TRÌNH DUYỆT =====
   function updateClientTime() {
     var now = new Date();
     document.getElementById('client-time').textContent = now.toLocaleTimeString('en-US', {
