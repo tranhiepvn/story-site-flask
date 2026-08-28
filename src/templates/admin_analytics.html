@@ -413,13 +413,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ===== TOOLTIP CHO TOP 15 TRANG =====
   const pathTooltip = document.getElementById('path-tooltip');
-  const topCountriesPerPath = {{ top_countries_per_path|tojson }};
+  const top15CountriesPerPath = {{ top_15_countries_per_path|tojson }};
   const pathRows = document.querySelectorAll('.path-container tbody tr');
 
   pathRows.forEach(row => {
     const path = row.dataset.path;
     if (!path) return;
-    const countries = topCountriesPerPath[path] || [];
+    const countries = top15CountriesPerPath[path] || [];
     const nameCell = row.querySelector('td:first-child');
     const countCell = row.querySelector('td:last-child');
     if (!nameCell || !countCell) return;

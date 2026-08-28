@@ -4588,7 +4588,8 @@ def admin_analytics():
         VisitLog.path.notlike('/search%')
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(15).all()
 
-    # Lấy top 3 quốc gia cho mỗi path trong top 10
+    top_15_countries_per_path = {}
+    # Lấy top 3 quốc gia cho mỗi path trong top 15
     top_countries_per_path = {}
     if path_stats:
         path_list = [p[0] for p in path_stats]  # danh sách các path
@@ -4642,6 +4643,7 @@ def admin_analytics():
         
         # Giữ lại top 3 cho mỗi path
         for path, items in temp_dict.items():
+            top_15_countries_per_path[path] = items
             top_countries_per_path[path] = items[:3]  # lấy 3 quốc gia đầu (đã sắp xếp giảm dần)
 
     # Xử lý path để hiển thị tên truyện/thể loại/type
@@ -4721,7 +4723,7 @@ def admin_analytics():
                 VisitLog.created_at <= end_of_day,
                 VisitLog.country.isnot(None),
                 VisitLog.country != ''
-            ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+            ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(15).all()
             
             # Chuyển thành list tuple để JSON hóa
             top_countries_by_date[date_str] = [(c, cnt) for c, cnt in country_stats]
@@ -4747,6 +4749,7 @@ def admin_analytics():
                            now_la=now_la,
                            now_vn=now_vn,
                            top_country_dict=top_country_dict,
+                           top_15_countries_per_path=top_15_countries_per_path,
                            top_countries_per_path=top_countries_per_path,
                            top_countries_by_date=top_countries_by_date)
 
