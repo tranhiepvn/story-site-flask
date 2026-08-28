@@ -292,7 +292,7 @@
 <div class="chart-container">
   <h3>📈 Lượt truy cập theo ngày</h3>
   <canvas id="visitChart" width="400" height="200"></canvas>
-  <div id="chart-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+  <div id="chart-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:450px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
 </div>
 
 <div class="path-container">
@@ -333,7 +333,7 @@
 </div>
 
 <!-- Tooltip cho Top 15 trang -->
-<div id="path-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+<div id="path-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:450px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
@@ -399,8 +399,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let left = e.clientX + 15;
     let top = e.clientY - 10;
-    if (left + 350 > window.innerWidth) left = e.clientX - 350 - 15;
-    if (top + 300 > window.innerHeight) top = window.innerHeight - 300 - 10;
+    const tooltipWidth = chartTooltip.scrollWidth || 350;
+    const tooltipHeight = chartTooltip.scrollHeight || 300;
+    if (left + tooltipWidth > window.innerWidth) left = e.clientX - tooltipWidth - 15;
+    if (top + tooltipHeight > window.innerHeight) top = window.innerHeight - tooltipHeight - 10;
     if (top < 10) top = 10;
     if (left < 10) left = 10;
     chartTooltip.style.left = left + 'px';
@@ -456,8 +458,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function positionTooltip(e) {
       let left = e.clientX + 15;
       let top = e.clientY - 10;
-      if (left + 350 > window.innerWidth) left = e.clientX - 350 - 15;
-      if (top + 300 > window.innerHeight) top = window.innerHeight - 300 - 10;
+      const tooltipWidth = pathTooltip.scrollWidth || 350;
+      const tooltipHeight = pathTooltip.scrollHeight || 300;
+      if (left + tooltipWidth > window.innerWidth) left = e.clientX - tooltipWidth - 15;
+      if (top + tooltipHeight > window.innerHeight) top = window.innerHeight - tooltipHeight - 10;
       if (top < 10) top = 10;
       if (left < 10) left = 10;
       pathTooltip.style.left = left + 'px';
