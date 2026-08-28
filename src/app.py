@@ -4703,6 +4703,31 @@ def admin_analytics():
     now_la = now_utc - timedelta(hours=7)
     now_vn = now_utc + timedelta(hours=7)
 
+    # === LẤY TOP 10 QUỐC GIA THEO TỪNG NGÀY ===
+    top_countries_by_date = {}
+    for date_str in dates:
+        try:
+            date_obj = datetime.strptime(date_str, '%d/%m').date()
+            # Gán năm hiện tại (dùng ngày trong năm)
+            date_obj = date_obj.replace(year=datetime.now().year)
+            start_of_day = datetime.combine(date_obj, datetime.min.time())
+            end_of_day = datetime.combine(date_obj, datetime.max.time())
+            
+            country_stats = db.session.query(
+                VisitLog.country,
+                func.count(VisitLog.id).label('total')
+            ).filter(
+                VisitLog.created_at >= start_of_day,
+                VisitLog.created_at <= end_of_day,
+                VisitLog.country.isnot(None),
+                VisitLog.country != ''
+            ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+            
+            # Chuyển thành list tuple để JSON hóa
+            top_countries_by_date[date_str] = [(c, cnt) for c, cnt in country_stats]
+        except:
+            top_countries_by_date[date_str] = []
+
     return render_template('admin_analytics.html',
                            total_sessions=total_sessions,
                            device_stats=device_stats,
@@ -4722,7 +4747,8 @@ def admin_analytics():
                            now_la=now_la,
                            now_vn=now_vn,
                            top_country_dict=top_country_dict,
-                           top_countries_per_path=top_countries_per_path)
+                           top_countries_per_path=top_countries_per_path,
+                           top_countries_by_date=top_countries_by_date)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):
@@ -4801,7 +4827,7 @@ def export_story_text(story_id):
         download_name=filename, 
         mimetype="text/plain"
     )
-    
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
