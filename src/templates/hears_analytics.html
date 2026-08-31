@@ -182,6 +182,21 @@
   .container, .content-wrapper, main {
     margin: 0 !important;
   }
+  .story-status-icon {
+    font-size: 1.1rem;
+    margin-right: 4px;
+  }
+  .story-part-count {
+    color: #aaa;
+    margin: 0 4px;
+  }
+  .story-single-view {
+    color: #FF8C00;
+    margin-left: 4px;
+  }
+  body.light-mode .story-part-count {
+    color: #555;
+  }
 </style>
 
 <h2 style="margin-bottom: 10px;">🎧 Lượt nghe 7 ngày gần nhất</h2>
@@ -231,38 +246,35 @@
       <tr data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
         <td class="col-stt">{{ loop.index }}</td>
         <td class="col-name" data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
-          <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-              {% if item.story.is_completed %}
-                  <span style="color: #39FF14; font-size: 1.1rem;" title="Đã hoàn thành">✅</span>
-              {% else %}
-                  <span style="color: #FFA500; font-size: 1.1rem;" title="Đang cập nhật">📘</span>
-              {% endif %}
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+              <span style="font-size:1.1rem;">
+                {% if item.story.is_completed %}✅{% else %}📘{% endif %}
+              </span>
               <a href="{{ url_for('story_detail', story_id=item.story.id) }}">{{ item.story.title }}</a>
-              {% if item.part_stats|length == 1 %}
-                  {# Nếu chỉ có 1 phần, hiển thị số listen ngay sau tên #}
-                  {% set single_part = item.part_stats[0] %}
-                  <span style="color: #FF8C00; font-weight: bold; margin-left: 4px;">({{ single_part[1] }})</span>
+              <span style="color:#888;"> [{{ item.part_stats|length }}/{{ item.story.parts|length }}]</span>
+              {% if item.story.parts|length > 1 %}
+                <button class="toggle-parts-btn" data-story-id="{{ item.story.id }}" data-target="parts-{{ item.story.id }}">
+                  {% if show_parts == '1' %}✕ Đóng phần{% else %}📊 Phần{% endif %}
+                </button>
               {% else %}
-                  <button class="toggle-parts-btn" data-story-id="{{ item.story.id }}" data-target="parts-{{ item.story.id }}">
-                      {% if show_parts == '1' %}✕ Đóng phần{% else %}📊 Phần{% endif %}
-                  </button>
+                <span style="color:#FF8C00; font-weight:bold; margin-left:4px;">({{ item.total_week }})</span>
               {% endif %}
-          </div>
-          <div id="parts-{{ item.story.id }}" class="part-stats" style="{% if show_parts != '1' %}display: none;{% endif %}">
+            </div>
+            <div id="parts-{{ item.story.id }}" class="part-stats" style="{% if show_parts != '1' %}display: none;{% endif %}">
               {% if item.part_stats %}
-                  {% for part_num, total in item.part_stats %}
-                      <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
-                         class="part-badge" 
-                         style="text-decoration: none; display: inline-block; background: #333; padding: 2px 8px; border-radius: 12px; margin: 0 4px 4px 0; color: #eee; font-weight: normal;">
-                          <span class="part-num" style="color: #4A90E2; font-weight: bold;">Phần {{ part_num }}</span>
-                          <span class="part-count" style="color: #FF8C00;">({{ total }})</span>
-                      </a>
-                  {% endfor %}
+                {% for part_num, total in item.part_stats %}
+                  <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
+                     class="part-badge" 
+                     style="text-decoration: none; display: inline-block; background: #333; padding: 2px 8px; border-radius: 12px; margin: 0 4px 4px 0; color: #eee; font-weight: normal;">
+                    <span class="part-num" style="color: #4A90E2; font-weight: bold;">Phần {{ part_num }}</span>
+                    <span class="part-count" style="color: #FF8C00;">({{ total }})</span>
+                  </a>
+                {% endfor %}
               {% else %}
-                  <span style="color: #888; font-size: 0.85rem;">Không có dữ liệu phần</span>
+                <span style="color: #888; font-size: 0.85rem;">Không có dữ liệu phần</span>
               {% endif %}
-          </div>
-      </td>
+            </div>
+        </td>
 
         <td class="col-total">{{ item.total_listens_alltime }}</td>
         <td class="col-week" style="color:#32CD32; font-weight:bold;">{{ item.total_week }}</td>
