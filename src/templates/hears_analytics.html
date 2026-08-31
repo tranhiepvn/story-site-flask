@@ -3,7 +3,6 @@
 
 {% block content %}
 <style>
-  /* Triệt tiêu mọi giới hạn chiều rộng */
   .container {
     max-width: 100% !important;
     padding-left: 0 !important;
@@ -182,21 +181,6 @@
   .container, .content-wrapper, main {
     margin: 0 !important;
   }
-  .story-status-icon {
-    font-size: 1.1rem;
-    margin-right: 4px;
-  }
-  .story-part-count {
-    color: #aaa;
-    margin: 0 4px;
-  }
-  .story-single-view {
-    color: #FF8C00;
-    margin-left: 4px;
-  }
-  body.light-mode .story-part-count {
-    color: #555;
-  }
 </style>
 
 <h2 style="margin-bottom: 10px;">🎧 Lượt nghe 7 ngày gần nhất</h2>
@@ -265,6 +249,7 @@
                 {% for part_num, total in item.part_stats %}
                   <a href="{{ url_for('story_detail', story_id=item.story.id, part=part_num) }}" 
                      class="part-badge" 
+                     data-part="{{ part_num }}"
                      style="text-decoration: none; display: inline-block; background: #333; padding: 2px 8px; border-radius: 12px; margin: 0 4px 4px 0; color: #eee; font-weight: normal;">
                     <span class="part-num" style="color: #4A90E2; font-weight: bold;">Phần {{ part_num }}</span>
                     <span class="part-count" style="color: #FF8C00;">({{ total }})</span>
@@ -314,16 +299,18 @@
   {% for item in story_data[:3] %}{{ item.story.title }} ({{ item.total_week }} lượt){% if not loop.last %}, {% endif %}{% endfor %}
 </p>
 
+<!-- Tooltip cho phần -->
+<div id="part-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ===== TOGGLE PART STATS CHO TỪNG TRUYỆN =====
+    // ===== TOGGLE PART STATS =====
     document.querySelectorAll('.toggle-parts-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
             const targetId = this.dataset.target;
             const partsContainer = document.getElementById(targetId);
             if (!partsContainer) return;
-            
             const isHidden = partsContainer.style.display === 'none';
             if (isHidden) {
                 partsContainer.style.display = 'block';
@@ -335,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== TOOLTIP QUỐC GIA =====
+    // ===== TOOLTIP QUỐC GIA CHO TOÀN BỘ TRUYỆN =====
     const cache = {};
     const tooltip = document.createElement('div');
     tooltip.id = 'country-tooltip';
@@ -409,7 +396,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const storyId = el.dataset.storyId;
         const storyTitle = el.dataset.storyTitle || '';
         if (!storyId) return;
-
         el.addEventListener('mouseenter', function(e) {
             showTooltip(e, storyId, storyTitle, type);
         });
@@ -427,6 +413,78 @@ document.addEventListener('DOMContentLoaded', function() {
             tooltip.style.display = 'none';
         });
     });
+
+    // ===== TOOLTIP CHO TỪNG PHẦN =====
+    const partTooltip = document.getElementById('part-tooltip');
+    const partCache = {};
+
+    document.querySelectorAll('.part-badge').forEach(badge => {
+        const storyId = badge.closest('[data-story-id]')?.dataset.storyId;
+        if (!storyId) return;
+        const partNum = badge.dataset.part;
+        if (!partNum) return;
+
+        badge.addEventListener('mouseenter', function(e) {
+            const type = window.location.pathname.includes('/admin/hears') ? 'listens' : 'views';
+            const key = `${storyId}_${partNum}_${type}`;
+            if (partCache[key]) {
+                renderPartTooltip(e, partCache[key], partNum);
+                return;
+            }
+            fetch(`/api/story_countries/${storyId}?part=${partNum}&type=${type}`)
+                .then(res => res.json())
+                .then(data => {
+                    partCache[key] = data;
+                    renderPartTooltip(e, data, partNum);
+                })
+                .catch(err => {
+                    console.error('Lỗi lấy dữ liệu quốc gia cho phần:', err);
+                    partTooltip.innerHTML = '<span style="color: #888;">Lỗi tải dữ liệu</span>';
+                    partTooltip.style.display = 'block';
+                });
+        });
+
+        badge.addEventListener('mousemove', function(e) {
+            positionPartTooltip(e);
+        });
+
+        badge.addEventListener('mouseleave', function() {
+            partTooltip.style.display = 'none';
+        });
+    });
+
+    function renderPartTooltip(e, data, partNum) {
+        const label = window.location.pathname.includes('/admin/hears') ? 'nghe' : 'xem';
+        let html = `<div><strong>Phần ${partNum}</strong></div>`;
+        if (!data || data.length === 0) {
+            html += `<span style="color: #888;">Chưa có dữ liệu quốc gia đã ${label}</span>`;
+        } else {
+            html += `<div style="margin-top:6px;"><strong>Top quốc gia đã ${label}:</strong>`;
+            data.forEach(item => {
+                html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0;">
+                            <span>${item.country || 'Unknown'}</span>
+                            <span style="color:#FF8C00;">${item.count}</span>
+                        </div>`;
+            });
+            html += '</div>';
+        }
+        partTooltip.innerHTML = html;
+        partTooltip.style.display = 'block';
+        positionPartTooltip(e);
+    }
+
+    function positionPartTooltip(e) {
+        let left = e.clientX + 15;
+        let top = e.clientY - 10;
+        const w = partTooltip.scrollWidth || 320;
+        const h = partTooltip.scrollHeight || 200;
+        if (left + w > window.innerWidth) left = e.clientX - w - 15;
+        if (top + h > window.innerHeight) top = window.innerHeight - h - 10;
+        if (top < 10) top = 10;
+        if (left < 10) left = 10;
+        partTooltip.style.left = left + 'px';
+        partTooltip.style.top = top + 'px';
+    }
 });
 </script>
 {% endblock %}

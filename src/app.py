@@ -4315,23 +4315,29 @@ def log_visit():
             ip = ip.split(',')[0].strip()
         geo = get_geo_info(ip)
 
-        # Xác định action và path chuẩn
-        if request.path.startswith('/api/start_audio/'):
-            action = 'listen'
-            # Lấy part_id và story_id để ghi path chuẩn
+        path = request.full_path[:500]
+        action = 'view'
+
+        if request.path.startswith('/story/'):
+            try:
+                story_id = int(request.path.split('/')[2])
+                part = request.args.get('part')
+                if not part:
+                    part = '1'  # mặc định phần 1
+                path = f'/story/{story_id}?part={part}'
+            except:
+                pass  # giữ nguyên path gốc nếu có lỗi
+
+        # Nếu là request audio (start_audio), cũng có thể lấy part từ Part
+        elif request.path.startswith('/api/start_audio/'):
             try:
                 part_id = int(request.path.split('/')[-1])
                 part = Part.query.get(part_id)
                 if part:
-                    path = f'/story/{part.story_id}/audio'
-                else:
-                    # Nếu không tìm thấy part, vẫn ghi path gốc nhưng không lọc được
-                    path = request.path[:500]
+                    path = f'/story/{part.story_id}?part={part.part_number}'
+                    action = 'listen'
             except:
-                path = request.path[:500]
-        else:
-            action = 'view'
-            path = request.path[:500]
+                pass
 
         log = VisitLog(
             session_id=session_id,
@@ -4763,11 +4769,15 @@ def set_theme(theme):
 
 @app.route("/api/story_countries/<int:story_id>")
 def api_story_countries(story_id):
-    """Trả về top 10 quốc gia đã xem/nghe truyện này."""
     stat_type = request.args.get('type', 'views')
+    part = request.args.get('part', type=int)
     action = 'view' if stat_type == 'views' else 'listen'
-    path_pattern = f'/story/{story_id}%'
-    
+
+    if part is not None:
+        path_pattern = f'/story/{story_id}?part={part}%'
+    else:
+        path_pattern = f'/story/{story_id}%'
+
     top_countries = db.session.query(
         VisitLog.country,
         func.count(VisitLog.id).label('total')
@@ -4775,15 +4785,15 @@ def api_story_countries(story_id):
         VisitLog.path.like(path_pattern),
         VisitLog.country.isnot(None),
         VisitLog.country != '',
-        VisitLog.action == action  # <-- THÊM ĐIỀU KIỆN NÀY
+        VisitLog.action == action
     ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
-    
+
     result = [{'country': c, 'count': cnt} for c, cnt in top_countries]
     return jsonify(result)
 
 @app.route("/export_story_text/<int:story_id>", methods=["POST"])
 def export_story_text(story_id):
-    """Export nội dung truyện ra file .txt (có mật khẩu)"""
+    """Export nội dung truyện ra file .txt (có mật khẩu và chọn phần)"""
     if not session.get("upload_authenticated"):
         return redirect(url_for("upload_login"))
     
@@ -4794,7 +4804,17 @@ def export_story_text(story_id):
         return redirect(url_for("upload", story_id=story_id))
     
     story = Story.query.get_or_404(story_id)
-    parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+    export_to_part = request.form.get("export_to_part", type=int)
+    
+    # Lấy tất cả phần của truyện, sắp xếp theo part_number
+    all_parts = Part.query.filter_by(story_id=story.id).order_by(Part.part_number).all()
+    
+    # Nếu không có export_to_part hoặc export_to_part > số phần cuối, lấy phần cuối làm mặc định
+    if not export_to_part or export_to_part > len(all_parts):
+        export_to_part = len(all_parts)
+    
+    # Lọc các phần từ 1 đến export_to_part
+    parts = [p for p in all_parts if p.part_number <= export_to_part]
     
     # Tạo nội dung text
     lines = []
