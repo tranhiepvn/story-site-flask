@@ -1719,6 +1719,23 @@ def upload():
 
     stories_pagination = stories_query.paginate(page=page, per_page=25, error_out=False)
     stories = stories_pagination.items
+    snippets = {}
+    if stories:
+        story_ids = [s.id for s in stories]
+        # Truy vấn phần 1 của mỗi truyện (part_number=1)
+        first_parts = Part.query.filter(
+            Part.story_id.in_(story_ids),
+            Part.part_number == 1
+        ).all()
+        for part in first_parts:
+            # Lấy nội dung, bỏ phần tiêu đề (dòng đầu) nếu có
+            content = part.content or ""
+            lines = content.split('\n')
+            if len(lines) > 1:
+                snippet = '\n'.join(lines[1:])  # bỏ dòng đầu tiên (tiêu đề)
+            else:
+                snippet = content
+            snippets[part.story_id] = snippet[:200]  # giới hạn 200 ký tự
 
     if search_query and search_type == "content":
         pattern = f"%{search_query}%"
@@ -2078,6 +2095,7 @@ def upload():
         all_categories=all_categories,
         all_authors=all_authors,
         total_stories=total_stories,
+        snippets=snippets,
     )
 
 @app.route("/admin/dashboard")
@@ -3481,6 +3499,9 @@ def views_analytics():
         prev_total = sum(dv.views for dv in prev_views)
         change_pct = round(((total_week - prev_total) / prev_total * 100), 1) if prev_total > 0 else None
 
+        first_part = story.parts[0] if story.parts else None
+        snippet = first_part.content[:200] if first_part else ""
+
         story_data.append({
             'story': story,
             'daily': daily_map,
@@ -3490,6 +3511,7 @@ def views_analytics():
             'change_pct': change_pct,
             'created_at': story.created_at,
             'part_stats': part_stats,  # thêm dòng này
+            'snippet': snippet,
         })
 
     sort = request.args.get('sort', 'week')   # mặc định là week
@@ -3576,6 +3598,9 @@ def hears_analytics():
         prev_total = sum(dl.listens for dl in prev_listens)
         change_pct = round(((total_week - prev_total) / prev_total * 100), 1) if prev_total > 0 else None
 
+        first_part = story.parts[0] if story.parts else None
+        snippet = first_part.content[:200] if first_part else ""
+
         story_data.append({
             'story': story,
             'daily': daily_map,
@@ -3588,6 +3613,7 @@ def hears_analytics():
             'change_pct': change_pct,
             'created_at': story.created_at,
             'part_stats': part_stats,
+            'snippet': snippet,
         })
 
     sort = request.args.get('sort', 'week')
@@ -4683,10 +4709,14 @@ def admin_analytics():
                 if story:
                     display_name = f'📖 {story.title}'
                     story_link = url_for('story_detail', story_id=story.id)
+                    # Lấy snippet từ phần 1
+                    first_part = story.parts[0] if story.parts else None
+                    snippet = first_part.content[:200] if first_part else ""
                 else:
                     display_name = f'📖 Truyện #{story_id} (đã xóa)'
+                    snippet = ""
             except:
-                pass
+                snippet = ""
         elif base_path.startswith('/category/'):
             try:
                 category_id = int(base_path.split('/')[2])
@@ -4717,7 +4747,8 @@ def admin_analytics():
             'path': path,
             'display_name': display_name,
             'count': count,
-            'link': story_link
+            'link': story_link,
+            'snippet': snippet
         })
     
     now_utc = datetime.utcnow()

@@ -117,7 +117,14 @@
     {% for story in stories %}
     <tr style="border-bottom:1px solid #333;">
       <td style="padding:8px; text-align:center;">{{ story.id }}</td>
-      <td style="padding:8px;"><a href="{{ url_for('upload', story_id=story.id) }}">{{ story.title }}</a></td>
+
+      <td style="padding:8px;">
+        <a href="{{ url_for('upload', story_id=story.id) }}" data-snippet="{{ snippets.get(story.id, '') }}">
+          {{ story.title }}
+        </a>
+      </td>
+
+
       <td style="padding:8px;">{{ story.author or 'Ẩn danh' }}</td>
       <td style="padding:8px; text-align:center;">{{ story.parts|length }}</td>
       <td style="padding:8px; text-align:center;">{% if story.is_completed %}✅{% else %}❌{% endif %}</td>
@@ -435,4 +442,51 @@ function confirmDeleteAll() {
   color: #00BFFF !important;
 }
 </style>
+
+<!-- Tooltip cho tên truyện -->
+<div id="upload-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltip = document.getElementById('upload-tooltip');
+    const nameLinks = document.querySelectorAll('a[data-snippet]');
+
+    nameLinks.forEach(link => {
+        link.addEventListener('mouseenter', function(e) {
+            const snippet = this.dataset.snippet;
+            if (!snippet) {
+                tooltip.style.display = 'none';
+                return;
+            }
+            const storyTitle = this.textContent.trim();
+            let html = `<div style="font-weight:bold; margin-bottom:4px;">${storyTitle}</div>`;
+            html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+            positionTooltip(e);
+        });
+
+        link.addEventListener('mousemove', function(e) {
+            positionTooltip(e);
+        });
+
+        link.addEventListener('mouseleave', function() {
+            tooltip.style.display = 'none';
+        });
+    });
+
+    function positionTooltip(e) {
+        let left = e.clientX + 15;
+        let top = e.clientY - 10;
+        const w = tooltip.scrollWidth || 320;
+        const h = tooltip.scrollHeight || 200;
+        if (left + w > window.innerWidth) left = e.clientX - w - 15;
+        if (top + h > window.innerHeight) top = window.innerHeight - h - 10;
+        if (top < 10) top = 10;
+        if (left < 10) left = 10;
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+    }
+});
+</script>
 {% endblock %}

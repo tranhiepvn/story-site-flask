@@ -307,7 +307,7 @@
     </thead>
     <tbody>
       {% for item in path_list %}
-      <tr style="border-bottom: 1px solid #333;" data-path="{{ item.path }}">
+      <tr style="border-bottom: 1px solid #333;" data-path="{{ item.path }}" data-snippet="{{ item.snippet or '' }}">
         <td style="padding:6px 8px;">
           {% if item.link %}
             <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
@@ -413,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function() {
     chartTooltip.style.display = 'none';
   });
 
-  // ===== TOOLTIP CHO TOP 15 TRANG =====
+  // ===== TOOLTIP CHO TOP 15 TRANG (có snippet) =====
   const pathTooltip = document.getElementById('path-tooltip');
   const top15CountriesPerPath = {{ top_15_countries_per_path|tojson }};
   const pathRows = document.querySelectorAll('.path-container tbody tr');
@@ -427,6 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!nameCell || !countCell) return;
     const name = nameCell.textContent.trim();
     const count = countCell.textContent.trim();
+    const snippet = row.dataset.snippet || '';
 
     row.addEventListener('mouseenter', function(e) {
       let html = `<div><strong>${name}</strong><br>Số lượt: <span style="color:#FF8C00;">${count}</span></div>`;
@@ -441,6 +442,9 @@ document.addEventListener('DOMContentLoaded', function() {
         html += '</div>';
       } else {
         html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
+      }
+      if (snippet) {
+        html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px; font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
       }
       pathTooltip.innerHTML = html;
       pathTooltip.style.display = 'block';

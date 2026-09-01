@@ -221,9 +221,9 @@
     </thead>
     <tbody>
       {% for item in story_data %}
-      <tr data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
+      <tr data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}" data-snippet="{{ item.snippet or '' }}">
         <td class="col-stt">{{ loop.index }}</td>
-        <td class="col-name" data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}">
+        <td class="col-name" data-story-id="{{ item.story.id }}" data-story-title="{{ item.story.title }}" data-snippet="{{ item.snippet or '' }}">
             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
               <span style="font-size:1.1rem;">
                 {% if item.story.is_completed %}✅{% else %}📘{% endif %}
@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== TOOLTIP QUỐC GIA CHO TOÀN BỘ TRUYỆN =====
+    // ===== TOOLTIP QUỐC GIA CHO TOÀN BỘ TRUYỆN (có snippet) =====
     const cache = {};
     const tooltip = document.createElement('div');
     tooltip.id = 'country-tooltip';
@@ -334,17 +334,17 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.body.appendChild(tooltip);
 
-    function showTooltip(e, storyId, storyTitle, type) {
+    function showTooltip(e, storyId, storyTitle, type, snippet) {
         const key = `${storyId}_${type}`;
         if (cache[key]) {
-            renderTooltip(e, cache[key], storyTitle, type);
+            renderTooltip(e, cache[key], storyTitle, type, snippet);
             return;
         }
         fetch(`/api/story_countries/${storyId}?type=${type}`)
             .then(res => res.json())
             .then(data => {
                 cache[key] = data;
-                renderTooltip(e, data, storyTitle, type);
+                renderTooltip(e, data, storyTitle, type, snippet);
             })
             .catch(err => {
                 console.error('Lỗi lấy dữ liệu quốc gia:', err);
@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function renderTooltip(e, data, storyTitle, type) {
+    function renderTooltip(e, data, storyTitle, type, snippet) {
         const label = type === 'listens' ? 'nghe' : 'xem';
         let html = `<div style="font-weight:bold; font-size:1rem; margin-bottom:6px; color:#4A90E2;">${storyTitle}</div>`;
         html += `<div>Số lượt ${label}: <span style="color:#FF8C00;">${data.total_count}</span></div>`;
@@ -368,6 +368,9 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '</div>';
         } else {
             html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
+        }
+        if (snippet) {
+            html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px; font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
         }
         tooltip.innerHTML = html;
 
@@ -387,11 +390,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[data-story-id]').forEach(el => {
         const storyId = el.dataset.storyId;
         const storyTitle = el.dataset.storyTitle || '';
+        const snippet = el.dataset.snippet || '';
         if (!storyId) return;
 
         el.addEventListener('mouseenter', function(e) {
             if (e.target.closest('.part-badge')) return;
-            showTooltip(e, storyId, storyTitle, type);
+            showTooltip(e, storyId, storyTitle, type, snippet);
         });
 
         el.addEventListener('mousemove', function(e) {
@@ -412,12 +416,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // ===== TOOLTIP CHO TỪNG PHẦN =====
+    // ===== TOOLTIP CHO TỪNG PHẦN (có snippet) =====
     const partTooltip = document.getElementById('part-tooltip');
     const partCache = {};
 
     document.querySelectorAll('.part-badge').forEach(badge => {
-        const storyId = badge.closest('[data-story-id]')?.dataset.storyId;
+        const storyEl = badge.closest('[data-story-id]');
+        const storyId = storyEl?.dataset.storyId;
+        const snippet = storyEl?.dataset.snippet || '';
         if (!storyId) return;
         const partNum = badge.dataset.part;
         if (!partNum) return;
@@ -427,14 +433,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const type = window.location.pathname.includes('/admin/hears') ? 'listens' : 'views';
             const key = `${storyId}_${partNum}_${type}`;
             if (partCache[key]) {
-                renderPartTooltip(e, partCache[key], partNum);
+                renderPartTooltip(e, partCache[key], partNum, snippet);
                 return;
             }
             fetch(`/api/story_countries/${storyId}?part=${partNum}&type=${type}`)
                 .then(res => res.json())
                 .then(data => {
                     partCache[key] = data;
-                    renderPartTooltip(e, data, partNum);
+                    renderPartTooltip(e, data, partNum, snippet);
                 })
                 .catch(err => {
                     console.error('Lỗi lấy dữ liệu quốc gia cho phần:', err);
@@ -452,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    function renderPartTooltip(e, data, partNum) {
+    function renderPartTooltip(e, data, partNum, snippet) {
         const label = window.location.pathname.includes('/admin/hears') ? 'nghe' : 'xem';
         let html = `<div><strong>Phần ${partNum}</strong></div>`;
         html += `<div>Số lượt ${label}: <span style="color:#FF8C00;">${data.total_count}</span></div>`;
@@ -467,6 +473,9 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '</div>';
         } else {
             html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
+        }
+        if (snippet) {
+            html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px; font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
         }
         partTooltip.innerHTML = html;
         partTooltip.style.display = 'block';
