@@ -4568,7 +4568,8 @@ def admin_analytics():
     for d in dates:
         counts.append(date_map.get(d, 0))
     
-    # Lấy tất cả path (đã lọc) và nhóm thủ công theo story_id
+    # ---- LẤY DỮ LIỆU PATH VÀ QUỐC GIA (NHÓM THEO STORY) ----
+    # 1. Lấy tất cả path và số lượt (đã lọc)
     all_paths = db.session.query(
         VisitLog.path,
         func.count(VisitLog.id).label('cnt')
@@ -4577,113 +4578,97 @@ def admin_analytics():
         VisitLog.created_at < next_day,
         VisitLog.path.notlike('/set_theme%'),
         VisitLog.path.notlike('/upload%'),
-        VisitLog.path.notlike('/admin%'),              # loại bỏ các path admin
-        VisitLog.path.notlike('/api%'),                # loại bỏ api
-        VisitLog.path.notlike('/static%'),             # loại bỏ static
-        VisitLog.path.notlike('/favicon.ico'),         # loại bỏ favicon
-        VisitLog.path.notlike('/'),         
-        VisitLog.path.notlike('/robots.txt'),          # loại bỏ robots
+        VisitLog.path.notlike('/admin%'),
+        VisitLog.path.notlike('/api%'),
+        VisitLog.path.notlike('/static%'),
+        VisitLog.path.notlike('/favicon.ico'),
+        VisitLog.path.notlike('/'),
+        VisitLog.path.notlike('/robots.txt'),
         VisitLog.path.notlike('/my_follows%'),
-        VisitLog.path.notlike('/.well-known%'),        
+        VisitLog.path.notlike('/.well-known%'),
         VisitLog.path.notlike('/wp-json%'),
-        VisitLog.path.notlike('/.env%'),                  
-        VisitLog.path.notlike('/wp-content%'),            
-        VisitLog.path.notlike('/fetch%'),                 
+        VisitLog.path.notlike('/.env%'),
+        VisitLog.path.notlike('/wp-content%'),
+        VisitLog.path.notlike('/fetch%'),
         VisitLog.path.notlike('/this_is_a_new_hello_world%'),
         VisitLog.path.notlike('/apple%'),
         VisitLog.path.notlike('/search%')
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).all()
 
-    # Nhóm các path theo story_id (nếu là story)
-    story_group = {}  # key: story_id, value: tổng count
-    other_paths = []   # list (path, count)
+    # 2. Lấy dữ liệu quốc gia theo path
+    country_data = db.session.query(
+        VisitLog.path,
+        VisitLog.country,
+        func.count(VisitLog.id).label('cnt')
+    ).filter(
+        VisitLog.created_at >= start_date,
+        VisitLog.created_at < next_day,
+        VisitLog.country.isnot(None),
+        VisitLog.country != '',
+        # Thêm các điều kiện lọc tương tự nếu cần
+    ).group_by(VisitLog.path, VisitLog.country).all()
+
+    # Tạo dictionary countries_by_path
+    countries_by_path = {}
+    for path, country, cnt in country_data:
+        if path not in countries_by_path:
+            countries_by_path[path] = {}
+        countries_by_path[path][country] = cnt
+
+    # 3. Nhóm các path theo story_id và gộp quốc gia
+    story_group = {}          # key: story_id, value: tổng count
+    other_paths = []          # list (path, count) cho các path không phải story
+    story_countries = {}      # key: story_id, value: dict {country: total}
+    other_paths_countries = {} # key: path, value: dict {country: count}
 
     for path, cnt in all_paths:
-        base_path = path.split('?')[0]  # bỏ query string
+        base_path = path.split('?')[0]
         if base_path.startswith('/story/'):
             try:
                 story_id = int(base_path.split('/')[2])
                 story_group[story_id] = story_group.get(story_id, 0) + cnt
+                # Gộp quốc gia
+                if story_id not in story_countries:
+                    story_countries[story_id] = {}
+                for country, c in countries_by_path.get(path, {}).items():
+                    story_countries[story_id][country] = story_countries[story_id].get(country, 0) + c
             except:
-                # Nếu không parse được, coi là path khác
                 other_paths.append((path, cnt))
+                # Lưu quốc gia cho path này
+                if path in countries_by_path:
+                    other_paths_countries[path] = countries_by_path[path]
         else:
             other_paths.append((path, cnt))
+            if path in countries_by_path:
+                other_paths_countries[path] = countries_by_path[path]
 
-    # Tạo danh sách path_stats đã nhóm: ưu tiên story_group trước, sau đó là other_paths
+    # 4. Tạo path_stats đã nhóm (top 15)
     path_stats = []
-    # Thêm các story đã nhóm
     for story_id, total in sorted(story_group.items(), key=lambda x: x[1], reverse=True):
         path_stats.append((f'/story/{story_id}', total))
-    # Thêm các path khác
     for path, cnt in other_paths:
         path_stats.append((path, cnt))
-
-    # Lấy top 15 (sau khi nhóm)
     path_stats = path_stats[:15]
 
-    top_15_countries_per_path = {}
-    # Lấy top 3 quốc gia cho mỗi path trong top 15
+    # 5. Tạo top_countries_per_path (top 3) và top_15_countries_per_path (top 15) cho template
     top_countries_per_path = {}
-    if path_stats:
-        path_list = [p[0] for p in path_stats]  # danh sách các path
-        
-        # Truy vấn group by path, country
-        if db.engine.dialect.name == 'postgresql':
-            # PostgreSQL: dùng extract hoặc date_trunc nếu cần, nhưng ở đây chỉ group path và country
-            country_query = db.session.query(
-                VisitLog.path,
-                VisitLog.country,
-                func.count(VisitLog.id).label('cnt')
-            ).filter(
-                VisitLog.created_at >= start_date,
-                VisitLog.created_at < next_day,
-                VisitLog.path.in_(path_list),
-                VisitLog.country.isnot(None),
-                VisitLog.country != ''
-            ).group_by(
-                VisitLog.path,
-                VisitLog.country
-            ).order_by(
-                VisitLog.path,
-                func.count(VisitLog.id).desc()
-            ).all()
-        else:
-            # SQLite: tương tự
-            country_query = db.session.query(
-                VisitLog.path,
-                VisitLog.country,
-                func.count(VisitLog.id).label('cnt')
-            ).filter(
-                VisitLog.created_at >= start_date,
-                VisitLog.created_at < next_day,
-                VisitLog.path.in_(path_list),
-                VisitLog.country.isnot(None),
-                VisitLog.country != ''
-            ).group_by(
-                VisitLog.path,
-                VisitLog.country
-            ).order_by(
-                VisitLog.path,
-                func.count(VisitLog.id).desc()
-            ).all()
-        
-        # Xử lý kết quả: nhóm theo path và lấy top 3 country
-        temp_dict = {}
-        for path, country, cnt in country_query:
-            if path not in temp_dict:
-                temp_dict[path] = []
-            temp_dict[path].append((country, cnt))
-        
-        # Giữ lại top 3 cho mỗi path
-        for path, items in temp_dict.items():
-            top_15_countries_per_path[path] = items
-            top_countries_per_path[path] = items[:3]  # lấy 3 quốc gia đầu (đã sắp xếp giảm dần)
+    top_15_countries_per_path = {}
 
-    # Xử lý path để hiển thị tên thân thiện
+    # Xử lý cho các story đã nhóm
+    for story_id, countries in story_countries.items():
+        sorted_countries = sorted(countries.items(), key=lambda x: x[1], reverse=True)
+        top_15_countries_per_path[f'/story/{story_id}'] = [(c, cnt) for c, cnt in sorted_countries]
+        top_countries_per_path[f'/story/{story_id}'] = [(c, cnt) for c, cnt in sorted_countries[:3]]
+
+    # Xử lý cho các path khác
+    for path, countries in other_paths_countries.items():
+        sorted_countries = sorted(countries.items(), key=lambda x: x[1], reverse=True)
+        top_15_countries_per_path[path] = [(c, cnt) for c, cnt in sorted_countries]
+        top_countries_per_path[path] = [(c, cnt) for c, cnt in sorted_countries[:3]]
+
+    # 6. Xây dựng path_list (hiển thị tên thân thiện)
     path_list = []
     for path, count in path_stats:
-        # Tách query string để lấy base_path
         base_path = path.split('?')[0] if '?' in path else path
         display_name = path
         story_link = None
@@ -4727,8 +4712,7 @@ def admin_analytics():
                     story_link = url_for('author_view', author=author)
             except:
                 pass
-        # Nếu không khớp, giữ nguyên display_name là path (bao gồm query)
-        
+
         path_list.append({
             'path': path,
             'display_name': display_name,
