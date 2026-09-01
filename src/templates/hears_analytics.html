@@ -392,14 +392,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const isHears = window.location.pathname.includes('/admin/hears');
     const type = isHears ? 'listens' : 'views';
 
+    // Gắn sự kiện cho tên truyện (trừ các phần tử .part-badge)
     document.querySelectorAll('[data-story-id]').forEach(el => {
         const storyId = el.dataset.storyId;
         const storyTitle = el.dataset.storyTitle || '';
         if (!storyId) return;
+
         el.addEventListener('mouseenter', function(e) {
+            // Nếu chuột đang ở trên .part-badge, không hiện tooltip truyện
+            if (e.target.closest('.part-badge')) return;
             showTooltip(e, storyId, storyTitle, type);
         });
+
         el.addEventListener('mousemove', function(e) {
+            if (e.target.closest('.part-badge')) return;
             const rect = tooltip.getBoundingClientRect();
             let left = e.clientX + 15;
             let top = e.clientY - 10;
@@ -409,7 +415,9 @@ document.addEventListener('DOMContentLoaded', function() {
             tooltip.style.left = left + 'px';
             tooltip.style.top = top + 'px';
         });
-        el.addEventListener('mouseleave', function() {
+
+        el.addEventListener('mouseleave', function(e) {
+            if (e.target.closest('.part-badge')) return;
             tooltip.style.display = 'none';
         });
     });
@@ -425,6 +433,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!partNum) return;
 
         badge.addEventListener('mouseenter', function(e) {
+            // Ẩn tooltip truyện
+            tooltip.style.display = 'none';
             const type = window.location.pathname.includes('/admin/hears') ? 'listens' : 'views';
             const key = `${storyId}_${partNum}_${type}`;
             if (partCache[key]) {
