@@ -4652,53 +4652,54 @@ def admin_analytics():
             top_15_countries_per_path[path] = items
             top_countries_per_path[path] = items[:3]  # lấy 3 quốc gia đầu (đã sắp xếp giảm dần)
 
-    # Xử lý path để hiển thị tên truyện/thể loại/type
+    # Xử lý path để hiển thị tên thân thiện
     path_list = []
     for path, count in path_stats:
+        # Tách query string để lấy base_path
+        base_path = path.split('?')[0] if '?' in path else path
         display_name = path
         story_link = None
-        
-        if path == '/':
-            display_name = 'Trang chủ'
+
+        if base_path == '/':
+            display_name = '🏠 Trang chủ'
             story_link = url_for('index')
-        elif path.startswith('/story/'):
+        elif base_path.startswith('/story/'):
             try:
-                story_id = int(path.split('/')[2])
+                story_id = int(base_path.split('/')[2])
                 story = Story.query.get(story_id)
                 if story:
-                    display_name = story.title
+                    display_name = f'📖 {story.title}'
                     story_link = url_for('story_detail', story_id=story.id)
                 else:
-                    display_name = f"Truyện #{story_id} (đã xóa)"
+                    display_name = f'📖 Truyện #{story_id} (đã xóa)'
             except:
                 pass
-        elif path.startswith('/category/'):
+        elif base_path.startswith('/category/'):
             try:
-                category_id = int(path.split('/')[2])
+                category_id = int(base_path.split('/')[2])
                 category = Category.query.get(category_id)
                 if category:
-                    display_name = f"Thể loại: {category.name}"
+                    display_name = f'📂 Thể loại: {category.name}'
                     story_link = url_for('category_view', category_id=category.id)
                 else:
-                    display_name = f"Thể loại #{category_id} (đã xóa)"
+                    display_name = f'📂 Thể loại #{category_id} (đã xóa)'
             except:
                 pass
-        elif path.startswith('/type/long'):
-            display_name = 'Truyện Dài'
+        elif base_path.startswith('/type/long'):
+            display_name = '📚 Truyện Dài'
             story_link = url_for('type_view', story_type='long')
-        elif path.startswith('/type/short'):
-            display_name = 'Truyện Ngắn'
+        elif base_path.startswith('/type/short'):
+            display_name = '📘 Truyện Ngắn'
             story_link = url_for('type_view', story_type='short')
-        elif path.startswith('/author/'):
+        elif base_path.startswith('/author/'):
             try:
-                author = path.split('/')[2]
+                author = base_path.split('/')[2]
                 if author:
-                    display_name = f"Tác giả: {author}"
+                    display_name = f'✍️ Tác giả: {author}'
                     story_link = url_for('author_view', author=author)
             except:
                 pass
-        # Nếu là các path lạ (.env, /wp-*...), giữ nguyên tên và không link
-        # Bạn có thể thêm các điều kiện lọc thêm tại đây
+        # Nếu không khớp, giữ nguyên display_name là path (bao gồm query)
         
         path_list.append({
             'path': path,
