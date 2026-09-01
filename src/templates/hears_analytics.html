@@ -366,16 +366,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderTooltip(e, data, storyTitle, type) {
         const label = type === 'listens' ? 'nghe' : 'xem';
         let html = `<div style="font-weight:bold; font-size:1rem; margin-bottom:6px; color:#4A90E2;">${storyTitle}</div>`;
-        if (!data || data.length === 0) {
-            html += `<span style="color: #888;">Chưa có dữ liệu quốc gia đã ${label}</span>`;
-        } else {
-            html += `<div style="font-weight:bold; margin-bottom:4px;">Top quốc gia đã ${label}:</div>`;
-            data.forEach(item => {
-                html += `<div style="display:flex; justify-content:space-between; gap:20px;">
+        html += `<div>Số lượt ${label}: <span style="color:#FF8C00;">${data.total_count}</span></div>`;
+        if (data.countries && data.countries.length > 0) {
+            html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px;"><strong>Top quốc gia đã ${label}:</strong>`;
+            data.countries.forEach(item => {
+                html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0;">
                             <span>${item.country || 'Unknown'}</span>
                             <span style="color:#FF8C00;">${item.count}</span>
                         </div>`;
             });
+            html += '</div>';
+        } else {
+            html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
         }
         tooltip.innerHTML = html;
 
@@ -392,14 +394,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const isHears = window.location.pathname.includes('/admin/hears');
     const type = isHears ? 'listens' : 'views';
 
-    // Gắn sự kiện cho tên truyện (trừ các phần tử .part-badge)
     document.querySelectorAll('[data-story-id]').forEach(el => {
         const storyId = el.dataset.storyId;
         const storyTitle = el.dataset.storyTitle || '';
         if (!storyId) return;
 
         el.addEventListener('mouseenter', function(e) {
-            // Nếu chuột đang ở trên .part-badge, không hiện tooltip truyện
             if (e.target.closest('.part-badge')) return;
             showTooltip(e, storyId, storyTitle, type);
         });
@@ -433,7 +433,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!partNum) return;
 
         badge.addEventListener('mouseenter', function(e) {
-            // Ẩn tooltip truyện
             tooltip.style.display = 'none';
             const type = window.location.pathname.includes('/admin/hears') ? 'listens' : 'views';
             const key = `${storyId}_${partNum}_${type}`;
@@ -466,17 +465,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderPartTooltip(e, data, partNum) {
         const label = window.location.pathname.includes('/admin/hears') ? 'nghe' : 'xem';
         let html = `<div><strong>Phần ${partNum}</strong></div>`;
-        if (!data || data.length === 0) {
-            html += `<span style="color: #888;">Chưa có dữ liệu quốc gia đã ${label}</span>`;
-        } else {
+        html += `<div>Số lượt ${label}: <span style="color:#FF8C00;">${data.total_count}</span></div>`;
+        if (data.countries && data.countries.length > 0) {
             html += `<div style="margin-top:6px;"><strong>Top quốc gia đã ${label}:</strong>`;
-            data.forEach(item => {
+            data.countries.forEach(item => {
                 html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0;">
                             <span>${item.country || 'Unknown'}</span>
                             <span style="color:#FF8C00;">${item.count}</span>
                         </div>`;
             });
             html += '</div>';
+        } else {
+            html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
         }
         partTooltip.innerHTML = html;
         partTooltip.style.display = 'block';

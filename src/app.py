@@ -4772,7 +4772,34 @@ def api_story_countries(story_id):
     stat_type = request.args.get('type', 'views')
     part = request.args.get('part', type=int)
     action = 'view' if stat_type == 'views' else 'listen'
+    
+    # Lấy tổng số lượt thực tế từ DailyView/DailyListen
+    total_count = 0
+    if part is not None:
+        if stat_type == 'views':
+            result = db.session.query(func.sum(DailyView.views)).filter(
+                DailyView.story_id == story_id,
+                DailyView.part_number == part
+            ).scalar()
+        else:
+            result = db.session.query(func.sum(DailyListen.listens)).filter(
+                DailyListen.story_id == story_id,
+                DailyListen.part_number == part
+            ).scalar()
+        total_count = result or 0
+    else:
+        if stat_type == 'views':
+            story = Story.query.get(story_id)
+            if story:
+                total_count = story.views
+        else:
+            result = db.session.query(func.sum(DailyListen.listens)).filter(
+                DailyListen.story_id == story_id,
+                DailyListen.part_number == 0
+            ).scalar()
+            total_count = result or 0
 
+    # Lấy top quốc gia từ VisitLog
     if part is not None:
         path_pattern = f'/story/{story_id}?part={part}%'
     else:
@@ -4788,7 +4815,10 @@ def api_story_countries(story_id):
         VisitLog.action == action
     ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
 
-    result = [{'country': c, 'count': cnt} for c, cnt in top_countries]
+    result = {
+        'total_count': total_count,
+        'countries': [{'country': c, 'count': cnt} for c, cnt in top_countries]
+    }
     return jsonify(result)
 
 @app.route("/export_story_text/<int:story_id>", methods=["POST"])
