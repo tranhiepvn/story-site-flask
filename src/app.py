@@ -4568,10 +4568,10 @@ def admin_analytics():
     for d in dates:
         counts.append(date_map.get(d, 0))
     
-        # Top đường dẫn (loại bỏ set_theme)
-    path_stats = db.session.query(
+    # Lấy tất cả path (đã lọc) và nhóm thủ công theo story_id
+    all_paths = db.session.query(
         VisitLog.path,
-        func.count(VisitLog.id)
+        func.count(VisitLog.id).label('cnt')
     ).filter(
         VisitLog.created_at >= start_date,
         VisitLog.created_at < next_day,
@@ -4592,7 +4592,35 @@ def admin_analytics():
         VisitLog.path.notlike('/this_is_a_new_hello_world%'),
         VisitLog.path.notlike('/apple%'),
         VisitLog.path.notlike('/search%')
-    ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).limit(15).all()
+    ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).all()
+
+    # Nhóm các path theo story_id (nếu là story)
+    story_group = {}  # key: story_id, value: tổng count
+    other_paths = []   # list (path, count)
+
+    for path, cnt in all_paths:
+        base_path = path.split('?')[0]  # bỏ query string
+        if base_path.startswith('/story/'):
+            try:
+                story_id = int(base_path.split('/')[2])
+                story_group[story_id] = story_group.get(story_id, 0) + cnt
+            except:
+                # Nếu không parse được, coi là path khác
+                other_paths.append((path, cnt))
+        else:
+            other_paths.append((path, cnt))
+
+    # Tạo danh sách path_stats đã nhóm: ưu tiên story_group trước, sau đó là other_paths
+    path_stats = []
+    # Thêm các story đã nhóm
+    for story_id, total in sorted(story_group.items(), key=lambda x: x[1], reverse=True):
+        path_stats.append((f'/story/{story_id}', total))
+    # Thêm các path khác
+    for path, cnt in other_paths:
+        path_stats.append((path, cnt))
+
+    # Lấy top 15 (sau khi nhóm)
+    path_stats = path_stats[:15]
 
     top_15_countries_per_path = {}
     # Lấy top 3 quốc gia cho mỗi path trong top 15
