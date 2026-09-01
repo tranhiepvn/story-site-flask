@@ -458,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    function renderPartTooltip(e, data, partNum, snippet) {
+    function renderPartTooltip(e, data, partNum) {
         const label = window.location.pathname.includes('/admin/hears') ? 'nghe' : 'xem';
         let html = `<div><strong>Phần ${partNum}</strong></div>`;
         html += `<div>Số lượt ${label}: <span style="color:#FF8C00;">${data.total_count}</span></div>`;
@@ -474,8 +474,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
         }
-        if (snippet) {
-            html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px; font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
+        // Thêm snippet của phần (nếu có)
+        if (data.snippet) {
+            html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px; font-style:italic; color:#ccc; font-size:0.85rem;">${data.snippet}...</div>`;
         }
         partTooltip.innerHTML = html;
         partTooltip.style.display = 'block';

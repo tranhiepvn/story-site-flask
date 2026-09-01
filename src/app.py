@@ -4817,9 +4817,21 @@ def api_story_countries(story_id):
     part = request.args.get('part', type=int)
     action = 'view' if stat_type == 'views' else 'listen'
     
-    # Lấy tổng số lượt thực tế từ DailyView/DailyListen
+    # Lấy tổng số lượt
     total_count = 0
+    snippet = ""
     if part is not None:
+        # Lấy nội dung của phần đó để làm snippet
+        part_obj = Part.query.filter_by(story_id=story_id, part_number=part).first()
+        if part_obj:
+            content = part_obj.content or ""
+            lines = content.split('\n')
+            if len(lines) > 1:
+                snippet = '\n'.join(lines[1:])  # bỏ dòng đầu (tiêu đề)
+            else:
+                snippet = content
+            snippet = snippet[:200]
+        # Tổng view/listen cho phần đó
         if stat_type == 'views':
             result = db.session.query(func.sum(DailyView.views)).filter(
                 DailyView.story_id == story_id,
@@ -4832,18 +4844,19 @@ def api_story_countries(story_id):
             ).scalar()
         total_count = result or 0
     else:
+        # Không có part, lấy tổng toàn bộ truyện
         if stat_type == 'views':
             story = Story.query.get(story_id)
-            if story:
-                total_count = story.views
+            total_count = story.views if story else 0
         else:
             result = db.session.query(func.sum(DailyListen.listens)).filter(
                 DailyListen.story_id == story_id,
                 DailyListen.part_number == 0
             ).scalar()
             total_count = result or 0
+        # Không có snippet khi hover vào tên truyện (sẽ lấy từ frontend)
 
-    # Lấy top quốc gia từ VisitLog
+    # Lấy top quốc gia từ VisitLog (giữ nguyên)
     if part is not None:
         path_pattern = f'/story/{story_id}?part={part}%'
     else:
@@ -4861,6 +4874,7 @@ def api_story_countries(story_id):
 
     result = {
         'total_count': total_count,
+        'snippet': snippet,  # thêm snippet
         'countries': [{'country': c, 'count': cnt} for c, cnt in top_countries]
     }
     return jsonify(result)
