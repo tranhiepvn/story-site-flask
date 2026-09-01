@@ -1308,8 +1308,8 @@ def story_detail(story_id: int):
     today = date.today()
     mobile = is_mobile()
 
-    # Tăng view cho truyện
-    daily = DailyView.query.filter_by(story_id=story.id, date=today).first()
+    # Tăng view cho truyện (part_number = 0)
+    daily = DailyView.query.filter_by(story_id=story.id, part_number=0, date=today).first()
     if daily:
         daily.views += 1
         if mobile:
@@ -1317,7 +1317,7 @@ def story_detail(story_id: int):
         else:
             daily.views_desktop = (daily.views_desktop or 0) + 1
     else:
-        daily = DailyView(story_id=story.id, date=today, views=1,
+        daily = DailyView(story_id=story.id, part_number=0, date=today, views=1,
                           views_desktop=0 if mobile else 1,
                           views_mobile=1 if mobile else 0)
         db.session.add(daily)
