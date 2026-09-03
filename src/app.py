@@ -4788,36 +4788,56 @@ def admin_analytics():
     # Lấy tổng views của từng truyện
     stories_with_views = Story.query.filter(Story.views > 0).all()
 
-    # Tác giả
+    # Tác giả - lấy top 15 truyện của mỗi tác giả
     author_views = {}
+    author_stories = {}
     for story in stories_with_views:
         if story.author:
             author_views[story.author] = author_views.get(story.author, 0) + story.views
+            if story.author not in author_stories:
+                author_stories[story.author] = []
+            author_stories[story.author].append({
+                'title': story.title,
+                'id': story.id,
+                'views': story.views
+            })
     top_authors_by_views = []
     for author, total in sorted(author_views.items(), key=lambda x: x[1], reverse=True)[:15]:
+        top_stories = sorted(author_stories.get(author, []), key=lambda x: x['views'], reverse=True)[:15]
         top_authors_by_views.append({
             'display_name': f'✍️ {author}',
             'link': url_for('author_view', author=author),
             'total': total,
             'countries': [],
-            'snippet': ''
+            'snippet': '',
+            'stories': [{'title': s['title'], 'id': s['id'], 'views': s['views']} for s in top_stories]
         })
 
-    # Thể loại (nhiều-nhiều)
+    # Thể loại - lấy top 15 truyện của mỗi thể loại
     category_views = {}
+    category_stories = {}
     for story in stories_with_views:
         for cat in story.categories:
             category_views[cat.id] = category_views.get(cat.id, 0) + story.views
+            if cat.id not in category_stories:
+                category_stories[cat.id] = []
+            category_stories[cat.id].append({
+                'title': story.title,
+                'id': story.id,
+                'views': story.views
+            })
     top_categories_by_views = []
     for cid, total in sorted(category_views.items(), key=lambda x: x[1], reverse=True)[:15]:
         category = Category.query.get(cid)
         if category:
+            top_stories = sorted(category_stories.get(cid, []), key=lambda x: x['views'], reverse=True)[:15]
             top_categories_by_views.append({
                 'display_name': f'📂 {category.name}',
                 'link': url_for('category_view', category_id=cid),
                 'total': total,
                 'countries': [],
-                'snippet': ''
+                'snippet': '',
+                'stories': [{'title': s['title'], 'id': s['id'], 'views': s['views']} for s in top_stories]
             })
 
     return render_template('admin_analytics.html',

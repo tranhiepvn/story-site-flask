@@ -472,9 +472,9 @@
     </thead>
     <tbody>
       {% for item in top_authors_by_views %}
-      <tr>
+      <tr data-stories="{{ item.stories|tojson }}">
         <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+          <a href="{{ item.link }}" style="color: #00BFFF;" data-stories="{{ item.stories|tojson }}">{{ item.display_name }}</a>
         </td>
         <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
       </tr>
@@ -495,9 +495,9 @@
     </thead>
     <tbody>
       {% for item in top_categories_by_views %}
-      <tr>
+      <tr data-stories="{{ item.stories|tojson }}">
         <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+          <a href="{{ item.link }}" style="color: #00BFFF;" data-stories="{{ item.stories|tojson }}">{{ item.display_name }}</a>
         </td>
         <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
       </tr>
@@ -587,35 +587,50 @@ document.addEventListener('DOMContentLoaded', function() {
     chartTooltip.style.display = 'none';
   });
 
-  // ===== TOOLTIP CHO CÁC BẢNG (dùng data-snippet) =====
+  // ===== TOOLTIP CHO CÁC BẢNG (dùng data-snippet và data-stories) =====
   const tooltip = document.getElementById('analytics-tooltip');
-  const allRows = document.querySelectorAll('.path-container tbody tr[data-snippet]');
-  
+  const allRows = document.querySelectorAll('.path-container tbody tr[data-snippet], .path-container tbody tr[data-stories]');
+
   allRows.forEach(row => {
-    const link = row.querySelector('a[data-snippet]');
-    if (!link) return;
-    const snippet = link.dataset.snippet || '';
-    const name = link.textContent.trim();
+      const link = row.querySelector('a[data-snippet], a[data-stories]');
+      if (!link) return;
+      const snippet = link.dataset.snippet || '';
+      const storiesJson = link.dataset.stories || '';
+      let stories = [];
+      try {
+          stories = JSON.parse(storiesJson);
+      } catch(e) {}
 
-    row.addEventListener('mouseenter', function(e) {
-      if (!snippet) {
-        tooltip.style.display = 'none';
-        return;
-      }
-      let html = `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
-      html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
-      tooltip.innerHTML = html;
-      tooltip.style.display = 'block';
-      positionTooltip(e);
-    });
+      row.addEventListener('mouseenter', function(e) {
+          let html = '';
+          const name = link.textContent.trim();
+          if (snippet) {
+              html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
+              html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
+          } else if (stories.length > 0) {
+              html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
+              html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
+              stories.slice(0, 15).forEach(s => {
+                  html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.85rem;">
+                              <span>${s.title}</span>
+                              <span style="color:#FF8C00;">${s.views}</span>
+                          </div>`;
+              });
+          } else {
+              return; // không có dữ liệu
+          }
+          tooltip.innerHTML = html;
+          tooltip.style.display = 'block';
+          positionTooltip(e);
+      });
 
-    row.addEventListener('mousemove', function(e) {
-      positionTooltip(e);
-    });
+      row.addEventListener('mousemove', function(e) {
+          positionTooltip(e);
+      });
 
-    row.addEventListener('mouseleave', function() {
-      tooltip.style.display = 'none';
-    });
+      row.addEventListener('mouseleave', function() {
+          tooltip.style.display = 'none';
+      });
   });
 
   function positionTooltip(e) {
