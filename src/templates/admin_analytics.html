@@ -336,11 +336,11 @@
       </tr>
     </thead>
     <tbody>
-      {% if top_stories %}
-        {% for item in top_stories %}
+      {% if top_story_list %}
+        {% for item in top_story_list %}
         <tr>
           <td style="padding:6px 8px;">
-            <a href="{{ url_for('story_detail', story_id=item.id) }}" style="color: #00BFFF;">📖 {{ item.title }}</a>
+            <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
           </td>
           <td style="padding:6px 8px;">
             {% if item.countries %}
@@ -351,7 +351,7 @@
               <span style="color: #888;">—</span>
             {% endif %}
           </td>
-          <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.views }}</td>
+          <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
         </tr>
         {% endfor %}
       {% else %}

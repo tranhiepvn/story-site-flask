@@ -4716,7 +4716,7 @@ def admin_analytics():
         return result
 
     # Tạo các danh sách
-    top_stories = build_top_list(story_data, 'story')
+    top_story_list = build_top_list(story_data, 'story')
     top_authors = build_top_list(author_data, 'author')
     top_categories = build_top_list(category_data, 'category')
 
@@ -4858,7 +4858,7 @@ def admin_analytics():
                            now_la=now_la,
                            now_vn=now_vn,
                            top_country_dict=top_country_dict,
-                           top_stories=top_stories,
+                           top_story_list=top_story_list,
                            top_authors=top_authors,
                            top_categories=top_categories,
                            top_others=top_others,
