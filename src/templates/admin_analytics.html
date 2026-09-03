@@ -338,9 +338,9 @@
     <tbody>
       {% if top_story_list %}
         {% for item in top_story_list %}
-        <tr>
+        <tr data-snippet="{{ item.snippet or '' }}">
           <td style="padding:6px 8px;">
-            <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+            <a href="{{ item.link }}" style="color: #00BFFF;" data-snippet="{{ item.snippet or '' }}">{{ item.display_name }}</a>
           </td>
           <td style="padding:6px 8px;">
             {% if item.countries %}
@@ -597,7 +597,7 @@ document.addEventListener('DOMContentLoaded', function() {
     chartTooltip.style.display = 'none';
   });
 
-  // ===== TOOLTIP CHO CÁC BẢNG =====
+    // ===== TOOLTIP CHO CÁC BẢNG =====
   // Tạo map từ tên tác giả/thể loại đến danh sách truyện
   const storiesMap = {};
 
@@ -691,6 +691,34 @@ document.addEventListener('DOMContentLoaded', function() {
         html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
         html += `<div style="color:#888;">Chưa có dữ liệu truyện</div>`;
       }
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mousemove', function(e) {
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mouseleave', function() {
+      tooltip.style.display = 'none';
+    });
+  });
+
+  // ===== TOOLTIP CHO TOP 15 TRUYỆN (snippet) =====
+  document.querySelectorAll('.path-container tbody tr[data-snippet]').forEach(row => {
+    const link = row.querySelector('a[data-snippet]');
+    if (!link) return;
+    const snippet = link.dataset.snippet || '';
+    const name = link.textContent.trim();
+
+    row.addEventListener('mouseenter', function(e) {
+      if (!snippet) {
+        tooltip.style.display = 'none';
+        return;
+      }
+      let html = `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
+      html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
       positionTooltip(e);
