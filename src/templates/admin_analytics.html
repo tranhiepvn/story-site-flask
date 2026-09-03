@@ -104,6 +104,29 @@
   body.light-mode .path-list li .path-count {
       color: #e67e22;
   }
+
+  /* Tooltip chung cho các bảng */
+  #analytics-tooltip {
+    position: fixed;
+    background: #222;
+    color: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    font-size: 0.85rem;
+    max-width: 350px;
+    max-height: 300px;
+    overflow-y: auto;
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: none;
+  }
+  body.light-mode #analytics-tooltip {
+    background: #f0f0f0;
+    color: #1a1a1a;
+    border-color: #ccc;
+  }
 </style>
 
 <div style="margin-bottom: 20px;">
@@ -181,6 +204,12 @@
   }
   td {
     padding: 6px 8px;
+  }
+  .path-container table {
+    background: transparent;
+  }
+  body.light-mode tbody tr:hover {
+    background: rgba(0, 86, 179, 0.1);
   }
 </style>
 
@@ -295,8 +324,108 @@
   <div id="chart-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:450px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
 </div>
 
+<!-- Bảng Top 15 truyện -->
 <div class="path-container">
-  <h3>🔝 Top 15 trang được truy cập nhiều nhất</h3>
+  <h3>📖 Top 15 truyện được truy cập nhiều nhất</h3>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="border-bottom: 2px solid #4A90E2;">
+        <th style="text-align:left; padding:6px 8px;">Truyện</th>
+        <th style="text-align:left; padding:6px 8px;">Top 3 quốc gia</th>
+        <th style="text-align:right; padding:6px 8px;">Số lượt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in top_stories %}
+      <tr data-snippet="{{ item.snippet or '' }}">
+        <td style="padding:6px 8px;">
+          <a href="{{ item.link }}" style="color: #00BFFF;" data-snippet="{{ item.snippet or '' }}">{{ item.display_name }}</a>
+        </td>
+        <td style="padding:6px 8px;">
+          {% if item.countries %}
+            {% for country, cnt in item.countries %}
+              {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            <span style="color: #888;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Bảng Top 15 tác giả -->
+<div class="path-container">
+  <h3>✍️ Top 15 tác giả được xem nhiều nhất</h3>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="border-bottom: 2px solid #4A90E2;">
+        <th style="text-align:left; padding:6px 8px;">Tác giả</th>
+        <th style="text-align:left; padding:6px 8px;">Top 3 quốc gia</th>
+        <th style="text-align:right; padding:6px 8px;">Số lượt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in top_authors %}
+      <tr>
+        <td style="padding:6px 8px;">
+          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+        </td>
+        <td style="padding:6px 8px;">
+          {% if item.countries %}
+            {% for country, cnt in item.countries %}
+              {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            <span style="color: #888;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Bảng Top 15 thể loại -->
+<div class="path-container">
+  <h3>📂 Top 15 thể loại được xem nhiều nhất</h3>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="border-bottom: 2px solid #4A90E2;">
+        <th style="text-align:left; padding:6px 8px;">Thể loại</th>
+        <th style="text-align:left; padding:6px 8px;">Top 3 quốc gia</th>
+        <th style="text-align:right; padding:6px 8px;">Số lượt</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in top_categories %}
+      <tr>
+        <td style="padding:6px 8px;">
+          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+        </td>
+        <td style="padding:6px 8px;">
+          {% if item.countries %}
+            {% for country, cnt in item.countries %}
+              {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            <span style="color: #888;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Bảng Top 15 trang khác -->
+<div class="path-container">
+  <h3>🌐 Top 15 trang khác được truy cập nhiều nhất</h3>
   <table style="width:100%; border-collapse: collapse;">
     <thead>
       <tr style="border-bottom: 2px solid #4A90E2;">
@@ -306,8 +435,8 @@
       </tr>
     </thead>
     <tbody>
-      {% for item in path_list %}
-      <tr style="border-bottom: 1px solid #333;" data-path="{{ item.path }}" data-snippet="{{ item.snippet or '' }}">
+      {% for item in top_others %}
+      <tr>
         <td style="padding:6px 8px;">
           {% if item.link %}
             <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
@@ -316,24 +445,23 @@
           {% endif %}
         </td>
         <td style="padding:6px 8px;">
-          {% set countries = top_countries_per_path.get(item.path, []) %}
-          {% if countries %}
-            {% for country, cnt in countries %}
+          {% if item.countries %}
+            {% for country, cnt in item.countries %}
               {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
             {% endfor %}
           {% else %}
             <span style="color: #888;">—</span>
           {% endif %}
         </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.count }}</td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
-<!-- Tooltip cho Top 15 trang -->
-<div id="path-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:450px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+<!-- Tooltip chung -->
+<div id="analytics-tooltip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
@@ -413,41 +541,25 @@ document.addEventListener('DOMContentLoaded', function() {
     chartTooltip.style.display = 'none';
   });
 
-  // ===== TOOLTIP CHO TOP 15 TRANG (có snippet) =====
-  const pathTooltip = document.getElementById('path-tooltip');
-  const top15CountriesPerPath = {{ top_15_countries_per_path|tojson }};
-  const pathRows = document.querySelectorAll('.path-container tbody tr');
-
-  pathRows.forEach(row => {
-    const path = row.dataset.path;
-    if (!path) return;
-    const countries = top15CountriesPerPath[path] || [];
-    const nameCell = row.querySelector('td:first-child');
-    const countCell = row.querySelector('td:last-child');
-    if (!nameCell || !countCell) return;
-    const name = nameCell.textContent.trim();
-    const count = countCell.textContent.trim();
-    const snippet = row.dataset.snippet || '';
+  // ===== TOOLTIP CHO CÁC BẢNG (dùng data-snippet) =====
+  const tooltip = document.getElementById('analytics-tooltip');
+  const allRows = document.querySelectorAll('.path-container tbody tr[data-snippet]');
+  
+  allRows.forEach(row => {
+    const link = row.querySelector('a[data-snippet]');
+    if (!link) return;
+    const snippet = link.dataset.snippet || '';
+    const name = link.textContent.trim();
 
     row.addEventListener('mouseenter', function(e) {
-      let html = `<div><strong>${name}</strong><br>Số lượt: <span style="color:#FF8C00;">${count}</span></div>`;
-      if (countries.length > 0) {
-        html += '<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px;"><strong>Top quốc gia:</strong>';
-        countries.forEach(item => {
-          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0;">
-                      <span>${item[0]}</span>
-                      <span style="color:#FF8C00;">${item[1]}</span>
-                    </div>`;
-        });
-        html += '</div>';
-      } else {
-        html += '<div style="margin-top:6px; color:#888;">Chưa có dữ liệu quốc gia</div>';
+      if (!snippet) {
+        tooltip.style.display = 'none';
+        return;
       }
-      if (snippet) {
-        html += `<div style="margin-top:8px; border-top:1px solid #555; padding-top:6px; font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
-      }
-      pathTooltip.innerHTML = html;
-      pathTooltip.style.display = 'block';
+      let html = `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
+      html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
       positionTooltip(e);
     });
 
@@ -456,22 +568,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     row.addEventListener('mouseleave', function() {
-      pathTooltip.style.display = 'none';
+      tooltip.style.display = 'none';
     });
-
-    function positionTooltip(e) {
-      let left = e.clientX + 15;
-      let top = e.clientY - 10;
-      const tooltipWidth = pathTooltip.scrollWidth || 350;
-      const tooltipHeight = pathTooltip.scrollHeight || 300;
-      if (left + tooltipWidth > window.innerWidth) left = e.clientX - tooltipWidth - 15;
-      if (top + tooltipHeight > window.innerHeight) top = window.innerHeight - tooltipHeight - 10;
-      if (top < 10) top = 10;
-      if (left < 10) left = 10;
-      pathTooltip.style.left = left + 'px';
-      pathTooltip.style.top = top + 'px';
-    }
   });
+
+  function positionTooltip(e) {
+    let left = e.clientX + 15;
+    let top = e.clientY - 10;
+    const w = tooltip.scrollWidth || 320;
+    const h = tooltip.scrollHeight || 200;
+    if (left + w > window.innerWidth) left = e.clientX - w - 15;
+    if (top + h > window.innerHeight) top = window.innerHeight - h - 10;
+    if (top < 10) top = 10;
+    if (left < 10) left = 10;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
 
   // ===== GIỜ TRÌNH DUYỆT =====
   function updateClientTime() {

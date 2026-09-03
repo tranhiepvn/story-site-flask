@@ -4323,7 +4323,8 @@ def log_visit():
         request.path.startswith('/author/') or
         request.path.startswith('/category/') or
         request.path.startswith('/type/') or
-        request.path.startswith('/api/start_audio/')  # chỉ log start_audio, không log get_chunk
+        request.path.startswith('/search') or
+        request.path.startswith('/api/start_audio/')
     )
     if not allowed_paths:
         return
@@ -4594,31 +4595,14 @@ def admin_analytics():
     for d in dates:
         counts.append(date_map.get(d, 0))
     
-    # ---- LẤY DỮ LIỆU PATH VÀ QUỐC GIA (NHÓM THEO STORY) ----
-    # 1. Lấy tất cả path và số lượt (đã lọc)
+    # ---- PHÂN LOẠI PATH ----
+    # 1. Lấy tất cả path và số lượt (đã lọc các path không mong muốn)
     all_paths = db.session.query(
         VisitLog.path,
         func.count(VisitLog.id).label('cnt')
     ).filter(
         VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day,
-        VisitLog.path.notlike('/set_theme%'),
-        VisitLog.path.notlike('/upload%'),
-        VisitLog.path.notlike('/admin%'),
-        VisitLog.path.notlike('/api%'),
-        VisitLog.path.notlike('/static%'),
-        VisitLog.path.notlike('/favicon.ico'),
-        VisitLog.path.notlike('/'),
-        VisitLog.path.notlike('/robots.txt'),
-        VisitLog.path.notlike('/my_follows%'),
-        VisitLog.path.notlike('/.well-known%'),
-        VisitLog.path.notlike('/wp-json%'),
-        VisitLog.path.notlike('/.env%'),
-        VisitLog.path.notlike('/wp-content%'),
-        VisitLog.path.notlike('/fetch%'),
-        VisitLog.path.notlike('/this_is_a_new_hello_world%'),
-        VisitLog.path.notlike('/apple%'),
-        VisitLog.path.notlike('/search%')
+        VisitLog.created_at < next_day
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).all()
 
     # 2. Lấy dữ liệu quốc gia theo path
@@ -4630,8 +4614,7 @@ def admin_analytics():
         VisitLog.created_at >= start_date,
         VisitLog.created_at < next_day,
         VisitLog.country.isnot(None),
-        VisitLog.country != '',
-        # Thêm các điều kiện lọc tương tự nếu cần
+        VisitLog.country != ''
     ).group_by(VisitLog.path, VisitLog.country).all()
 
     # Tạo dictionary countries_by_path
@@ -4641,116 +4624,143 @@ def admin_analytics():
             countries_by_path[path] = {}
         countries_by_path[path][country] = cnt
 
-    # 3. Nhóm các path theo story_id và gộp quốc gia
-    story_group = {}          # key: story_id, value: tổng count
-    other_paths = []          # list (path, count) cho các path không phải story
-    story_countries = {}      # key: story_id, value: dict {country: total}
-    other_paths_countries = {} # key: path, value: dict {country: count}
+    # 3. Phân loại
+    story_data = {}      # key: story_id, value: {'total': cnt, 'countries': {country: total}}
+    author_data = {}     # key: author_name, value: {'total': cnt, 'countries': {country: total}}
+    category_data = {}   # key: category_id, value: {'total': cnt, 'countries': {country: total}}
+    other_data = []      # list các dict {'path': path, 'count': cnt, 'countries': {...}}
 
     for path, cnt in all_paths:
         base_path = path.split('?')[0]
         if base_path.startswith('/story/'):
             try:
                 story_id = int(base_path.split('/')[2])
-                story_group[story_id] = story_group.get(story_id, 0) + cnt
-                # Gộp quốc gia
-                if story_id not in story_countries:
-                    story_countries[story_id] = {}
+                if story_id not in story_data:
+                    story_data[story_id] = {'total': 0, 'countries': {}}
+                story_data[story_id]['total'] += cnt
                 for country, c in countries_by_path.get(path, {}).items():
-                    story_countries[story_id][country] = story_countries[story_id].get(country, 0) + c
+                    story_data[story_id]['countries'][country] = story_data[story_id]['countries'].get(country, 0) + c
             except:
-                other_paths.append((path, cnt))
-                # Lưu quốc gia cho path này
-                if path in countries_by_path:
-                    other_paths_countries[path] = countries_by_path[path]
-        else:
-            other_paths.append((path, cnt))
-            if path in countries_by_path:
-                other_paths_countries[path] = countries_by_path[path]
-
-    # 4. Tạo path_stats đã nhóm (top 15)
-    path_stats = []
-    for story_id, total in sorted(story_group.items(), key=lambda x: x[1], reverse=True):
-        path_stats.append((f'/story/{story_id}', total))
-    for path, cnt in other_paths:
-        path_stats.append((path, cnt))
-    path_stats = path_stats[:15]
-
-    # 5. Tạo top_countries_per_path (top 3) và top_15_countries_per_path (top 15) cho template
-    top_countries_per_path = {}
-    top_15_countries_per_path = {}
-
-    # Xử lý cho các story đã nhóm
-    for story_id, countries in story_countries.items():
-        sorted_countries = sorted(countries.items(), key=lambda x: x[1], reverse=True)
-        top_15_countries_per_path[f'/story/{story_id}'] = [(c, cnt) for c, cnt in sorted_countries]
-        top_countries_per_path[f'/story/{story_id}'] = [(c, cnt) for c, cnt in sorted_countries[:3]]
-
-    # Xử lý cho các path khác
-    for path, countries in other_paths_countries.items():
-        sorted_countries = sorted(countries.items(), key=lambda x: x[1], reverse=True)
-        top_15_countries_per_path[path] = [(c, cnt) for c, cnt in sorted_countries]
-        top_countries_per_path[path] = [(c, cnt) for c, cnt in sorted_countries[:3]]
-
-    # 6. Xây dựng path_list (hiển thị tên thân thiện)
-    path_list = []
-    for path, count in path_stats:
-        base_path = path.split('?')[0] if '?' in path else path
-        display_name = path
-        story_link = None
-
-        if base_path == '/':
-            display_name = '🏠 Trang chủ'
-            story_link = url_for('index')
-        elif base_path.startswith('/story/'):
-            try:
-                story_id = int(base_path.split('/')[2])
-                story = Story.query.get(story_id)
-                if story:
-                    display_name = f'📖 {story.title}'
-                    story_link = url_for('story_detail', story_id=story.id)
-                    # Lấy snippet từ phần 1
-                    first_part = story.parts[0] if story.parts else None
-                    snippet = first_part.content[:200] if first_part else ""
-                else:
-                    display_name = f'📖 Truyện #{story_id} (đã xóa)'
-                    snippet = ""
-            except:
-                snippet = ""
-        elif base_path.startswith('/category/'):
-            try:
-                category_id = int(base_path.split('/')[2])
-                category = Category.query.get(category_id)
-                if category:
-                    display_name = f'📂 Thể loại: {category.name}'
-                    story_link = url_for('category_view', category_id=category.id)
-                else:
-                    display_name = f'📂 Thể loại #{category_id} (đã xóa)'
-            except:
-                pass
-        elif base_path.startswith('/type/long'):
-            display_name = '📚 Truyện Dài'
-            story_link = url_for('type_view', story_type='long')
-        elif base_path.startswith('/type/short'):
-            display_name = '📘 Truyện Ngắn'
-            story_link = url_for('type_view', story_type='short')
+                # Nếu parse lỗi, coi như path khác
+                other_data.append({
+                    'path': path,
+                    'count': cnt,
+                    'countries': countries_by_path.get(path, {})
+                })
         elif base_path.startswith('/author/'):
             try:
                 author = base_path.split('/')[2]
-                if author:
-                    display_name = f'✍️ Tác giả: {author}'
-                    story_link = url_for('author_view', author=author)
+                if not author:
+                    continue
+                if author not in author_data:
+                    author_data[author] = {'total': 0, 'countries': {}}
+                author_data[author]['total'] += cnt
+                for country, c in countries_by_path.get(path, {}).items():
+                    author_data[author]['countries'][country] = author_data[author]['countries'].get(country, 0) + c
             except:
-                pass
+                other_data.append({
+                    'path': path,
+                    'count': cnt,
+                    'countries': countries_by_path.get(path, {})
+                })
+        elif base_path.startswith('/category/'):
+            try:
+                category_id = int(base_path.split('/')[2])
+                if category_id not in category_data:
+                    category_data[category_id] = {'total': 0, 'countries': {}}
+                category_data[category_id]['total'] += cnt
+                for country, c in countries_by_path.get(path, {}).items():
+                    category_data[category_id]['countries'][country] = category_data[category_id]['countries'].get(country, 0) + c
+            except:
+                other_data.append({
+                    'path': path,
+                    'count': cnt,
+                    'countries': countries_by_path.get(path, {})
+                })
+        else:
+            other_data.append({
+                'path': path,
+                'count': cnt,
+                'countries': countries_by_path.get(path, {})
+            })
 
-        path_list.append({
-            'path': path,
+    # Hàm helper để tạo danh sách top và lấy top 3 countries
+    def build_top_list(data_dict, type_name, limit=15):
+        result = []
+        if type_name == 'story':
+            for sid, info in sorted(data_dict.items(), key=lambda x: x[1]['total'], reverse=True)[:limit]:
+                story = Story.query.get(sid)
+                if not story:
+                    continue
+                snippet = story.parts[0].content[:200] if story.parts else ''
+                top3 = sorted(info['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
+                result.append({
+                    'display_name': f'📖 {story.title}',
+                    'link': url_for('story_detail', story_id=sid),
+                    'total': info['total'],
+                    'countries': [(c, cnt) for c, cnt in top3],
+                    'snippet': snippet
+                })
+        elif type_name == 'author':
+            for author, info in sorted(data_dict.items(), key=lambda x: x[1]['total'], reverse=True)[:limit]:
+                top3 = sorted(info['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
+                result.append({
+                    'display_name': f'✍️ {author}',
+                    'link': url_for('author_view', author=author),
+                    'total': info['total'],
+                    'countries': [(c, cnt) for c, cnt in top3],
+                    'snippet': ''
+                })
+        elif type_name == 'category':
+            for cid, info in sorted(data_dict.items(), key=lambda x: x[1]['total'], reverse=True)[:limit]:
+                category = Category.query.get(cid)
+                if not category:
+                    continue
+                top3 = sorted(info['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
+                result.append({
+                    'display_name': f'📂 {category.name}',
+                    'link': url_for('category_view', category_id=cid),
+                    'total': info['total'],
+                    'countries': [(c, cnt) for c, cnt in top3],
+                    'snippet': ''
+                })
+        return result
+
+    # Tạo các danh sách
+    top_stories = build_top_list(story_data, 'story')
+    top_authors = build_top_list(author_data, 'author')
+    top_categories = build_top_list(category_data, 'category')
+
+    # Top 15 other
+    other_sorted = sorted(other_data, key=lambda x: x['count'], reverse=True)[:15]
+    top_others = []
+    for item in other_sorted:
+        top3 = sorted(item['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
+        # Lấy tên hiển thị thân thiện
+        display_name = item['path']
+        link = None
+        if item['path'] == '/':
+            display_name = '🏠 Trang chủ'
+            link = url_for('index')
+        elif item['path'].startswith('/type/long'):
+            display_name = '📚 Truyện Dài'
+            link = url_for('type_view', story_type='long')
+        elif item['path'].startswith('/type/short'):
+            display_name = '📘 Truyện Ngắn'
+            link = url_for('type_view', story_type='short')
+        elif item['path'].startswith('/search'):
+            display_name = '🔍 Tìm kiếm'
+            link = url_for('search')
+        else:
+            display_name = item['path']
+        top_others.append({
             'display_name': display_name,
-            'count': count,
-            'link': story_link,
-            'snippet': snippet
+            'link': link,
+            'total': item['count'],
+            'countries': [(c, cnt) for c, cnt in top3],
+            'snippet': ''
         })
-    
+
     now_utc = datetime.utcnow()
     now_la = now_utc - timedelta(hours=7)
     now_vn = now_utc + timedelta(hours=7)
@@ -4790,7 +4800,6 @@ def admin_analytics():
                            counts=counts,
                            hours=hours,
                            hour_counts=hour_counts,
-                           path_list=path_list,
                            start_date=start_date,
                            end_date=end_date,
                            range_type=range_param,
@@ -4799,8 +4808,10 @@ def admin_analytics():
                            now_la=now_la,
                            now_vn=now_vn,
                            top_country_dict=top_country_dict,
-                           top_15_countries_per_path=top_15_countries_per_path,
-                           top_countries_per_path=top_countries_per_path,
+                           top_stories=top_stories,
+                           top_authors=top_authors,
+                           top_categories=top_categories,
+                           top_others=top_others,
                            top_countries_by_date=top_countries_by_date)
 
 @app.route('/set_theme/<theme>')
