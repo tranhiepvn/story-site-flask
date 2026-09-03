@@ -4583,27 +4583,14 @@ def admin_analytics():
     for d in dates:
         counts.append(date_map.get(d, 0))
     
-    # ---- PHÂN LOẠI PATH (đã sửa) ----
+    # ---- PHÂN LOẠI PATH (đã sửa: gộp type/long, type/short, / ; giữ nguyên search) ----
     # 1. Lấy tất cả path và số lượt (đã lọc các path không mong muốn)
     all_paths = db.session.query(
         VisitLog.path,
         func.count(VisitLog.id).label('cnt')
     ).filter(
         VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day,
-        VisitLog.path.notlike('/set_theme%'),
-        VisitLog.path.notlike('/upload%'),
-        VisitLog.path.notlike('/admin%'),
-        VisitLog.path.notlike('/api%'),
-        VisitLog.path.notlike('/static%'),
-        VisitLog.path.notlike('/favicon.ico'),
-        VisitLog.path.notlike('/robots.txt'),
-        VisitLog.path.notlike('/.well-known%'),
-        VisitLog.path.notlike('/wp-json%'),
-        VisitLog.path.notlike('/wp-content%'),
-        VisitLog.path.notlike('/.env%'),
-        VisitLog.path.notlike('/fetch%'),
-        VisitLog.path.notlike('/this_is_a_new_hello_world.php%')
+        VisitLog.created_at < next_day
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).all()
 
     # 2. Lấy dữ liệu quốc gia theo path
@@ -4625,11 +4612,11 @@ def admin_analytics():
             countries_by_path[path] = {}
         countries_by_path[path][country] = cnt
 
-    # 3. Phân loại (gộp type/long, type/short, search, ...)
+    # 3. Phân loại (gộp type/long, type/short, / ; giữ nguyên search và các path khác)
     story_data = {}
     author_data = {}
     category_data = {}
-    other_data = {}  # key: display_key (đã gộp), value: {'total': cnt, 'countries': {country: total}}
+    other_data = {}  # key: display_key (đã gộp hoặc path gốc), value: {'total': cnt, 'countries': {country: total}}
 
     for path, cnt in all_paths:
         base_path = path.split('?')[0]
@@ -4669,17 +4656,17 @@ def admin_analytics():
             except:
                 pass
         else:
-            # Gộp các path theo base_path cho type/long, type/short, search, /
-            display_key = base_path
+            # Xác định display_key để gộp hoặc giữ nguyên
             if base_path.startswith('/type/long'):
                 display_key = '/type/long'
             elif base_path.startswith('/type/short'):
                 display_key = '/type/short'
-            elif base_path.startswith('/search'):
-                display_key = '/search'
             elif base_path == '/':
                 display_key = '/'
-            # Các path khác giữ nguyên base_path
+            else:
+                # Giữ nguyên path đầy đủ cho search và các path khác
+                display_key = path
+            
             if display_key not in other_data:
                 other_data[display_key] = {'total': 0, 'countries': {}}
             other_data[display_key]['total'] += cnt
@@ -4733,7 +4720,7 @@ def admin_analytics():
     top_authors = build_top_list(author_data, 'author')
     top_categories = build_top_list(category_data, 'category')
 
-    # Top 15 other (đã gộp)
+    # Top 15 other (đã gộp type/long, type/short, / ; giữ nguyên search và các path khác)
     other_sorted = sorted(other_data.items(), key=lambda x: x[1]['total'], reverse=True)[:15]
     top_others = []
     for display_key, info in other_sorted:
@@ -4748,11 +4735,20 @@ def admin_analytics():
             display_name = '📘 Truyện Ngắn'
             link = url_for('type_view', story_type='short')
         elif display_key.startswith('/search'):
-            display_name = '🔍 Tìm kiếm'
-            link = url_for('search')
+            # Trích xuất từ khóa tìm kiếm
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(display_key)
+            qs = parse_qs(parsed.query)
+            q = qs.get('q', [''])[0]
+            if q:
+                display_name = f'🔍 Tìm kiếm: "{q}"'
+            else:
+                display_name = '🔍 Tìm kiếm'
+            link = display_key  # link trực tiếp đến URL tìm kiếm
         else:
             display_name = display_key
-            link = None
+            link = display_key if display_key.startswith('/') else None
+        
         top_others.append({
             'display_name': display_name,
             'link': link,
@@ -4788,6 +4784,42 @@ def admin_analytics():
         except:
             top_countries_by_date[date_str] = []
 
+    # ---- TÍNH TOP TÁC GIẢ VÀ THỂ LOẠI THEO LƯỢT XEM ----
+    # Lấy tổng views của từng truyện
+    stories_with_views = Story.query.filter(Story.views > 0).all()
+
+    # Tác giả
+    author_views = {}
+    for story in stories_with_views:
+        if story.author:
+            author_views[story.author] = author_views.get(story.author, 0) + story.views
+    top_authors_by_views = []
+    for author, total in sorted(author_views.items(), key=lambda x: x[1], reverse=True)[:15]:
+        top_authors_by_views.append({
+            'display_name': f'✍️ {author}',
+            'link': url_for('author_view', author=author),
+            'total': total,
+            'countries': [],
+            'snippet': ''
+        })
+
+    # Thể loại (nhiều-nhiều)
+    category_views = {}
+    for story in stories_with_views:
+        for cat in story.categories:
+            category_views[cat.id] = category_views.get(cat.id, 0) + story.views
+    top_categories_by_views = []
+    for cid, total in sorted(category_views.items(), key=lambda x: x[1], reverse=True)[:15]:
+        category = Category.query.get(cid)
+        if category:
+            top_categories_by_views.append({
+                'display_name': f'📂 {category.name}',
+                'link': url_for('category_view', category_id=cid),
+                'total': total,
+                'countries': [],
+                'snippet': ''
+            })
+
     return render_template('admin_analytics.html',
                            total_sessions=total_sessions,
                            device_stats=device_stats,
@@ -4810,7 +4842,9 @@ def admin_analytics():
                            top_authors=top_authors,
                            top_categories=top_categories,
                            top_others=top_others,
-                           top_countries_by_date=top_countries_by_date)
+                           top_countries_by_date=top_countries_by_date,
+                           top_authors_by_views=top_authors_by_views,
+                           top_categories_by_views=top_categories_by_views)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):

@@ -359,7 +359,7 @@
 
 <!-- Bảng Top 15 tác giả -->
 <div class="path-container">
-  <h3>✍️ Top 15 tác giả được xem nhiều nhất</h3>
+  <h3>✍️ Top 15 tác giả được tìm kiếm nhiều nhất</h3>
   <table style="width:100%; border-collapse: collapse;">
     <thead>
       <tr style="border-bottom: 2px solid #4A90E2;">
@@ -392,7 +392,7 @@
 
 <!-- Bảng Top 15 thể loại -->
 <div class="path-container">
-  <h3>📂 Top 15 thể loại được xem nhiều nhất</h3>
+  <h3>📂 Top 15 thể loại được tìm kiếm nhiều nhất</h3>
   <table style="width:100%; border-collapse: collapse;">
     <thead>
       <tr style="border-bottom: 2px solid #4A90E2;">
@@ -452,6 +452,52 @@
           {% else %}
             <span style="color: #888;">—</span>
           {% endif %}
+        </td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Bảng Top 15 tác giả theo lượt xem -->
+<div class="path-container">
+  <h3>✍️ Top 15 tác giả có tổng lượt xem cao nhất</h3>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="border-bottom: 2px solid #4A90E2;">
+        <th style="text-align:left; padding:6px 8px;">Tác giả</th>
+        <th style="text-align:right; padding:6px 8px;">Số lượt xem</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in top_authors_by_views %}
+      <tr>
+        <td style="padding:6px 8px;">
+          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+        </td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Bảng Top 15 thể loại theo lượt xem -->
+<div class="path-container">
+  <h3>📂 Top 15 thể loại có tổng lượt xem cao nhất</h3>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="border-bottom: 2px solid #4A90E2;">
+        <th style="text-align:left; padding:6px 8px;">Thể loại</th>
+        <th style="text-align:right; padding:6px 8px;">Số lượt xem</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in top_categories_by_views %}
+      <tr>
+        <td style="padding:6px 8px;">
+          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
         </td>
         <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
       </tr>
