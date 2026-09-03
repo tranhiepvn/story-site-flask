@@ -113,9 +113,9 @@
     padding: 12px;
     border-radius: 6px;
     border: 1px solid #444;
-    font-size: 0.8rem;    /* giảm từ 0.85rem xuống 0.8rem */
-    max-width: 420px;     /* tăng từ 350px lên 420px */
-    max-height: 500px;    /* tăng từ 300px lên 500px */
+    font-size: 0.8rem;
+    max-width: 420px;
+    max-height: 500px;
     overflow-y: auto;
     pointer-events: none;
     z-index: 9999;
@@ -336,23 +336,27 @@
       </tr>
     </thead>
     <tbody>
-      {% for item in top_stories %}
-      <tr data-snippet="{{ item.snippet or '' }}">
-        <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;" data-snippet="{{ item.snippet or '' }}">{{ item.display_name }}</a>
-        </td>
-        <td style="padding:6px 8px;">
-          {% if item.countries %}
-            {% for country, cnt in item.countries %}
-              {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
-            {% endfor %}
-          {% else %}
-            <span style="color: #888;">—</span>
-          {% endif %}
-        </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
-      </tr>
-      {% endfor %}
+      {% if top_stories %}
+        {% for item in top_stories %}
+        <tr>
+          <td style="padding:6px 8px;">
+            <a href="{{ url_for('story_detail', story_id=item.id) }}" style="color: #00BFFF;">📖 {{ item.title }}</a>
+          </td>
+          <td style="padding:6px 8px;">
+            {% if item.countries %}
+              {% for country, cnt in item.countries %}
+                {{ country }} ({{ cnt }}){% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% else %}
+              <span style="color: #888;">—</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.views }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="3" style="color:#888; text-align:center;">Chưa có dữ liệu</td></tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
@@ -383,7 +387,7 @@
             <span style="color: #888;">—</span>
           {% endif %}
         </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total if item.total is not none else 0 }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -416,7 +420,7 @@
             <span style="color: #888;">—</span>
           {% endif %}
         </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total if item.total is not none else 0 }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -453,7 +457,7 @@
             <span style="color: #888;">—</span>
           {% endif %}
         </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total if item.total is not none else 0 }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -476,7 +480,7 @@
         <td style="padding:6px 8px;">
           <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
         </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total if item.total is not none else 0 }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -499,7 +503,7 @@
         <td style="padding:6px 8px;">
           <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
         </td>
-        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
+        <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total if item.total is not none else 0 }}</td>
       </tr>
       {% endfor %}
     </tbody>
