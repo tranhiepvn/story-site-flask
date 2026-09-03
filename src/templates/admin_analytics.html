@@ -113,9 +113,9 @@
     padding: 12px;
     border-radius: 6px;
     border: 1px solid #444;
-    font-size: 0.85rem;
-    max-width: 350px;
-    max-height: 300px;
+    font-size: 0.8rem;    /* giảm từ 0.85rem xuống 0.8rem */
+    max-width: 420px;     /* tăng từ 350px lên 420px */
+    max-height: 500px;    /* tăng từ 300px lên 500px */
     overflow-y: auto;
     pointer-events: none;
     z-index: 9999;
@@ -642,7 +642,7 @@ document.addEventListener('DOMContentLoaded', function() {
         html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
         html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
         stories.slice(0, 15).forEach(s => {
-          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.85rem;">
+          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.8rem;">
                       <span>${s.title}</span>
                       <span style="color:#FF8C00;">${s.views}</span>
                     </div>`;
@@ -678,7 +678,7 @@ document.addEventListener('DOMContentLoaded', function() {
         html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
         html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
         stories.slice(0, 15).forEach(s => {
-          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.85rem;">
+          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.8rem;">
                       <span>${s.title}</span>
                       <span style="color:#FF8C00;">${s.views}</span>
                     </div>`;
