@@ -4448,7 +4448,6 @@ def admin_analytics():
         VisitLog.created_at < next_day
     ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
 
-
     # Lấy offset giờ hiện tại của server (đã có hàm get_server_offset_hours)
     offset_hours = get_server_offset_hours()
 
@@ -4485,23 +4484,19 @@ def admin_analytics():
         ).group_by('hour_server').order_by(func.count(VisitLog.id).desc()).all()
         
         # Tạo cấu trúc dữ liệu giống PostgreSQL để template không bị lỗi
-        # Biến hour_stats sẽ là list các object có hour_server, hour_la, hour_vn, count
-        # Với SQLite, ta gán hour_la và hour_vn giống hour_server (hoặc None)
         hour_stats_processed = []
         for item in hour_stats:
             hour_stats_processed.append({
                 'hour_server': int(item.hour_server),
-                'hour_la': int(item.hour_server),  # tạm thời cho giống
+                'hour_la': int(item.hour_server),
                 'hour_vn': int(item.hour_server),
                 'count': item.count
             })
         hour_stats = hour_stats_processed
 
-
     # Lấy top country cho mỗi giờ server
     top_country_dict = {}
     if db.engine.dialect.name == 'postgresql':
-        # Subquery: group by hour_server, country
         subq = db.session.query(
             extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")).label('hour_server'),
             VisitLog.country,
@@ -4516,7 +4511,6 @@ def admin_analytics():
             VisitLog.country
         ).subquery()
         
-        # Distinct on hour_server, sắp xếp theo cnt desc
         top_country_query = db.session.query(
             subq.c.hour_server,
             subq.c.country
@@ -4530,8 +4524,6 @@ def admin_analytics():
         for hour, country in top_country_query:
             top_country_dict[int(hour)] = country
     else:
-        # SQLite: không hỗ trợ DISTINCT ON, có thể bỏ qua hoặc xử lý đơn giản
-        # Ta có thể lấy tất cả và tự xử lý trong Python
         subq = db.session.query(
             func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour_server'),
             VisitLog.country,
@@ -4545,7 +4537,6 @@ def admin_analytics():
             'hour_server',
             VisitLog.country
         ).all()
-        # Tìm max cnt cho mỗi hour
         temp = {}
         for hour, country, cnt in subq:
             key = int(hour)
@@ -4557,9 +4548,8 @@ def admin_analytics():
     hour_counts = [0] * 24
     for item in hour_stats:
         try:
-            # item có thể là tuple hoặc object; lấy hour_server
             h = item.hour_server if hasattr(item, 'hour_server') else item[0]
-            count = item.count if hasattr(item, 'count') else item[3]  # hoặc item[3] nếu tuple
+            count = item.count if hasattr(item, 'count') else item[3]
             idx = int(h)
             if 0 <= idx <= 23:
                 hour_counts[idx] = count
@@ -4578,10 +4568,8 @@ def admin_analytics():
     dates = [(start_date + timedelta(days=i)).strftime('%d/%m') for i in range(7)]
     counts = []
     
-    # Xây dựng map từ ngày (chuỗi) sang count
     date_map = {}
     for stat in daily_stats:
-        # SQLite trả về chuỗi 'YYYY-MM-DD', PostgreSQL trả về date object
         if isinstance(stat.date, str):
             try:
                 date_obj = datetime.strptime(stat.date, '%Y-%m-%d').date()
@@ -4595,14 +4583,27 @@ def admin_analytics():
     for d in dates:
         counts.append(date_map.get(d, 0))
     
-    # ---- PHÂN LOẠI PATH ----
+    # ---- PHÂN LOẠI PATH (đã sửa) ----
     # 1. Lấy tất cả path và số lượt (đã lọc các path không mong muốn)
     all_paths = db.session.query(
         VisitLog.path,
         func.count(VisitLog.id).label('cnt')
     ).filter(
         VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
+        VisitLog.created_at < next_day,
+        VisitLog.path.notlike('/set_theme%'),
+        VisitLog.path.notlike('/upload%'),
+        VisitLog.path.notlike('/admin%'),
+        VisitLog.path.notlike('/api%'),
+        VisitLog.path.notlike('/static%'),
+        VisitLog.path.notlike('/favicon.ico'),
+        VisitLog.path.notlike('/robots.txt'),
+        VisitLog.path.notlike('/.well-known%'),
+        VisitLog.path.notlike('/wp-json%'),
+        VisitLog.path.notlike('/wp-content%'),
+        VisitLog.path.notlike('/.env%'),
+        VisitLog.path.notlike('/fetch%'),
+        VisitLog.path.notlike('/this_is_a_new_hello_world.php%')
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).all()
 
     # 2. Lấy dữ liệu quốc gia theo path
@@ -4624,29 +4625,27 @@ def admin_analytics():
             countries_by_path[path] = {}
         countries_by_path[path][country] = cnt
 
-    # 3. Phân loại
-    story_data = {}      # key: story_id, value: {'total': cnt, 'countries': {country: total}}
-    author_data = {}     # key: author_name, value: {'total': cnt, 'countries': {country: total}}
-    category_data = {}   # key: category_id, value: {'total': cnt, 'countries': {country: total}}
-    other_data = []      # list các dict {'path': path, 'count': cnt, 'countries': {...}}
+    # 3. Phân loại (gộp type/long, type/short, search, ...)
+    story_data = {}
+    author_data = {}
+    category_data = {}
+    other_data = {}  # key: display_key (đã gộp), value: {'total': cnt, 'countries': {country: total}}
 
     for path, cnt in all_paths:
         base_path = path.split('?')[0]
         if base_path.startswith('/story/'):
             try:
-                story_id = int(base_path.split('/')[2])
-                if story_id not in story_data:
-                    story_data[story_id] = {'total': 0, 'countries': {}}
-                story_data[story_id]['total'] += cnt
-                for country, c in countries_by_path.get(path, {}).items():
-                    story_data[story_id]['countries'][country] = story_data[story_id]['countries'].get(country, 0) + c
+                import re
+                match = re.search(r'/story/(\d+)', base_path)
+                if match:
+                    story_id = int(match.group(1))
+                    if story_id not in story_data:
+                        story_data[story_id] = {'total': 0, 'countries': {}}
+                    story_data[story_id]['total'] += cnt
+                    for country, c in countries_by_path.get(path, {}).items():
+                        story_data[story_id]['countries'][country] = story_data[story_id]['countries'].get(country, 0) + c
             except:
-                # Nếu parse lỗi, coi như path khác
-                other_data.append({
-                    'path': path,
-                    'count': cnt,
-                    'countries': countries_by_path.get(path, {})
-                })
+                pass
         elif base_path.startswith('/author/'):
             try:
                 author = base_path.split('/')[2]
@@ -4658,11 +4657,7 @@ def admin_analytics():
                 for country, c in countries_by_path.get(path, {}).items():
                     author_data[author]['countries'][country] = author_data[author]['countries'].get(country, 0) + c
             except:
-                other_data.append({
-                    'path': path,
-                    'count': cnt,
-                    'countries': countries_by_path.get(path, {})
-                })
+                pass
         elif base_path.startswith('/category/'):
             try:
                 category_id = int(base_path.split('/')[2])
@@ -4672,17 +4667,24 @@ def admin_analytics():
                 for country, c in countries_by_path.get(path, {}).items():
                     category_data[category_id]['countries'][country] = category_data[category_id]['countries'].get(country, 0) + c
             except:
-                other_data.append({
-                    'path': path,
-                    'count': cnt,
-                    'countries': countries_by_path.get(path, {})
-                })
+                pass
         else:
-            other_data.append({
-                'path': path,
-                'count': cnt,
-                'countries': countries_by_path.get(path, {})
-            })
+            # Gộp các path theo base_path cho type/long, type/short, search, /
+            display_key = base_path
+            if base_path.startswith('/type/long'):
+                display_key = '/type/long'
+            elif base_path.startswith('/type/short'):
+                display_key = '/type/short'
+            elif base_path.startswith('/search'):
+                display_key = '/search'
+            elif base_path == '/':
+                display_key = '/'
+            # Các path khác giữ nguyên base_path
+            if display_key not in other_data:
+                other_data[display_key] = {'total': 0, 'countries': {}}
+            other_data[display_key]['total'] += cnt
+            for country, c in countries_by_path.get(path, {}).items():
+                other_data[display_key]['countries'][country] = other_data[display_key]['countries'].get(country, 0) + c
 
     # Hàm helper để tạo danh sách top và lấy top 3 countries
     def build_top_list(data_dict, type_name, limit=15):
@@ -4731,32 +4733,30 @@ def admin_analytics():
     top_authors = build_top_list(author_data, 'author')
     top_categories = build_top_list(category_data, 'category')
 
-    # Top 15 other
-    other_sorted = sorted(other_data, key=lambda x: x['count'], reverse=True)[:15]
+    # Top 15 other (đã gộp)
+    other_sorted = sorted(other_data.items(), key=lambda x: x[1]['total'], reverse=True)[:15]
     top_others = []
-    for item in other_sorted:
-        top3 = sorted(item['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
-        # Lấy tên hiển thị thân thiện
-        display_name = item['path']
-        link = None
-        if item['path'] == '/':
+    for display_key, info in other_sorted:
+        top3 = sorted(info['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
+        if display_key == '/':
             display_name = '🏠 Trang chủ'
             link = url_for('index')
-        elif item['path'].startswith('/type/long'):
+        elif display_key == '/type/long':
             display_name = '📚 Truyện Dài'
             link = url_for('type_view', story_type='long')
-        elif item['path'].startswith('/type/short'):
+        elif display_key == '/type/short':
             display_name = '📘 Truyện Ngắn'
             link = url_for('type_view', story_type='short')
-        elif item['path'].startswith('/search'):
+        elif display_key.startswith('/search'):
             display_name = '🔍 Tìm kiếm'
             link = url_for('search')
         else:
-            display_name = item['path']
+            display_name = display_key
+            link = None
         top_others.append({
             'display_name': display_name,
             'link': link,
-            'total': item['count'],
+            'total': info['total'],
             'countries': [(c, cnt) for c, cnt in top3],
             'snippet': ''
         })
@@ -4770,7 +4770,6 @@ def admin_analytics():
     for date_str in dates:
         try:
             date_obj = datetime.strptime(date_str, '%d/%m').date()
-            # Gán năm hiện tại (dùng ngày trong năm)
             date_obj = date_obj.replace(year=datetime.now().year)
             start_of_day = datetime.combine(date_obj, datetime.min.time())
             end_of_day = datetime.combine(date_obj, datetime.max.time())
@@ -4785,7 +4784,6 @@ def admin_analytics():
                 VisitLog.country != ''
             ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(15).all()
             
-            # Chuyển thành list tuple để JSON hóa
             top_countries_by_date[date_str] = [(c, cnt) for c, cnt in country_stats]
         except:
             top_countries_by_date[date_str] = []
