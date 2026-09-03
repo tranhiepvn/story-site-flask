@@ -472,9 +472,9 @@
     </thead>
     <tbody>
       {% for item in top_authors_by_views %}
-      <tr data-stories="{{ item.stories|tojson }}">
+      <tr data-author="{{ item.display_name|replace('✍️ ', '') }}">
         <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;" data-stories="{{ item.stories|tojson }}">{{ item.display_name }}</a>
+          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
         </td>
         <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
       </tr>
@@ -495,9 +495,9 @@
     </thead>
     <tbody>
       {% for item in top_categories_by_views %}
-      <tr data-stories="{{ item.stories|tojson }}">
+      <tr data-category="{{ item.display_name|replace('📂 ', '') }}">
         <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;" data-stories="{{ item.stories|tojson }}">{{ item.display_name }}</a>
+          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
         </td>
         <td style="text-align:right; padding:6px 8px; color:#FF8C00;">{{ item.total }}</td>
       </tr>
@@ -508,6 +508,12 @@
 
 <!-- Tooltip chung -->
 <div id="analytics-tooltip"></div>
+
+<script>
+  // Dữ liệu từ view để sử dụng trong tooltip
+  var topAuthorsByViews = {{ top_authors_by_views|tojson|safe }};
+  var topCategoriesByViews = {{ top_categories_by_views|tojson|safe }};
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
@@ -587,52 +593,29 @@ document.addEventListener('DOMContentLoaded', function() {
     chartTooltip.style.display = 'none';
   });
 
-  // ===== TOOLTIP CHO CÁC BẢNG (dùng data-snippet và data-stories) =====
+  // ===== TOOLTIP CHO CÁC BẢNG =====
+  // Tạo map từ tên tác giả/thể loại đến danh sách truyện
+  const storiesMap = {};
+
+  // Tác giả
+  if (typeof topAuthorsByViews !== 'undefined' && topAuthorsByViews.length) {
+    topAuthorsByViews.forEach(item => {
+      const name = item.display_name.replace('✍️ ', '');
+      storiesMap[name] = item.stories || [];
+    });
+  }
+
+  // Thể loại
+  if (typeof topCategoriesByViews !== 'undefined' && topCategoriesByViews.length) {
+    topCategoriesByViews.forEach(item => {
+      const name = item.display_name.replace('📂 ', '');
+      storiesMap[name] = item.stories || [];
+    });
+  }
+
   const tooltip = document.getElementById('analytics-tooltip');
-  const allRows = document.querySelectorAll('.path-container tbody tr[data-snippet], .path-container tbody tr[data-stories]');
 
-  allRows.forEach(row => {
-      const link = row.querySelector('a[data-snippet], a[data-stories]');
-      if (!link) return;
-      const snippet = link.dataset.snippet || '';
-      const storiesJson = link.dataset.stories || '';
-      let stories = [];
-      try {
-          stories = JSON.parse(storiesJson);
-      } catch(e) {}
-
-      row.addEventListener('mouseenter', function(e) {
-          let html = '';
-          const name = link.textContent.trim();
-          if (snippet) {
-              html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
-              html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
-          } else if (stories.length > 0) {
-              html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
-              html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
-              stories.slice(0, 15).forEach(s => {
-                  html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.85rem;">
-                              <span>${s.title}</span>
-                              <span style="color:#FF8C00;">${s.views}</span>
-                          </div>`;
-              });
-          } else {
-              return; // không có dữ liệu
-          }
-          tooltip.innerHTML = html;
-          tooltip.style.display = 'block';
-          positionTooltip(e);
-      });
-
-      row.addEventListener('mousemove', function(e) {
-          positionTooltip(e);
-      });
-
-      row.addEventListener('mouseleave', function() {
-          tooltip.style.display = 'none';
-      });
-  });
-
+  // Hàm định vị tooltip
   function positionTooltip(e) {
     let left = e.clientX + 15;
     let top = e.clientY - 10;
@@ -645,6 +628,78 @@ document.addEventListener('DOMContentLoaded', function() {
     tooltip.style.left = left + 'px';
     tooltip.style.top = top + 'px';
   }
+
+  // Xử lý hover cho tác giả
+  document.querySelectorAll('.path-container tbody tr[data-author]').forEach(row => {
+    const link = row.querySelector('a');
+    if (!link) return;
+    const name = row.dataset.author;
+    const stories = storiesMap[name] || [];
+
+    row.addEventListener('mouseenter', function(e) {
+      let html = '';
+      if (stories.length > 0) {
+        html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
+        html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
+        stories.slice(0, 15).forEach(s => {
+          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.85rem;">
+                      <span>${s.title}</span>
+                      <span style="color:#FF8C00;">${s.views}</span>
+                    </div>`;
+        });
+      } else {
+        html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
+        html += `<div style="color:#888;">Chưa có dữ liệu truyện</div>`;
+      }
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mousemove', function(e) {
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mouseleave', function() {
+      tooltip.style.display = 'none';
+    });
+  });
+
+  // Xử lý hover cho thể loại
+  document.querySelectorAll('.path-container tbody tr[data-category]').forEach(row => {
+    const link = row.querySelector('a');
+    if (!link) return;
+    const name = row.dataset.category;
+    const stories = storiesMap[name] || [];
+
+    row.addEventListener('mouseenter', function(e) {
+      let html = '';
+      if (stories.length > 0) {
+        html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
+        html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
+        stories.slice(0, 15).forEach(s => {
+          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.85rem;">
+                      <span>${s.title}</span>
+                      <span style="color:#FF8C00;">${s.views}</span>
+                    </div>`;
+        });
+      } else {
+        html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
+        html += `<div style="color:#888;">Chưa có dữ liệu truyện</div>`;
+      }
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mousemove', function(e) {
+      positionTooltip(e);
+    });
+
+    row.addEventListener('mouseleave', function() {
+      tooltip.style.display = 'none';
+    });
+  });
 
   // ===== GIỜ TRÌNH DUYỆT =====
   function updateClientTime() {
