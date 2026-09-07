@@ -429,7 +429,21 @@
 
 <!-- Bảng Top 15 trang khác -->
 <div class="path-container">
-  <h3>🌐 Top 15 trang khác được truy cập nhiều nhất</h3>
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+  <h3 style="margin:0;">🌐 Top 15 trang khác được truy cập nhiều nhất</h3>
+  <div style="display: flex; gap: 8px;">
+    <a href="{{ url_for('admin_analytics', range=range_type, show_all_others='0') }}" 
+       class="filter-btn {% if show_all_others == '0' %}active{% endif %}"
+       style="padding: 4px 12px; font-size: 0.85rem;">
+      Hiện top 15
+    </a>
+    <a href="{{ url_for('admin_analytics', range=range_type, show_all_others='1') }}" 
+       class="filter-btn {% if show_all_others == '1' %}active{% endif %}"
+       style="padding: 4px 12px; font-size: 0.85rem;">
+      Hiện tất cả
+    </a>
+  </div>
+</div>
   <table style="width:100%; border-collapse: collapse;">
     <thead>
       <tr style="border-bottom: 2px solid #4A90E2;">

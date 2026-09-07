@@ -4392,6 +4392,8 @@ def admin_analytics():
         flash("Vui lòng đăng nhập admin.", "danger")
         return redirect(url_for('upload_login'))
     
+    show_all_others = request.args.get('show_all_others', '0')
+
     # Lấy tham số range từ URL
     range_type = request.args.get('range', 'week')
     from datetime import datetime
@@ -4720,10 +4722,19 @@ def admin_analytics():
     top_authors = build_top_list(author_data, 'author')
     top_categories = build_top_list(category_data, 'category')
 
+
+
     # Top 15 other (đã gộp type/long, type/short, / ; giữ nguyên search và các path khác)
-    other_sorted = sorted(other_data.items(), key=lambda x: x[1]['total'], reverse=True)[:15]
+    other_sorted = sorted(other_data.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # Nếu show_all_others == '1', lấy tất cả; ngược lại chỉ lấy 15
+    if show_all_others == '1':
+        other_selected = other_sorted
+    else:
+        other_selected = other_sorted[:15]
+
     top_others = []
-    for display_key, info in other_sorted:
+    for display_key, info in other_selected:
         top3 = sorted(info['countries'].items(), key=lambda x: x[1], reverse=True)[:3]
         if display_key == '/':
             display_name = '🏠 Trang chủ'
@@ -4864,7 +4875,8 @@ def admin_analytics():
                            top_others=top_others,
                            top_countries_by_date=top_countries_by_date,
                            top_authors_by_views=top_authors_by_views,
-                           top_categories_by_views=top_categories_by_views)
+                           top_categories_by_views=top_categories_by_views,
+                           show_all_others=show_all_others)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):
