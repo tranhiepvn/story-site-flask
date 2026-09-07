@@ -323,9 +323,9 @@ document.addEventListener('DOMContentLoaded', function() {
         padding: 12px;
         border-radius: 6px;
         border: 1px solid #444;
-        font-size: 0.85rem;
-        max-width: 300px;
-        max-height: 300px;
+        font-size: 0.8rem;
+        max-width: 400px;
+        max-height: 500px;
         overflow-y: auto;
         display: none;
         z-index: 9999;
@@ -417,7 +417,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ===== TOOLTIP CHO TỪNG PHẦN (có snippet) =====
-    const partTooltip = document.getElementById('part-tooltip');
+    const partTooltip = document.createElement('div');
+    partTooltip.id = 'part-tooltip';
+    partTooltip.style.cssText = `
+    position: fixed;
+    background: #222;
+    color: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    font-size: 0.8rem;
+    max-width: 400px;
+    max-height: 500px;
+    overflow-y: auto;
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: none;
+    `;
+    document.body.appendChild(partTooltip);
     const partCache = {};
 
     document.querySelectorAll('.part-badge').forEach(badge => {
