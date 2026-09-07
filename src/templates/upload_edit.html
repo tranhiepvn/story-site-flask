@@ -1,6 +1,109 @@
 {% extends "layout.html" %}
 {% block title %}Chỉnh sửa truyện{% endblock %}
 {% block content %}
+<style>
+  /* ===== FULL WIDTH ===== */
+  .container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+  .container .content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .sidebar, aside.sidebar { display: none !important; }
+  .content-wrapper, main {
+    margin-left: 0 !important;
+    padding: 0 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  /* ===== CÁC STYLE KHÁC GIỮ NGUYÊN ===== */
+  .form-group {
+    margin-bottom: 1em;
+  }
+  input[type="text"], input[type="email"], input[type="password"], textarea, select {
+    width: 100%;
+    padding: 0.5em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  button {
+    padding: 0.5em 1em;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #0056b3;
+  }
+  .video-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1em;
+  }
+  .video-item {
+    flex: 1 0 calc(33.333% - 1em);
+    max-width: 300px;
+  }
+  .video-item input[type="url"] {
+    width: 100%;
+    margin-top: 0.15em;
+  }
+  .video-item iframe {
+    width: 100%;
+    height: 180px;
+    margin-top: 0.1em;
+    margin-bottom: 1em;
+    display: block;
+  }
+  .category-list-admin ul {
+    background: #000;
+    padding: 8px;
+    border-radius: 4px;
+  }
+  .special-blue label {
+    color: #00BFFF !important;
+  }
+  .category-group-even label {
+    color: #dddddd !important;
+  }
+  .category-group-odd label {
+    color: #aaaaaa !important;
+  }
+  .special-type span {
+    color: #FF9800 !important;
+    font-weight: bold;
+  }
+  body.light-mode .category-list-admin ul {
+    background: #f0f0f0;
+  }
+  body.light-mode .category-group-even label {
+    color: #333 !important;
+  }
+  body.light-mode .category-group-odd label {
+    color: #555 !important;
+  }
+  body.light-mode .special-blue label {
+    color: #0056b3 !important;
+  }
+  .chapter-list {
+    list-style: none;
+    padding: 0;
+  }
+  .chapter-list li {
+    margin-bottom: 0.5em;
+  }
+  /* ===== PHẦN CŨ GIỮ NGUYÊN ===== */
+</style>
+
 <h2>Chỉnh sửa truyện</h2>
 <p style="margin-top: -5px; font-size: 1.2rem; color: #aaa;">
   Tổng số truyện: <strong style="color: #00BFFF;">{{ total_stories }}</strong>
@@ -285,6 +388,19 @@
     <input type="password" id="export_txt_password" name="password" required>
   </div>
   <div class="form-group">
+    <label for="export_to_part">Export đến phần:</label>
+    <select id="export_to_part" name="export_to_part">
+      {% for p in parts %}
+        <option value="{{ p.part_number }}" {% if p.part_number == parts|length %}selected{% endif %}>
+          Phần {{ p.part_number }}
+        </option>
+      {% endfor %}
+    </select>
+    <span style="font-style:italic; color:#888; margin-left:8px;">
+      (export từ phần 1 đến phần được chọn)
+    </span>
+  </div>
+  <div class="form-group">
     <button type="submit" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
       📄 Export TXT
     </button>
@@ -392,25 +508,4 @@ function confirmDeleteParts() {
   }
 }
 </script>
-
-<style>
-.category-list-admin ul {
-  background: #000;
-  padding: 8px;
-  border-radius: 4px;
-}
-.special-blue label {
-  color: #00BFFF !important;
-}
-.category-group-even label {
-  color: #dddddd !important;
-}
-.category-group-odd label {
-  color: #aaaaaa !important;
-}
-.special-type span {
-  color: #FF9800 !important;
-  font-weight: bold;
-}
-</style>
 {% endblock %}

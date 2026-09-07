@@ -1,6 +1,97 @@
 {% extends "layout.html" %}
 {% block title %}Quản trị truyện{% endblock %}
 {% block content %}
+<style>
+  .container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+  .container .content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .sidebar, aside.sidebar { display: none !important; }
+  .content-wrapper, main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+    padding: 0 5px;
+    box-sizing: border-box;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #1C1C1C;
+    color: #FFFFFF;
+    table-layout: auto;
+    font-size: 0.85rem;
+  }
+  th, td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #333;
+    text-align: center;
+    white-space: nowrap;
+  }
+  th {
+    background: #4A90E2;
+    color: white;
+    font-weight: bold;
+  }
+  td a {
+    color: #00BFFF;
+  }
+  body.light-mode table {
+    background: #fff;
+    color: #1a1a1a;
+  }
+  body.light-mode th {
+    background: #2c3e50;
+    color: white;
+  }
+  body.light-mode td {
+    border-bottom-color: #ddd;
+  }
+  body.light-mode td a {
+    color: #0056b3;
+  }
+  .pagination a {
+    color: #00BFFF;
+    text-decoration: none;
+    margin: 0 5px;
+  }
+  .pagination span {
+    color: #aaa;
+  }
+  .filter-btn {
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    background: #555;
+    color: white;
+    display: inline-block;
+  }
+  .filter-btn.active {
+    background: #4A90E2;
+  }
+  body.light-mode .filter-btn {
+    background: #e0e0e0;
+    color: #1a1a1a;
+  }
+  body.light-mode .filter-btn.active {
+    background: #0056b3;
+    color: white;
+  }
+</style>
+
 <h2>Quản trị truyện</h2>
 <p style="margin-top: -5px; font-size: 1.2rem; color: #aaa;">
   Tổng số truyện: <strong style="color: #00BFFF;">{{ total_stories }}</strong>
@@ -44,7 +135,7 @@
   <a href="{{ url_for('admin_analytics') }}" style="background:#6c757d; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;">📊 Thống kê truy cập</a>
 </div>
 
-<!-- Form tìm kiếm nâng cao (đã chỉnh lần cuối) -->
+<!-- Form tìm kiếm nâng cao -->
 <form method="get" class="advanced-search" style="background:#111; padding:15px; border-radius:8px; margin-bottom:20px;">
   <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
     <div style="flex: 2.5;">
@@ -95,51 +186,70 @@
       <button type="submit" style="padding:0 15px; background:#0056b3; color:white; border:none; border-radius:4px; cursor:pointer; height: 34px; line-height: 34px;">Lọc</button>
       <a href="{{ url_for('upload') }}" style="padding:0 15px; background:#555; color:white; text-decoration:none; border-radius:4px; display: inline-block; height: 34px; line-height: 34px;">Reset</a>
     </div>
-
   </div>
 </form>
 
-<!-- Danh sách truyện dạng bảng -->
-<table style="width:100%; border-collapse: collapse; background:#1C1C1C;">
-  <thead>
-    <tr style="background:#4A90E2; color:white;">
-      <th style="padding:8px;">ID</th>
-      <th style="padding:8px;">Tên truyện</th>
-      <th style="padding:8px;">Tác giả</th>
-      <th style="padding:8px;">Số phần</th>
-      <th style="padding:8px;">Hoàn thành</th>
-      <th style="padding:8px;">Ẩn</th>
-      <th style="padding:8px;">Ngày tạo</th>
-      <th style="padding:8px;">Hành động</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for story in stories %}
-    <tr style="border-bottom:1px solid #333;">
-      <td style="padding:8px; text-align:center;">{{ story.id }}</td>
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Tên truyện</th>
+        <th>Tác giả</th>
+        <th>Số phần</th>
+        <th>Hoàn thành</th>
+        <th>Ẩn</th>
+        <th>Ngày tạo</th>
+        <th>Ngày cập nhật cuối</th>
+        <th>Ngày trôi qua</th>
+        <th>Tổng view</th>
+        <th>Tổng nghe</th>
+        <th>Tổng view+nghe</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for story in stories %}
+      <tr>
+        <td>{{ story.id }}</td>
+        <td>
+          <a href="{{ url_for('upload', story_id=story.id) }}" data-snippet="{{ snippets.get(story.id, '') }}">
+            {{ story.title }}
+          </a>
+        </td>
+        <td>{{ story.author or 'Ẩn danh' }}</td>
+        <td>{{ story.parts|length }}</td>
+        <td>{% if story.is_completed %}✅{% else %}❌{% endif %}</td>
+        <td>{% if story.is_hidden %}🔒{% else %}👁️{% endif %}</td>
+        <td>{{ story.created_at.strftime('%d/%m/%Y') }}</td>
+        <td>
+          {% if story.last_updated %}
+            {{ story.last_updated.strftime('%d/%m/%Y %H:%M') }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          {% if story.days_since_update is not none %}
+            {{ story.days_since_update }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>{{ story.total_views }}</td>
+        <td>{{ story.total_listens }}</td>
+        <td>{{ story.total_view_listen }}</td>
+        <td>
+          <a href="{{ url_for('upload', story_id=story.id) }}" style="color:#00BFFF;">Sửa</a>
+          <a href="{{ url_for('upload', story_id=story.id, delete=1) }}" style="color:#FF4444; margin-left:8px;">Xoá</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
-      <td style="padding:8px;">
-        <a href="{{ url_for('upload', story_id=story.id) }}" data-snippet="{{ snippets.get(story.id, '') }}">
-          {{ story.title }}
-        </a>
-      </td>
-
-
-      <td style="padding:8px;">{{ story.author or 'Ẩn danh' }}</td>
-      <td style="padding:8px; text-align:center;">{{ story.parts|length }}</td>
-      <td style="padding:8px; text-align:center;">{% if story.is_completed %}✅{% else %}❌{% endif %}</td>
-      <td style="padding:8px; text-align:center;">{% if story.is_hidden %}🔒{% else %}👁️{% endif %}</td>
-      <td style="padding:8px;">{{ story.created_at.strftime('%d/%m/%Y') }}</td>
-      <td style="padding:8px;">
-        <a href="{{ url_for('upload', story_id=story.id) }}" style="color:#00BFFF;">Sửa</a>
-        <a href="{{ url_for('upload', story_id=story.id, delete=1) }}" style="color:#FF4444; margin-left:8px;">Xoá</a>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<div class="pagination" style="margin-top:15px;">
+<div class="pagination" style="margin-top:15px; text-align:center;">
   {% if pagination.has_prev %}
     <a href="{{ url_for('upload', page=pagination.prev_num, q=q, stype=stype, category=filter_category, completed=filter_completed, hidden=filter_hidden, date_from=filter_date_from, date_to=filter_date_to) }}">&laquo; Trước</a>
   {% endif %}
@@ -197,8 +307,6 @@
     <label>Thể loại (có thể chọn nhiều):</label><br>
     <div class="category-list-admin" style="max-height: 300px; overflow-y: auto; background: #000;">
       <ul style="list-style: none; padding: 0; margin: 0;">
-        
-
         {# Đưa hai thể loại đặc biệt lên đầu #}
         {% set special_names = ['Truyện một phần', 'Truyện nhiều phần'] %}
         {% set normal_cats = [] %}
@@ -225,8 +333,6 @@
             <label for="cat_{{ cat.id }}" style="cursor: pointer;">{{ cat.name }}</label>
           </li>
         {% endfor %}
-
-
       </ul>
     </div>
     <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
@@ -337,31 +443,44 @@
   </div>
 </form>
 
+<!-- Tooltip cho tên truyện -->
+<div id="upload-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+
 <script>
 function confirmDeleteAll() {
+  if (!document.getElementById('confirm_delete_all').checked) {
+    alert('Bạn phải xác nhận bằng cách check vào ô "Tôi xác nhận muốn xoá toàn bộ truyện"');
+    return false;
+  }
   var pw1 = document.getElementById('password1').value;
   var pw2 = document.getElementById('password2').value;
+  if (!pw1 || !pw2) {
+    alert('Vui lòng nhập đầy đủ mật khẩu');
+    return false;
+  }
   if (pw1 !== pw2) {
     alert('Hai mật khẩu phải giống nhau.');
     return false;
   }
-  if (!confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện?')) return false;
-  return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
+  return confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện? Thao tác này không thể hoàn tác!');
 }
 
-function confirmDeleteAll() {
-  if (!document.getElementById('confirm_delete_all').checked) {
-    alert('Vui lòng xác nhận bằng cách tick vào ô trước khi xoá.');
-    return false;
+function toggleDeleteAllButton() {
+  const checkbox = document.getElementById('confirm_delete_all');
+  const pw1 = document.getElementById('password1');
+  const pw2 = document.getElementById('password2');
+  const btn = document.getElementById('delete_all_btn');
+  const isChecked = checkbox.checked;
+  btn.disabled = !isChecked;
+  pw1.disabled = !isChecked;
+  pw2.disabled = !isChecked;
+  if (isChecked) {
+    pw1.required = true;
+    pw2.required = true;
+  } else {
+    pw1.required = false;
+    pw2.required = false;
   }
-  var pw1 = document.getElementById('password1_all').value;
-  var pw2 = document.getElementById('password2_all').value;
-  if (pw1 !== pw2) {
-    alert('Hai mật khẩu phải giống nhau.');
-    return false;
-  }
-  if (!confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện?')) return false;
-  return confirm('Bạn thực sự muốn xoá? Thao tác này không thể hoàn tác!');
 }
 
 // Xem trước video
@@ -386,67 +505,7 @@ document.getElementById('clear-author')?.addEventListener('click', function() {
   input.focus();
 });
 
-function toggleDeleteAllButton() {
-  const checkbox = document.getElementById('confirm_delete_all');
-  const pw1 = document.getElementById('password1');
-  const pw2 = document.getElementById('password2');
-  const btn = document.getElementById('delete_all_btn');
-  const isChecked = checkbox.checked;
-  btn.disabled = !isChecked;
-  pw1.disabled = !isChecked;
-  pw2.disabled = !isChecked;
-  if (isChecked) {
-    pw1.required = true;
-    pw2.required = true;
-  } else {
-    pw1.required = false;
-    pw2.required = false;
-  }
-}
-
-function confirmDeleteAll() {
-  if (!document.getElementById('confirm_delete_all').checked) {
-    alert('Bạn phải xác nhận bằng cách check vào ô "Tôi xác nhận muốn xoá toàn bộ truyện"');
-    return false;
-  }
-  var pw1 = document.getElementById('password1').value;
-  var pw2 = document.getElementById('password2').value;
-  if (!pw1 || !pw2) {
-    alert('Vui lòng nhập đầy đủ mật khẩu');
-    return false;
-  }
-  if (pw1 !== pw2) {
-    alert('Hai mật khẩu phải giống nhau.');
-    return false;
-  }
-  return confirm('Bạn có chắc chắn muốn xoá toàn bộ truyện? Thao tác này không thể hoàn tác!');
-}
-</script>
-
-<style>
-.category-list-admin ul {
-  background: #000;
-  padding: 8px;
-  border-radius: 4px;
-}
-.special-blue label {
-  color: #00BFFF !important;
-}
-.category-group-even label {
-  color: #dddddd !important;
-}
-.category-group-odd label {
-  color: #aaaaaa !important;
-}
-.special-blue label {
-  color: #00BFFF !important;
-}
-</style>
-
-<!-- Tooltip cho tên truyện -->
-<div id="upload-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:350px; max-height:300px; overflow-y:auto; pointer-events:none; z-index:1000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
-
-<script>
+// Tooltip cho tên truyện
 document.addEventListener('DOMContentLoaded', function() {
     const tooltip = document.getElementById('upload-tooltip');
     const nameLinks = document.querySelectorAll('a[data-snippet]');
@@ -489,4 +548,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<style>
+.category-list-admin ul {
+  background: #000;
+  padding: 8px;
+  border-radius: 4px;
+}
+.special-blue label {
+  color: #00BFFF !important;
+}
+.category-group-even label {
+  color: #dddddd !important;
+}
+.category-group-odd label {
+  color: #aaaaaa !important;
+}
+</style>
 {% endblock %}

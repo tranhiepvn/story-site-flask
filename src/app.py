@@ -48,6 +48,9 @@ from sqlalchemy import func, text, extract
 from sqlalchemy.exc import IntegrityError
 from datetime import date as date_type
 
+from sqlalchemy import func
+from datetime import date
+
 def process_bulk_categories(bulk_text: str, existing_category_ids: set) -> list:
     """
     Nhận chuỗi bulk categories (mỗi dòng một tên), tạo các thể loại chưa có,
@@ -1719,6 +1722,65 @@ def upload():
 
     stories_pagination = stories_query.paginate(page=page, per_page=25, error_out=False)
     stories = stories_pagination.items
+
+    # Lấy danh sách story id
+    story_ids = [s.id for s in stories]
+    if story_ids:
+        # 1. Lấy ngày cập nhật sau cùng (max created_at của Part)
+        last_updated_subq = db.session.query(
+            Part.story_id,
+            func.max(Part.created_at).label('last_updated')
+        ).filter(Part.story_id.in_(story_ids)).group_by(Part.story_id).subquery()
+        last_updated_query = db.session.query(
+            last_updated_subq.c.story_id,
+            last_updated_subq.c.last_updated
+        ).all()
+        last_updated_map = {row.story_id: row.last_updated for row in last_updated_query}
+
+        # 2. Lấy tổng listens (toàn bộ) từ DailyListen (part_number = 0 là tổng)
+        listens_subq = db.session.query(
+            DailyListen.story_id,
+            func.sum(DailyListen.listens).label('total_listens')
+        ).filter(DailyListen.story_id.in_(story_ids), DailyListen.part_number == 0).group_by(DailyListen.story_id).subquery()
+        listens_query = db.session.query(
+            listens_subq.c.story_id,
+            listens_subq.c.total_listens
+        ).all()
+        total_listens_map = {row.story_id: row.total_listens or 0 for row in listens_query}
+
+        # 3. Tổng views từ DailyView (part_number=0) hoặc fallback story.views
+        views_subq = db.session.query(
+            DailyView.story_id,
+            func.sum(DailyView.views).label('total_views')
+        ).filter(DailyView.story_id.in_(story_ids), DailyView.part_number == 0).group_by(DailyView.story_id).subquery()
+        views_query = db.session.query(
+            views_subq.c.story_id,
+            views_subq.c.total_views
+        ).all()
+        total_views_map = {row.story_id: row.total_views or 0 for row in views_query}
+        # Fallback: nếu không có dữ liệu trong DailyView, lấy story.views
+        for story in stories:
+            if story.id not in total_views_map:
+                total_views_map[story.id] = story.views or 0
+    else:
+        last_updated_map = {}
+        total_listens_map = {}
+        total_views_map = {}
+
+    # Tính số ngày từ lần cập nhật cuối
+    today = date.today()
+    for story in stories:
+        last_up = last_updated_map.get(story.id)
+        if last_up:
+            days_since = (today - last_up.date()).days
+        else:
+            days_since = None
+        story.last_updated = last_up
+        story.days_since_update = days_since
+        story.total_listens = total_listens_map.get(story.id, 0)
+        story.total_views = total_views_map.get(story.id, 0)
+        story.total_view_listen = story.total_views + story.total_listens
+
     snippets = {}
     if stories:
         story_ids = [s.id for s in stories]
