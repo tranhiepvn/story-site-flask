@@ -338,9 +338,9 @@
     <tbody>
       {% if top_story_list %}
         {% for item in top_story_list %}
-        <tr data-snippet="{{ item.snippet or '' }}">
+        <tr data-snippet="{{ item.snippet or '' }}" data-author="{{ item.author or '' }}">
           <td style="padding:6px 8px;">
-            <a href="{{ item.link }}" style="color: #00BFFF;" data-snippet="{{ item.snippet or '' }}">{{ item.display_name }}</a>
+            <a href="{{ item.link }}" style="color: #00BFFF;" data-snippet="{{ item.snippet or '' }}" data-author="{{ item.author or '' }}">{{ item.display_name }}</a>
           </td>
           <td style="padding:6px 8px;">
             {% if item.countries %}
@@ -374,9 +374,9 @@
     </thead>
     <tbody>
       {% for item in top_authors %}
-      <tr>
+      <tr data-author="{{ item.display_name|replace('✍️ ', '') }}">
         <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+          <a href="{{ item.link }}" style="color: #00BFFF;" data-author="{{ item.display_name|replace('✍️ ', '') }}">{{ item.display_name }}</a>
         </td>
         <td style="padding:6px 8px;">
           {% if item.countries %}
@@ -407,9 +407,9 @@
     </thead>
     <tbody>
       {% for item in top_categories %}
-      <tr>
+      <tr data-category="{{ item.display_name|replace('📂 ', '') }}">
         <td style="padding:6px 8px;">
-          <a href="{{ item.link }}" style="color: #00BFFF;">{{ item.display_name }}</a>
+          <a href="{{ item.link }}" style="color: #00BFFF;" data-category="{{ item.display_name|replace('📂 ', '') }}">{{ item.display_name }}</a>
         </td>
         <td style="padding:6px 8px;">
           {% if item.countries %}
@@ -430,20 +430,20 @@
 <!-- Bảng Top 15 trang khác -->
 <div class="path-container">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-  <h3 style="margin:0;">🌐 Top 15 trang khác được truy cập nhiều nhất</h3>
-  <div style="display: flex; gap: 8px;">
-    <a href="{{ url_for('admin_analytics', range=range_type, show_all_others='0') }}" 
-       class="filter-btn {% if show_all_others == '0' %}active{% endif %}"
-       style="padding: 4px 12px; font-size: 0.85rem;">
-      Hiện top 15
-    </a>
-    <a href="{{ url_for('admin_analytics', range=range_type, show_all_others='1') }}" 
-       class="filter-btn {% if show_all_others == '1' %}active{% endif %}"
-       style="padding: 4px 12px; font-size: 0.85rem;">
-      Hiện tất cả
-    </a>
+    <h3 style="margin:0;">🌐 Top 15 trang khác được truy cập nhiều nhất</h3>
+    <div style="display: flex; gap: 8px;">
+      <a href="{{ url_for('admin_analytics', range=range_type, show_all_others='0') }}" 
+         class="filter-btn {% if show_all_others == '0' %}active{% endif %}"
+         style="padding: 4px 12px; font-size: 0.85rem;">
+        Hiện top 15
+      </a>
+      <a href="{{ url_for('admin_analytics', range=range_type, show_all_others='1') }}" 
+         class="filter-btn {% if show_all_others == '1' %}active{% endif %}"
+         style="padding: 4px 12px; font-size: 0.85rem;">
+        Hiện tất cả
+      </a>
+    </div>
   </div>
-</div>
   <table style="width:100%; border-collapse: collapse;">
     <thead>
       <tr style="border-bottom: 2px solid #4A90E2;">
@@ -531,6 +531,8 @@
   // Dữ liệu từ view để sử dụng trong tooltip
   var topAuthorsByViews = {{ top_authors_by_views|tojson|safe }};
   var topCategoriesByViews = {{ top_categories_by_views|tojson|safe }};
+  var topAuthorsStoriesMap = {{ top_authors_stories_map|tojson|safe }};
+  var topCategoriesStoriesMap = {{ top_categories_stories_map|tojson|safe }};
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -611,29 +613,9 @@ document.addEventListener('DOMContentLoaded', function() {
     chartTooltip.style.display = 'none';
   });
 
-    // ===== TOOLTIP CHO CÁC BẢNG =====
-  // Tạo map từ tên tác giả/thể loại đến danh sách truyện
-  const storiesMap = {};
-
-  // Tác giả
-  if (typeof topAuthorsByViews !== 'undefined' && topAuthorsByViews.length) {
-    topAuthorsByViews.forEach(item => {
-      const name = item.display_name.replace('✍️ ', '');
-      storiesMap[name] = item.stories || [];
-    });
-  }
-
-  // Thể loại
-  if (typeof topCategoriesByViews !== 'undefined' && topCategoriesByViews.length) {
-    topCategoriesByViews.forEach(item => {
-      const name = item.display_name.replace('📂 ', '');
-      storiesMap[name] = item.stories || [];
-    });
-  }
-
+  // ===== TOOLTIP CHO CÁC BẢNG =====
   const tooltip = document.getElementById('analytics-tooltip');
 
-  // Hàm định vị tooltip
   function positionTooltip(e) {
     let left = e.clientX + 15;
     let top = e.clientY - 10;
@@ -647,31 +629,34 @@ document.addEventListener('DOMContentLoaded', function() {
     tooltip.style.top = top + 'px';
   }
 
-  // Xử lý hover cho tác giả
+  // Hàm render tooltip cho tác giả/thể loại (hiển thị danh sách truyện)
+  function renderStoriesTooltip(e, name, stories) {
+    if (!stories || stories.length === 0) {
+      tooltip.innerHTML = `<div style="font-weight:bold; margin-bottom:4px;">${name}</div><div style="color:#888;">Chưa có dữ liệu truyện</div>`;
+    } else {
+      let html = `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
+      html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
+      stories.slice(0, 15).forEach(s => {
+        html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.8rem;">
+                    <span>${s.title}</span>
+                    <span style="color:#FF8C00;">${s.views}</span>
+                  </div>`;
+      });
+      tooltip.innerHTML = html;
+    }
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  }
+
+  // Xử lý hover cho tác giả (cả bảng tìm kiếm và bảng lượt xem)
   document.querySelectorAll('.path-container tbody tr[data-author]').forEach(row => {
     const link = row.querySelector('a');
     if (!link) return;
     const name = row.dataset.author;
-    const stories = storiesMap[name] || [];
+    const stories = topAuthorsStoriesMap[name] || [];
 
     row.addEventListener('mouseenter', function(e) {
-      let html = '';
-      if (stories.length > 0) {
-        html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
-        html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
-        stories.slice(0, 15).forEach(s => {
-          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.8rem;">
-                      <span>${s.title}</span>
-                      <span style="color:#FF8C00;">${s.views}</span>
-                    </div>`;
-        });
-      } else {
-        html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
-        html += `<div style="color:#888;">Chưa có dữ liệu truyện</div>`;
-      }
-      tooltip.innerHTML = html;
-      tooltip.style.display = 'block';
-      positionTooltip(e);
+      renderStoriesTooltip(e, name, stories);
     });
 
     row.addEventListener('mousemove', function(e) {
@@ -683,31 +668,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Xử lý hover cho thể loại
+  // Xử lý hover cho thể loại (cả bảng tìm kiếm và bảng lượt xem)
   document.querySelectorAll('.path-container tbody tr[data-category]').forEach(row => {
     const link = row.querySelector('a');
     if (!link) return;
     const name = row.dataset.category;
-    const stories = storiesMap[name] || [];
+    const stories = topCategoriesStoriesMap[name] || [];
 
     row.addEventListener('mouseenter', function(e) {
-      let html = '';
-      if (stories.length > 0) {
-        html += `<div style="font-weight:bold; margin-bottom:6px;">${name}</div>`;
-        html += `<div style="margin-top:4px;"><strong>Top truyện theo lượt xem:</strong></div>`;
-        stories.slice(0, 15).forEach(s => {
-          html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.8rem;">
-                      <span>${s.title}</span>
-                      <span style="color:#FF8C00;">${s.views}</span>
-                    </div>`;
-        });
-      } else {
-        html += `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
-        html += `<div style="color:#888;">Chưa có dữ liệu truyện</div>`;
-      }
-      tooltip.innerHTML = html;
-      tooltip.style.display = 'block';
-      positionTooltip(e);
+      renderStoriesTooltip(e, name, stories);
     });
 
     row.addEventListener('mousemove', function(e) {
@@ -719,11 +688,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // ===== TOOLTIP CHO TOP 15 TRUYỆN (snippet) =====
+  // Xử lý hover cho truyện (snippet + tác giả)
   document.querySelectorAll('.path-container tbody tr[data-snippet]').forEach(row => {
     const link = row.querySelector('a[data-snippet]');
     if (!link) return;
     const snippet = link.dataset.snippet || '';
+    const author = link.dataset.author || '';
     const name = link.textContent.trim();
 
     row.addEventListener('mouseenter', function(e) {
@@ -732,6 +702,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       let html = `<div style="font-weight:bold; margin-bottom:4px;">${name}</div>`;
+      if (author) {
+        html += `<div style="font-size:0.85rem; color:#aaa; margin-bottom:4px;">Tác giả: ${author}</div>`;
+      }
       html += `<div style="font-style:italic; color:#ccc; font-size:0.85rem;">${snippet}...</div>`;
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';

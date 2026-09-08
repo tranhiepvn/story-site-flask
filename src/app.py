@@ -4785,7 +4785,6 @@ def admin_analytics():
     top_categories = build_top_list(category_data, 'category')
 
 
-
     # Top 15 other (đã gộp type/long, type/short, / ; giữ nguyên search và các path khác)
     other_sorted = sorted(other_data.items(), key=lambda x: x[1]['total'], reverse=True)
 
@@ -4913,32 +4912,70 @@ def admin_analytics():
                 'stories': [{'title': s['title'], 'id': s['id'], 'views': s['views']} for s in top_stories]
             })
 
+    # ---- TẠO MAP TÁC GIẢ/THỂ LOẠI -> DANH SÁCH TRUYỆN CHO TOOLTIP ----
+    # Tác giả: lấy từ top_authors (tìm kiếm) và top_authors_by_views (lượt xem)
+    top_authors_stories_map = {}
+    for item in top_authors:
+        author = item['display_name'].replace('✍️ ', '')
+        if author in author_stories:
+            top_authors_stories_map[author] = sorted(author_stories[author], key=lambda x: x['views'], reverse=True)[:15]
+    for item in top_authors_by_views:
+        author = item['display_name'].replace('✍️ ', '')
+        if author in author_stories:
+            top_authors_stories_map[author] = sorted(author_stories[author], key=lambda x: x['views'], reverse=True)[:15]
+
+    # Thể loại: lấy từ top_categories và top_categories_by_views
+    top_categories_stories_map = {}
+    for item in top_categories:
+        cat_name = item['display_name'].replace('📂 ', '')
+        # Tìm category_id từ tên
+        cat = Category.query.filter_by(name=cat_name).first()
+        if cat and cat.id in category_stories:
+            top_categories_stories_map[cat_name] = sorted(category_stories[cat.id], key=lambda x: x['views'], reverse=True)[:15]
+    for item in top_categories_by_views:
+        cat_name = item['display_name'].replace('📂 ', '')
+        if cat_name not in top_categories_stories_map:
+            cat = Category.query.filter_by(name=cat_name).first()
+            if cat and cat.id in category_stories:
+                top_categories_stories_map[cat_name] = sorted(category_stories[cat.id], key=lambda x: x['views'], reverse=True)[:15]
+
+    # ---- THÊM AUTHOR VÀO TOP_STORY_LIST ----
+    for item in top_story_list:
+        story_id = item['link'].split('/')[-1]
+        story = Story.query.get(int(story_id))
+        if story:
+            item['author'] = story.author or 'Ẩn danh'
+        else:
+            item['author'] = 'Ẩn danh'
+
     return render_template('admin_analytics.html',
-                           total_sessions=total_sessions,
-                           device_stats=device_stats,
-                           theme_stats=theme_stats,
-                           country_stats=country_stats,
-                           hour_stats=hour_stats,
-                           dates=dates,
-                           counts=counts,
-                           hours=hours,
-                           hour_counts=hour_counts,
-                           start_date=start_date,
-                           end_date=end_date,
-                           range_type=range_param,
-                           title_suffix=title_suffix,
-                           now_server=datetime.now(),
-                           now_la=now_la,
-                           now_vn=now_vn,
-                           top_country_dict=top_country_dict,
-                           top_story_list=top_story_list,
-                           top_authors=top_authors,
-                           top_categories=top_categories,
-                           top_others=top_others,
-                           top_countries_by_date=top_countries_by_date,
-                           top_authors_by_views=top_authors_by_views,
-                           top_categories_by_views=top_categories_by_views,
-                           show_all_others=show_all_others)
+                       total_sessions=total_sessions,
+                       device_stats=device_stats,
+                       theme_stats=theme_stats,
+                       country_stats=country_stats,
+                       hour_stats=hour_stats,
+                       dates=dates,
+                       counts=counts,
+                       hours=hours,
+                       hour_counts=hour_counts,
+                       start_date=start_date,
+                       end_date=end_date,
+                       range_type=range_param,
+                       title_suffix=title_suffix,
+                       now_server=datetime.now(),
+                       now_la=now_la,
+                       now_vn=now_vn,
+                       top_country_dict=top_country_dict,
+                       top_story_list=top_story_list,
+                       top_authors=top_authors,
+                       top_categories=top_categories,
+                       top_others=top_others,
+                       top_countries_by_date=top_countries_by_date,
+                       top_authors_by_views=top_authors_by_views,
+                       top_categories_by_views=top_categories_by_views,
+                       show_all_others=show_all_others,
+                       top_authors_stories_map=top_authors_stories_map,
+                       top_categories_stories_map=top_categories_stories_map)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):
