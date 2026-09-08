@@ -4458,7 +4458,9 @@ def admin_analytics():
 
     # Lấy tham số range từ URL
     range_type = request.args.get('range', 'week')
-    from datetime import datetime
+    from datetime import datetime, timedelta
+    from sqlalchemy import func, text, extract
+    
     if range_type == 'all':
         # Toàn bộ thời gian
         start_date = db.session.query(func.min(VisitLog.created_at)).scalar()
@@ -4477,12 +4479,14 @@ def admin_analytics():
         title_suffix = "(7 ngày gần nhất)"
         range_param = 'week'
 
-    next_day = end_date + timedelta(days=1)
-    
+    # Chuyển đổi date thành datetime để so sánh chính xác với VisitLog.created_at
+    start_datetime = datetime.combine(start_date, datetime.min.time())
+    end_datetime = datetime.combine(end_date, datetime.min.time())
+
     # Tổng số phiên
     total_sessions = VisitLog.query.filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime
     ).count()
     
     # Phân bố thiết bị
@@ -4490,8 +4494,8 @@ def admin_analytics():
         VisitLog.device_type,
         func.count(VisitLog.id)
     ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime
     ).group_by(VisitLog.device_type).all()
     
     # Phân bố theme
@@ -4499,18 +4503,20 @@ def admin_analytics():
         VisitLog.theme,
         func.count(VisitLog.id)
     ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime
     ).group_by(VisitLog.theme).all()
     
-    # Thống kê theo quốc gia (top 10)
+    # Thống kê theo quốc gia (top 15)
     country_stats = db.session.query(
         VisitLog.country,
         func.count(VisitLog.id)
     ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
-    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(10).all()
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime,
+        VisitLog.country.isnot(None),
+        VisitLog.country != ''
+    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(15).all()
 
     # Lấy offset giờ hiện tại của server (đã có hàm get_server_offset_hours)
     offset_hours = get_server_offset_hours()
@@ -4530,8 +4536,8 @@ def admin_analytics():
             # Số lượt
             func.count(VisitLog.id).label('count')
         ).filter(
-            VisitLog.created_at >= start_date,
-            VisitLog.created_at < next_day
+            VisitLog.created_at >= start_datetime,
+            VisitLog.created_at < end_datetime
         ).group_by(
             extract('hour', VisitLog.created_at + text(f"INTERVAL '{offset_hours} hours'")),
             extract('hour', text(f"visit_logs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '{LA_TZ}'")),
@@ -4543,8 +4549,8 @@ def admin_analytics():
             func.strftime('%H', func.datetime(VisitLog.created_at, 'localtime')).label('hour_server'),
             func.count(VisitLog.id).label('count')
         ).filter(
-            VisitLog.created_at >= start_date,
-            VisitLog.created_at < next_day
+            VisitLog.created_at >= start_datetime,
+            VisitLog.created_at < end_datetime
         ).group_by('hour_server').order_by(func.count(VisitLog.id).desc()).all()
         
         # Tạo cấu trúc dữ liệu giống PostgreSQL để template không bị lỗi
@@ -4566,8 +4572,8 @@ def admin_analytics():
             VisitLog.country,
             func.count(VisitLog.id).label('cnt')
         ).filter(
-            VisitLog.created_at >= start_date,
-            VisitLog.created_at < next_day,
+            VisitLog.created_at >= start_datetime,
+            VisitLog.created_at < end_datetime,
             VisitLog.country.isnot(None),
             VisitLog.country != ''
         ).group_by(
@@ -4593,8 +4599,8 @@ def admin_analytics():
             VisitLog.country,
             func.count(VisitLog.id).label('cnt')
         ).filter(
-            VisitLog.created_at >= start_date,
-            VisitLog.created_at < next_day,
+            VisitLog.created_at >= start_datetime,
+            VisitLog.created_at < end_datetime,
             VisitLog.country.isnot(None),
             VisitLog.country != ''
         ).group_by(
@@ -4625,8 +4631,8 @@ def admin_analytics():
         func.date(VisitLog.created_at).label('date'),
         func.count(VisitLog.id).label('count')
     ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime
     ).group_by(func.date(VisitLog.created_at)).order_by(func.date(VisitLog.created_at)).all()
     
     dates = [(start_date + timedelta(days=i)).strftime('%d/%m') for i in range(7)]
@@ -4653,8 +4659,8 @@ def admin_analytics():
         VisitLog.path,
         func.count(VisitLog.id).label('cnt')
     ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime
     ).group_by(VisitLog.path).order_by(func.count(VisitLog.id).desc()).all()
 
     # 2. Lấy dữ liệu quốc gia theo path
@@ -4663,8 +4669,8 @@ def admin_analytics():
         VisitLog.country,
         func.count(VisitLog.id).label('cnt')
     ).filter(
-        VisitLog.created_at >= start_date,
-        VisitLog.created_at < next_day,
+        VisitLog.created_at >= start_datetime,
+        VisitLog.created_at < end_datetime,
         VisitLog.country.isnot(None),
         VisitLog.country != ''
     ).group_by(VisitLog.path, VisitLog.country).all()
@@ -4784,7 +4790,6 @@ def admin_analytics():
     top_authors = build_top_list(author_data, 'author')
     top_categories = build_top_list(category_data, 'category')
 
-
     # Top 15 other (đã gộp type/long, type/short, / ; giữ nguyên search và các path khác)
     other_sorted = sorted(other_data.items(), key=lambda x: x[1]['total'], reverse=True)
 
@@ -4842,7 +4847,7 @@ def admin_analytics():
             start_of_day = datetime.combine(date_obj, datetime.min.time())
             end_of_day = datetime.combine(date_obj, datetime.max.time())
             
-            country_stats = db.session.query(
+            daily_country_stats = db.session.query(
                 VisitLog.country,
                 func.count(VisitLog.id).label('total')
             ).filter(
@@ -4852,7 +4857,7 @@ def admin_analytics():
                 VisitLog.country != ''
             ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(15).all()
             
-            top_countries_by_date[date_str] = [(c, cnt) for c, cnt in country_stats]
+            top_countries_by_date[date_str] = [(c, cnt) for c, cnt in daily_country_stats]
         except:
             top_countries_by_date[date_str] = []
 
@@ -4949,33 +4954,33 @@ def admin_analytics():
             item['author'] = 'Ẩn danh'
 
     return render_template('admin_analytics.html',
-                       total_sessions=total_sessions,
-                       device_stats=device_stats,
-                       theme_stats=theme_stats,
-                       country_stats=country_stats,
-                       hour_stats=hour_stats,
-                       dates=dates,
-                       counts=counts,
-                       hours=hours,
-                       hour_counts=hour_counts,
-                       start_date=start_date,
-                       end_date=end_date,
-                       range_type=range_param,
-                       title_suffix=title_suffix,
-                       now_server=datetime.now(),
-                       now_la=now_la,
-                       now_vn=now_vn,
-                       top_country_dict=top_country_dict,
-                       top_story_list=top_story_list,
-                       top_authors=top_authors,
-                       top_categories=top_categories,
-                       top_others=top_others,
-                       top_countries_by_date=top_countries_by_date,
-                       top_authors_by_views=top_authors_by_views,
-                       top_categories_by_views=top_categories_by_views,
-                       show_all_others=show_all_others,
-                       top_authors_stories_map=top_authors_stories_map,
-                       top_categories_stories_map=top_categories_stories_map)
+                           total_sessions=total_sessions,
+                           device_stats=device_stats,
+                           theme_stats=theme_stats,
+                           country_stats=country_stats,
+                           hour_stats=hour_stats,
+                           dates=dates,
+                           counts=counts,
+                           hours=hours,
+                           hour_counts=hour_counts,
+                           start_date=start_date,
+                           end_date=end_date,
+                           range_type=range_param,
+                           title_suffix=title_suffix,
+                           now_server=datetime.now(),
+                           now_la=now_la,
+                           now_vn=now_vn,
+                           top_country_dict=top_country_dict,
+                           top_story_list=top_story_list,
+                           top_authors=top_authors,
+                           top_categories=top_categories,
+                           top_others=top_others,
+                           top_countries_by_date=top_countries_by_date,
+                           top_authors_by_views=top_authors_by_views,
+                           top_categories_by_views=top_categories_by_views,
+                           show_all_others=show_all_others,
+                           top_authors_stories_map=top_authors_stories_map,
+                           top_categories_stories_map=top_categories_stories_map)
 
 @app.route('/set_theme/<theme>')
 def set_theme(theme):
