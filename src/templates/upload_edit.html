@@ -271,6 +271,10 @@
 {% endif %}
 
 <h3>Thêm phần mới</h3>
+{% if parts %}
+    {% set next_part_number = parts|length + 1 %}
+    <p><strong>📌 Phần tiếp theo sẽ là phần {{ next_part_number }}</strong></p>
+{% endif %}
 <form method="post" enctype="multipart/form-data">
   <input type="hidden" name="existing_story_id" value="{{ story.id }}">
   <div class="form-group">

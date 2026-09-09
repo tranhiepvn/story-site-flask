@@ -1831,7 +1831,7 @@ def upload():
     # Lấy danh sách thể loại cho dropdown lọc
     all_categories = Category.query.order_by(Category.name).all()
 
-    # === PHẦN POST (giữ nguyên logic cũ) ===
+    # === PHẦN POST ===
     if request.method == "POST":
         password = request.form.get("password", "")
         if password != UPLOAD_PASSWORD:
@@ -1853,34 +1853,39 @@ def upload():
 
                 parts_data = split_and_clean_content(raw_content)
 
-                last_new_part_id = None
+                last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
+                next_number = (last_part.part_number + 1) if last_part else 1
 
+                added_parts = []
                 for part_num, cleaned_content in parts_data:
-                    last_part = Part.query.filter_by(story_id=story.id).order_by(Part.part_number.desc()).first()
-                    next_number = (last_part.part_number + 1) if last_part else 1
                     new_part = Part(story_id=story.id, part_number=next_number, content=cleaned_content)
                     db.session.add(new_part)
                     db.session.flush()
-                    
-                    last_new_part_id = new_part.id
-
+                    added_parts.append(next_number)
                     for url in video_urls[:9]:
                         url = (url or "").strip()
                         if url:
                             db.session.add(PartVideo(part_id=new_part.id, url=url))
+                    next_number += 1
 
                 db.session.commit()
 
-                flash(f"Đã thêm {len(parts_data)} phần mới (đã dọn dẹp, tách tự động và gán video).", "success")
+                # Tạo thông báo chi tiết
+                if len(added_parts) == 1:
+                    flash(f"✅ Đã thêm phần {added_parts[0]}.", "success")
+                else:
+                    first = added_parts[0]
+                    last = added_parts[-1]
+                    flash(f"✅ Đã thêm các phần {first}-{last}.", "success")
 
                 # Gửi thông báo cho người theo dõi
                 if story.followers:
                     recipient_emails = [f.email for f in story.followers]
-                    part_title = cleaned_content.split('\n', 1)[0].strip()
-                    send_new_chapter_notification(story, next_number, part_title, recipient_emails)
-                    flash(f"Đã gửi thông báo đến {len(recipient_emails)} người theo dõi.")
+                    part_title = parts_data[0][1].split('\n', 1)[0].strip() if parts_data else ""
+                    send_new_chapter_notification(story, added_parts[0], part_title, recipient_emails)
+                    flash(f"📧 Đã gửi thông báo đến {len(recipient_emails)} người theo dõi.")
 
-                return redirect(url_for("upload", story_id=story.id, edit_part=last_new_part_id))
+                return redirect(url_for("upload", story_id=story.id, edit_part=added_parts[-1]))
 
             elif action == "update_part":
                 part_id = request.form.get("part_id")
@@ -1889,15 +1894,14 @@ def upload():
                     flash("Nội dung không được trống.", "error")
                     return redirect(url_for("upload", story_id=story.id))
 
-
                 part_obj = Part.query.get(int(part_id))
                 if part_obj and part_obj.story_id == story.id:
                     cleaned_lines = [clean_line(line) for line in raw_content.splitlines()]
                     if cleaned_lines:
-                        # cleaned_lines[0] = format_part_title(cleaned_lines[0])
+                        # Không format tiêu đề tự động
                         pass
                     cleaned_content = '\n'.join(cleaned_lines)
-                    part_obj.content = cleaned_content                    
+                    part_obj.content = cleaned_content
 
                     PartVideo.query.filter_by(part_id=part_obj.id).delete()
                     for url in video_urls[:9]:
@@ -1907,10 +1911,9 @@ def upload():
 
                     db.session.commit()
 
-                    # ===== XÓA AUDIO CỦA PHẦN NÀY =====
+                    # Xóa audio cũ
                     audio_dir = Path("static/audio") / str(part_obj.story_id)
                     if audio_dir.exists():
-                        # Xóa tất cả file chunk của phần này (cả female và male)
                         pattern = f"{part_obj.part_number}_chunk_*.mp3"
                         deleted_files = 0
                         for mp3_file in audio_dir.glob(pattern):
@@ -1920,10 +1923,9 @@ def upload():
                             except Exception as e:
                                 print(f"[DELETE AUDIO] Lỗi xóa {mp3_file.name}: {e}")
                         if deleted_files > 0:
-                            flash(f"Đã xóa {deleted_files} file audio cũ của phần này.", "info")
-                            print(f"[DELETE AUDIO] Đã xóa {deleted_files} file cho phần {part_obj.part_number}")
+                            flash(f"🗑️ Đã xóa {deleted_files} file audio cũ của phần này.", "info")
 
-                    flash("Đã cập nhật phần (đã dọn dẹp và cập nhật video).", "success")
+                    flash(f"✅ Đã cập nhật phần {part_obj.part_number}.", "success")
                 return redirect(url_for("upload", story_id=story.id, edit_part=part_id))
 
             elif action == "update_story":
@@ -2038,7 +2040,6 @@ def upload():
                     flash(f"Lỗi khi xóa truyện: {str(e)}", "error")
                     print(f"[ERROR] Xóa truyện thất bại: {e}")
                 return redirect(url_for("upload", story_id=story.id) if request.args.get('story_id') else url_for("upload"))
-
 
             elif action == "replace_text":
                 search_str = request.form.get("search_string", "").strip()
