@@ -4508,7 +4508,7 @@ def admin_analytics():
         VisitLog.created_at < end_datetime
     ).group_by(VisitLog.theme).all()
     
-    # Thống kê theo quốc gia (top 15)
+    # Thống kê theo quốc gia (top 25)
     country_stats = db.session.query(
         VisitLog.country,
         func.count(VisitLog.id)
@@ -4517,7 +4517,7 @@ def admin_analytics():
         VisitLog.created_at < end_datetime,
         VisitLog.country.isnot(None),
         VisitLog.country != ''
-    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(15).all()
+    ).group_by(VisitLog.country).order_by(func.count(VisitLog.id).desc()).limit(25).all()
 
     # Lấy offset giờ hiện tại của server (đã có hàm get_server_offset_hours)
     offset_hours = get_server_offset_hours()
