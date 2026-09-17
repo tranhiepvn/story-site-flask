@@ -565,4 +565,104 @@ document.addEventListener('DOMContentLoaded', function() {
   color: #aaaaaa !important;
 }
 </style>
+
+<!-- Tooltip cho tác giả -->
+<div id="author-tooltip" style="display:none; position:fixed; background:#222; color:#fff; padding:12px; border-radius:6px; border:1px solid #444; font-size:0.85rem; max-width:400px; max-height:1000px; overflow-y:auto; pointer-events:none; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const authorInput = document.getElementById('author');
+    const authorTooltip = document.getElementById('author-tooltip');
+    if (!authorInput || !authorTooltip) return;
+
+    let hoverTimer = null;
+    let cacheAuthor = null;  // cache theo tên tác giả
+    let cacheData = null;
+
+    function positionTooltip(e) {
+        let left = e.clientX + 15;
+        let top = e.clientY - 10;
+        const w = authorTooltip.scrollWidth || 350;
+        const h = authorTooltip.scrollHeight || 200;
+        if (left + w > window.innerWidth) left = e.clientX - w - 15;
+        if (top + h > window.innerHeight) top = window.innerHeight - h - 10;
+        if (top < 10) top = 10;
+        if (left < 10) left = 10;
+        authorTooltip.style.left = left + 'px';
+        authorTooltip.style.top = top + 'px';
+    }
+
+    async function loadAndShowTooltip(e) {
+        const author = authorInput.value.trim();
+        if (!author) {
+            authorTooltip.style.display = 'none';
+            return;
+        }
+
+        // Nếu là tác giả mới → gọi API
+        if (cacheAuthor !== author) {
+            try {
+                const res = await fetch(`/api/author_stories?author=${encodeURIComponent(author)}`);
+                const stories = await res.json();
+                cacheAuthor = author;
+                cacheData = stories;
+            } catch (err) {
+                console.error('Lỗi lấy truyện của tác giả:', err);
+                authorTooltip.innerHTML = '<div style="color:#888;">Lỗi tải dữ liệu</div>';
+                authorTooltip.style.display = 'block';
+                positionTooltip(e);
+                return;
+            }
+        }
+
+        const stories = cacheData || [];
+
+        if (stories.length === 0) {
+            authorTooltip.innerHTML = `<div style="font-weight:bold; margin-bottom:4px;">✍️ ${author}</div><div style="color:#888;">Chưa có truyện nào</div>`;
+        } else {
+            let html = `<div style="font-weight:bold; margin-bottom:6px;">✍️ Truyện của ${author}:</div>`;
+            html += `<div style="margin-bottom:4px; font-size:0.75rem; color:#aaa;">(Sắp xếp theo tổng view + hear)</div>`;
+            stories.forEach(s => {
+                html += `<div style="display:flex; justify-content:space-between; gap:20px; padding:2px 0; font-size:0.8rem;">
+                            <span style="flex:1;">${s.title}</span>
+                            <span style="color:#FF8C00; white-space:nowrap;">${s.total} <span style="color:#888;">(${s.views}V+${s.listens}H)</span></span>
+                        </div>`;
+            });
+            authorTooltip.innerHTML = html;
+        }
+        authorTooltip.style.display = 'block';
+        positionTooltip(e);
+    }
+
+    authorInput.addEventListener('mouseenter', function(e) {
+        // Không hiện khi đang focus (để tránh cản trở việc nhập liệu)
+        if (document.activeElement === authorInput) return;
+        // Chờ 400ms trước khi hiện (tránh hiện lúc vô tình lướt qua)
+        hoverTimer = setTimeout(() => loadAndShowTooltip(e), 400);
+    });
+
+    authorInput.addEventListener('mousemove', function(e) {
+        if (authorTooltip.style.display === 'block') {
+            positionTooltip(e);
+        }
+    });
+
+    authorInput.addEventListener('mouseleave', function() {
+        if (hoverTimer) {
+            clearTimeout(hoverTimer);
+            hoverTimer = null;
+        }
+        authorTooltip.style.display = 'none';
+    });
+
+    // Ẩn tooltip khi user click vào input để nhập liệu
+    authorInput.addEventListener('focus', function() {
+        authorTooltip.style.display = 'none';
+        if (hoverTimer) {
+            clearTimeout(hoverTimer);
+            hoverTimer = null;
+        }
+    });
+});
+</script>
 {% endblock %}

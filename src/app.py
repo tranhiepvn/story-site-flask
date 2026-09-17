@@ -5119,6 +5119,64 @@ def export_story_text(story_id):
         mimetype="text/plain"
     )
 
+@app.route("/api/author_stories")
+def api_author_stories():
+    """Trả về danh sách truyện của một tác giả, sắp xếp theo tổng lượt view + hear giảm dần."""
+    author = request.args.get("author", "").strip()
+    if not author:
+        return jsonify([])
+
+    # Lấy tất cả truyện của tác giả
+    stories = Story.query.filter(Story.author == author).all()
+
+    result = []
+    for story in stories:
+        # ===== TÍNH VIEWS =====
+        # Lớp 1: tổng từ DailyView part_number=0
+        views = db.session.query(func.sum(DailyView.views)).filter(
+            DailyView.story_id == story.id,
+            DailyView.part_number == 0
+        ).scalar()
+        # Lớp 2: nếu chưa có, cộng từ tất cả các phần (part_number > 0)
+        if not views:
+            views = db.session.query(func.sum(DailyView.views)).filter(
+                DailyView.story_id == story.id,
+                DailyView.part_number > 0
+            ).scalar()
+        # Lớp 3: fallback story.views
+        if not views:
+            views = story.views or 0
+
+        # ===== TÍNH LISTENS =====
+        # Lớp 1: tổng từ DailyListen part_number=0
+        listens = db.session.query(func.sum(DailyListen.listens)).filter(
+            DailyListen.story_id == story.id,
+            DailyListen.part_number == 0
+        ).scalar()
+        # Lớp 2: nếu chưa có, cộng từ tất cả các phần (part_number > 0)
+        if not listens:
+            listens = db.session.query(func.sum(DailyListen.listens)).filter(
+                DailyListen.story_id == story.id,
+                DailyListen.part_number > 0
+            ).scalar() or 0
+
+        views = int(views or 0)
+        listens = int(listens or 0)
+        total = views + listens
+
+        result.append({
+            'id': story.id,
+            'title': story.title,
+            'views': views,
+            'listens': listens,
+            'total': total
+        })
+
+    # Sắp xếp theo tổng view + hear giảm dần
+    result.sort(key=lambda x: x['total'], reverse=True)
+
+    return jsonify(result)
+    
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
