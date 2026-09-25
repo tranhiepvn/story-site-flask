@@ -888,6 +888,26 @@
             });
         });
     });
+
+    // Toggle cho khối video liên kết
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.video-section-toggle').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const target = document.getElementById(targetId);
+                if (!target) return;
+                target.classList.toggle('open');
+                this.classList.toggle('open');
+                const count = target.querySelectorAll('.video-item').length;
+                const label = this.querySelector('.toggle-label');
+                if (label) {
+                    label.textContent = target.classList.contains('open')
+                        ? `Thu gọn (${count} ô)`
+                        : `Mở rộng (${count} ô)`;
+                }
+            });
+        });
+    });
 </script>
 </body>
 </html>

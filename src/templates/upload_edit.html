@@ -249,17 +249,26 @@
       <label for="edit_content">Nội dung phần:</label><br>
       <textarea id="edit_content" name="content" rows="30" cols="80" required>{{ edit_part.content }}</textarea>
     </div>
+    
+
     <div class="form-group">
-      <label>Video liên kết (tối đa 9):</label><br>
-      <div class="video-grid">
-        {% for i in range(9) %}
-        <div class="video-item">
-          <input type="url" name="video_urls" id="edit_video_{{ i }}" class="video-input" data-preview="edit_preview_{{ i }}" placeholder="URL video Google Drive" value="{{ edit_part.videos[i].url if edit_part.videos|length > i else '' }}">
-          <iframe id="edit_preview_{{ i }}" src="{{ drive_embed(edit_part.videos[i].url) if edit_part.videos|length > i else '' }}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+      <div class="video-section-toggle" data-target="video-section-edit">
+          <span class="toggle-arrow">▶</span>
+          <span class="toggle-label">Mở rộng (9 ô)</span>
+      </div>
+      <div id="video-section-edit" class="video-collapsible">
+        <label>Video liên kết (tối đa 9):</label><br>
+        <div class="video-grid">
+          {% for i in range(9) %}
+          <div class="video-item">
+            <input type="url" name="video_urls" id="edit_video_{{ i }}" class="video-input" data-preview="edit_preview_{{ i }}" placeholder="URL video Google Drive" value="{{ edit_part.videos[i].url if edit_part.videos|length > i else '' }}">
+            <iframe id="edit_preview_{{ i }}" src="{{ drive_embed(edit_part.videos[i].url) if edit_part.videos|length > i else '' }}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
+
     <div class="form-group">
       <label for="password_update">Password:</label><br>
       <input type="password" id="password_update" name="password" required>
@@ -282,14 +291,20 @@
     <textarea id="new_content" name="content" rows="30" cols="80" required></textarea>
   </div>
   <div class="form-group">
-    <label>Video liên kết (tối đa 9):</label><br>
-    <div class="video-grid">
-      {% for i in range(9) %}
-      <div class="video-item">
-        <input type="url" name="video_urls" id="new_video_{{ i }}" class="video-input" data-preview="new_preview_{{ i }}" placeholder="URL video Google Drive">
-        <iframe id="new_preview_{{ i }}" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <div class="video-section-toggle" data-target="video-section-add">
+        <span class="toggle-arrow">▶</span>
+        <span class="toggle-label">Mở rộng (9 ô)</span>
+    </div>
+    <div id="video-section-add" class="video-collapsible">
+      <label>Video liên kết (tối đa 9):</label><br>
+      <div class="video-grid">
+        {% for i in range(9) %}
+        <div class="video-item">
+          <input type="url" name="video_urls" id="new_video_{{ i }}" class="video-input" data-preview="new_preview_{{ i }}" placeholder="URL video Google Drive">
+          <iframe id="new_preview_{{ i }}" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
   </div>
   <div class="form-group">

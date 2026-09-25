@@ -349,14 +349,20 @@
   </div>
 
   <div class="form-group">
-    <label>Video phần đầu (tối đa 9):</label><br>
-    <div class="video-grid">
-      {% for i in range(9) %}
-      <div class="video-item">
-        <input type="url" name="video_urls" id="video_{{ i }}" class="video-input" data-preview="preview_{{ i }}" placeholder="URL video Google Drive">
-        <iframe id="preview_{{ i }}" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <div class="video-section-toggle" data-target="video-section-new">
+        <span class="toggle-arrow">▶</span>
+        <span class="toggle-label">Mở rộng (9 ô)</span>
+    </div>
+    <div id="video-section-new" class="video-collapsible">
+      <label>Video phần đầu (tối đa 9):</label><br>
+      <div class="video-grid">
+        {% for i in range(9) %}
+        <div class="video-item">
+          <input type="url" name="video_urls" id="video_{{ i }}" class="video-input" data-preview="preview_{{ i }}" placeholder="URL video Google Drive">
+          <iframe id="preview_{{ i }}" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
   </div>
 
