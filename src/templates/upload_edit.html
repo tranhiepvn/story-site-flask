@@ -197,9 +197,26 @@
     <a href="{{ url_for('add_category') }}">Thêm thể loại</a>
   </div>
 
+
+
+
+
+
+
   <div class="form-group">
-    <label for="bulk_categories">Nhập thêm thể loại (mỗi dòng một thể loại):</label><br>
-    <textarea id="bulk_categories" name="bulk_categories" rows="15" cols="80" placeholder="Ví dụ:&#10;Truyện mới&#10;Thể loại khác" style="width: 100%; padding: 0.5em; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea>
+    <div class="video-section-toggle" 
+       data-target="bulk-categories-section"
+       data-open-text="Thu gọn ô nhập thể loại"
+       data-close-text="Mở rộng ô nhập thể loại">
+      <span class="toggle-arrow">▶</span>
+      <span class="toggle-label">Mở rộng ô nhập thể loại</span>
+    </div>
+
+
+    <div id="bulk-categories-section" class="video-collapsible">
+        <label for="bulk_categories">Nhập thêm thể loại (mỗi dòng một thể loại):</label><br>
+        <textarea id="bulk_categories" name="bulk_categories" rows="15" cols="80" placeholder="Ví dụ:&#10;Truyện mới&#10;Thể loại khác" style="width: 100%; padding: 0.5em; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea>
+    </div>
   </div>
 
   <div class="form-group">
@@ -252,9 +269,12 @@
     
 
     <div class="form-group">
-      <div class="video-section-toggle" data-target="video-section-edit">
+      <div class="video-section-toggle" 
+          data-target="video-section-edit"
+          data-open-text="Thu gọn các ô video liên kết"
+          data-close-text="Mở rộng các ô video liên kết">
           <span class="toggle-arrow">▶</span>
-          <span class="toggle-label">Mở rộng (9 ô)</span>
+          <span class="toggle-label">Mở rộng các ô video liên kết</span>
       </div>
       <div id="video-section-edit" class="video-collapsible">
         <label>Video liên kết (tối đa 9):</label><br>
@@ -291,9 +311,12 @@
     <textarea id="new_content" name="content" rows="30" cols="80" required></textarea>
   </div>
   <div class="form-group">
-    <div class="video-section-toggle" data-target="video-section-add">
+    <div class="video-section-toggle" 
+        data-target="video-section-add"
+        data-open-text="Thu gọn các ô video liên kết"
+        data-close-text="Mở rộng các ô video liên kết">
         <span class="toggle-arrow">▶</span>
-        <span class="toggle-label">Mở rộng (9 ô)</span>
+        <span class="toggle-label">Mở rộng các ô video liên kết</span>
     </div>
     <div id="video-section-add" class="video-collapsible">
       <label>Video liên kết (tối đa 9):</label><br>

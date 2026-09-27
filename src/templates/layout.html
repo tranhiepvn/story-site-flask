@@ -889,7 +889,7 @@
         });
     });
 
-    // Toggle cho khối video liên kết
+    // Toggle cho khối có thể thu gọn (video, bulk categories, ...)
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.video-section-toggle').forEach(function(btn) {
             btn.addEventListener('click', function() {
@@ -898,12 +898,25 @@
                 if (!target) return;
                 target.classList.toggle('open');
                 this.classList.toggle('open');
-                const count = target.querySelectorAll('.video-item').length;
+
                 const label = this.querySelector('.toggle-label');
-                if (label) {
+                if (!label) return;
+
+                // Lấy nhãn gốc từ data attribute hoặc fallback
+                const openText = this.getAttribute('data-open-text') || 'Thu gọn';
+                const closeText = this.getAttribute('data-close-text') || 'Mở rộng';
+
+                // Nếu có video-item → hiển thị số ô
+                const videoItems = target.querySelectorAll('.video-item');
+                if (videoItems.length > 0) {
+                    const count = videoItems.length;
                     label.textContent = target.classList.contains('open')
-                        ? `Thu gọn (${count} ô)`
-                        : `Mở rộng (${count} ô)`;
+                        ? `${openText} (${count} ô)`
+                        : `${closeText} (${count} ô)`;
+                } else {
+                    label.textContent = target.classList.contains('open')
+                        ? openText
+                        : closeText;
                 }
             });
         });
