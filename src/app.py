@@ -5061,7 +5061,9 @@ def api_story_countries(story_id):
 
 @app.route("/export_story_text/<int:story_id>", methods=["POST"])
 def export_story_text(story_id):
-    """Export nội dung truyện ra file .txt (có mật khẩu và chọn phần)"""
+    """Export nội dung truyện ra file .txt (có mật khẩu và chọn phần).
+    Giữa các phần có 3 dấu '---' được bao quanh bởi hàng trống.
+    """
     if not session.get("upload_authenticated"):
         return redirect(url_for("upload_login"))
     
@@ -5087,24 +5089,20 @@ def export_story_text(story_id):
     # Tạo nội dung text
     lines = []
     lines.append(story.title)
+    lines.append("")
+    lines.append("---")
     lines.append("")  # dòng trống sau tên truyện
     
-    for part in parts:
-        content = part.content
-        # Tách tiêu đề và nội dung (dòng đầu là tiêu đề)
-        if '\n' in content:
-            title, body = content.split('\n', 1)
-        else:
-            title = content
-            body = ""
-        lines.append(f"Phần {part.part_number}: {title.strip()}")
-        if body.strip():
-            lines.append(body.strip())
-        lines.append("")  # dòng trống ngăn cách
-    
-    # Bỏ dòng trống cuối cùng
-    if lines and lines[-1] == "":
-        lines.pop()
+    for idx, part in enumerate(parts):
+        # Lấy nội dung phần (bao gồm cả tiêu đề của phần ở dòng đầu)
+        content = part.content or ""
+        lines.append(content)
+        
+        # Nếu chưa phải phần cuối, thêm dòng trống + --- + dòng trống
+        if idx < len(parts) - 1:
+            lines.append("")
+            lines.append("---")
+            lines.append("")
     
     text_content = "\n".join(lines)
     
@@ -5176,7 +5174,7 @@ def api_author_stories():
     result.sort(key=lambda x: x['total'], reverse=True)
 
     return jsonify(result)
-    
+
 if __name__ == "__main__":
     # Tạo cơ sở dữ liệu khi khởi động để đảm bảo các bảng tồn tại
     create_tables()
